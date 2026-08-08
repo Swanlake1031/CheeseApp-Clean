@@ -91,23 +91,7 @@ struct CheeseAppApp: App {
                 if authService.bootstrapState == .restoringSession {
                     AppBootstrapView()
                 } else if authService.isAuthenticated {
-                    NavigationStack {
-                        MainTabView()
-                            .toolbar(.hidden, for: .navigationBar)
-                            .navigationDestination(
-                                item: Binding(
-                                    get: { postDeepLinkCoordinator.activeRoute },
-                                    set: { route in
-                                        if route == nil {
-                                            postDeepLinkCoordinator.dismissActiveRoute()
-                                        }
-                                    }
-                                )
-                            ) { route in
-                                DeepLinkedPostPresenterView(route: route)
-                            }
-                    }
-                    .enableSwipeBackGesture()
+                    MainTabView()
                 } else {
                     AuthView()
                 }

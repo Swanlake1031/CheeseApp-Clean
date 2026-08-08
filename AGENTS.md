@@ -11,7 +11,9 @@ The active product surface is:
 
 Do not reintroduce retired Ride-Sharing, Carpooling, Team-Up, or Group-Finding flows. Generic group chat is still a supported shared capability.
 
-Rentals/Housing is not present in the current app or schema contract. Migration 127 removed that module. Treat reintroduction as a new product/backend project requiring explicit approval and forward migrations; do not infer it from historical migrations or documentation.
+Rentals/Housing is not present in the current app or schema contract. Migration 127 removed that module. Do not reintroduce it or infer it from historical migrations or documentation.
+
+Secondhand supports bookmarks, but not likes or comments. Migration 140 rejects Marketplace likes. Do not restore Secondhand likes or comments.
 
 ## Important Paths
 

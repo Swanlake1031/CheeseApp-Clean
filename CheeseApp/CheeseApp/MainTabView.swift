@@ -62,7 +62,13 @@ struct MainTabView: View {
             // 主内容区域
             ZStack {
                 if shouldMount(.home) {
-                    HomeView(viewModel: homeViewModel)
+                    NavigationStack {
+                        HomeView(viewModel: homeViewModel)
+                            .navigationDestination(item: activePostRouteBinding) { route in
+                                DeepLinkedPostPresenterView(route: route)
+                            }
+                    }
+                    .enableSwipeBackGesture()
                     .id(homeRootResetID)
                     .opacity(selectedTab == .home ? 1 : 0)
                     .allowsHitTesting(selectedTab == .home)
@@ -92,11 +98,14 @@ struct MainTabView: View {
                 }
 
                 if shouldMount(.profile) {
-                    ProfileView(isActive: selectedTab == .profile)
-                        .id(profileRootResetID)
-                        .opacity(selectedTab == .profile ? 1 : 0)
-                        .allowsHitTesting(selectedTab == .profile)
-                        .accessibilityHidden(selectedTab != .profile)
+                    NavigationStack {
+                        ProfileView(isActive: selectedTab == .profile)
+                    }
+                    .enableSwipeBackGesture()
+                    .id(profileRootResetID)
+                    .opacity(selectedTab == .profile ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .profile)
+                    .accessibilityHidden(selectedTab != .profile)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -149,11 +158,13 @@ struct MainTabView: View {
         .onAppear {
             syncProfileOnboardingState()
             activatePendingDeepLinksIfPossible()
+            routeActivePostIfNeeded()
             routeNotificationIfNeeded()
         }
         .task(id: authService.currentUser?.id) {
             await refreshLifecycleDataIfNeeded(force: true)
             activatePendingDeepLinksIfPossible()
+            routeActivePostIfNeeded()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
@@ -193,9 +204,13 @@ struct MainTabView: View {
         .onChange(of: notificationRouter.pendingActionID) { _, _ in
             routeNotificationIfNeeded()
         }
+        .onChange(of: postDeepLinkCoordinator.activeRoute) { _, _ in
+            routeActivePostIfNeeded()
+        }
         .onChange(of: authService.requiresProfileCompletion) { _, _ in
             syncProfileOnboardingState()
             activatePendingDeepLinksIfPossible()
+            routeActivePostIfNeeded()
             routeNotificationIfNeeded()
         }
         .onChange(of: authService.currentUser?.id) { _, _ in
@@ -205,6 +220,7 @@ struct MainTabView: View {
             profileRootResetID = UUID()
             syncProfileOnboardingState()
             activatePendingDeepLinksIfPossible()
+            routeActivePostIfNeeded()
             routeNotificationIfNeeded()
         }
     }
@@ -256,13 +272,31 @@ struct MainTabView: View {
     private func routeNotificationIfNeeded() {
         guard let action = notificationRouter.pendingAction else { return }
 
-        switch action.target {
-        case .conversation, .group, .systemMessages:
-            selectedTab = .chat
-            activatedTabs.insert(.chat)
-        case .post:
-            break
+        let targetTab = AppTabNavigationPolicy.tab(for: action.target)
+        selectedTab = targetTab
+        activatedTabs.insert(targetTab)
+
+        if case .post = action.target {
+            routeActivePostIfNeeded()
         }
+    }
+
+    private var activePostRouteBinding: Binding<PostDeepLinkRoute?> {
+        Binding(
+            get: { postDeepLinkCoordinator.activeRoute },
+            set: { route in
+                if route == nil {
+                    postDeepLinkCoordinator.dismissActiveRoute()
+                }
+            }
+        )
+    }
+
+    private func routeActivePostIfNeeded() {
+        guard let route = postDeepLinkCoordinator.activeRoute else { return }
+        let targetTab = AppTabNavigationPolicy.tab(for: route)
+        selectedTab = targetTab
+        activatedTabs.insert(targetTab)
     }
 
     private func shouldMount(_ tab: TabItem) -> Bool {
@@ -293,6 +327,21 @@ enum TabItem: String, CaseIterable {
         case .search: return "magnifyingglass"
         case .chat: return "bubble.left.and.bubble.right.fill"
         case .profile: return "person.fill"
+        }
+    }
+}
+
+enum AppTabNavigationPolicy {
+    static func tab(for _: PostDeepLinkRoute) -> TabItem {
+        .home
+    }
+
+    static func tab(for target: NotificationNavigationTarget) -> TabItem {
+        switch target {
+        case .post:
+            return .home
+        case .conversation, .group, .systemMessages:
+            return .chat
         }
     }
 }

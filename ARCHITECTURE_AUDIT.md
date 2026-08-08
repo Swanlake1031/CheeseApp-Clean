@@ -12,11 +12,11 @@ No current P0 crash, corruption, or exposed secret was confirmed. The baseline a
 
 The highest-confidence structural issue is Home publication: fetches are assembled in the background, but the assembled result is still committed through many independent `@Published` properties. That is not an atomic visible snapshot and can trigger multiple feed-wide invalidations. The cleanup should replace those fields with one published content snapshot while retaining separate loading/mutation state.
 
-The largest product-contract problem is external to a safe refactor: the supplied product boundary still names Rentals/Housing, while the actual application has no Rent feature, `PostKind` contains only `secondhand` and `forum`, and migration `127_remove_rent_module.sql` intentionally removes Rent data/contracts. This audit does not reintroduce Rent because doing so would be feature and schema development, not structural cleanup. The mismatch must be resolved by product/backend owners before a future housing implementation.
+The supplied brief named Rentals/Housing and Secondhand likes, but the actual app and forward migrations had removed those contracts. The product decision is now explicit: neither Rentals/Housing nor Secondhand likes are part of this baseline, and historical implementations must not be restored.
 
 ## Cleanup Outcome
 
-The cleanup implemented A-01, A-04, A-05, A-06, A-07, A-11, A-12, A-13, and the documentation portion of A-02. A-03, A-15, the broad work in A-08/A-09/A-10, and restoration of Rentals/Housing remain deliberately deferred. The post-clean architecture is documented in `ARCHITECTURE.md`; operational handoff details are in `HANDOFF.md`.
+The cleanup implemented A-01, A-03, A-04, A-05, A-06, A-07, A-11, A-12, and A-13. A-02 and A-15 are resolved as explicit product boundaries: do not restore Rentals/Housing or Secondhand likes. Broad work in A-08/A-09/A-10 remains deliberately deferred. The post-clean architecture is documented in `ARCHITECTURE.md`; operational handoff details are in `HANDOFF.md`.
 
 ## Audit Method
 
@@ -105,18 +105,18 @@ Strict scans found no committed private key material, service-role credential va
 - **Affected files:** `AGENTS.md`, the historical root `README.md`, `Core/Models/PostKind.swift`, `Features/Create/Views/CreatePostView.swift`, `Features/Search/Views/SearchView.swift`, `Supabase/migrations/127_remove_rent_module.sql`.
 - **Feature:** Product boundary, Create, Search, Home, database release contract.
 - **Runtime/user impact:** A developer can incorrectly assume housing exists and either advertise unavailable behavior or attempt to rebuild against a schema that intentionally removed it.
-- **Recommended solution:** Record the actual absence in handoff docs and obtain an explicit product decision plus new forward migrations before rebuilding housing.
-- **Fix during cleanup:** **Documentation only.** Reintroducing Rent is explicitly outside safe structural cleanup.
+- **Recommended solution:** Record Rentals/Housing as outside the product boundary and prevent historical migrations or empty folders from being treated as live architecture.
+- **Fix during cleanup:** **Yes, documentation/guardrails only.** The product decision is not to restore Rentals/Housing; no schema change is required.
 
 #### A-03 — Root navigation ownership is split across an outer stack and per-tab stacks
 
 - **Problem:** `CheeseAppApp` wraps authenticated content in a `NavigationStack` for deep links, while Home, Search, Chat, Profile, create, and several sheets create their own stacks. Custom swipe-back enabling is applied at multiple levels.
 - **Root cause:** Deep-link routing was added at the app root after tabs had already established independent navigation histories.
-- **Affected files:** `CheeseAppApp.swift`, `MainTabView.swift`, `HomeView.swift`, `View+Extensions.swift`, and feature roots.
+- **Affected files:** `CheeseAppApp.swift`, `MainTabView.swift`, `HomeView.swift`, `ProfileView.swift`, `View+Extensions.swift`, and feature roots.
 - **Feature:** Global navigation, deep links, tabs, back gestures.
 - **Runtime/user impact:** Ownership is hard to reason about; future destinations can land on the wrong stack, and gesture policy must inspect nested controllers. Current primary paths compile and are guarded, but expansion is risky.
-- **Recommended solution:** In a dedicated navigation project, choose one explicit deep-link presentation boundary and one stack per persistent tab, then remove redundant stack/gesture application.
-- **Fix during cleanup:** **No.** This is deferred because changing stack topology without device-level regression coverage can alter back history and deep-link behavior.
+- **Recommended solution:** Make `MainTabView` the owner of one stack per persistent tab. Global post routes select Home and publish into the Home stack; chat notification routes select Chat. Remove the authenticated outer stack and feature-root stacks.
+- **Fix during cleanup:** **Yes (2026-08-08 follow-up).** A pure route-to-tab policy and assertions were added. The app and test bundle compile; signed-in device execution remains necessary because the available CoreSimulator failed before launching XCTest with Mach error -308.
 
 #### A-15 — Requested Secondhand likes conflict with the shipped database contract
 
@@ -125,8 +125,8 @@ Strict scans found no committed private key material, service-role credential va
 - **Affected files:** `Features/Home/Views/HomeView.swift`, `Features/Home/ViewModels/HomeViewModel.swift`, `Features/Secondhand/Services/SecondhandService.swift`, `Supabase/migrations/140_secondhand_disallows_likes.sql`.
 - **Feature:** Secondhand/Home interactions.
 - **Runtime/user impact:** Bookmarks work, but a client that re-enables likes would fail against the current backend and could display permanently inconsistent counters.
-- **Recommended solution:** Product and backend owners must explicitly choose the contract. If likes return, add a new forward migration that removes the rejection trigger and defines counter/backfill behavior, then update the client and tests together.
-- **Fix during cleanup:** **No.** Silently reversing a destructive production contract violates the database-safety and behavior-preservation requirements.
+- **Recommended solution:** Keep Secondhand likes outside the product boundary, retain bookmarks, and prevent the old like implementation from being restored from migration history.
+- **Fix during cleanup:** **Yes, documentation/guardrails only.** No backend or UI behavior is changed; migration 140 remains authoritative.
 
 ### P2
 
@@ -251,9 +251,9 @@ Strict scans found no committed private key material, service-role credential va
 ### P1
 
 1. Convert Home visible content to one published snapshot and delete progressive loaders.
-2. Document the Rent/product-boundary mismatch; do not invent a replacement module.
-3. Document the requested Secondhand-like/backend conflict; do not reverse migration 140 during structural cleanup.
-4. Preserve current navigation topology and document its ownership risk for a device-tested follow-up.
+2. Record Rentals/Housing as outside the product boundary; do not invent a replacement module.
+3. Record Secondhand likes as outside the product boundary; do not reverse migration 140.
+4. Consolidate persistent navigation to one stack per tab and route global intents through an explicit tab policy.
 
 ### P2
 
@@ -290,18 +290,16 @@ Strict scans found no committed private key material, service-role credential va
 - Group-member component/candidate loading duplication.
 - Unreachable Forum bell notification stack.
 - Hardcoded backend project configuration.
+- Root/per-tab navigation ownership and explicit global route targeting.
 - Confirmed dead files/symbols and repository artifacts.
 - Current architecture, handoff, and setup documentation.
 
 ## DEFER
 
-- Root/per-tab navigation topology changes.
 - Broad service snapshot conversion outside Home.
 - Large-scale file/folder movement.
 - Full cross-feature card redesign.
 - Splitting large services without accompanying feature work and tests.
-- Reintroducing Rentals/Housing; this requires a product decision and new forward database/application work.
-- Reintroducing Secondhand likes; this requires a product decision and new forward migration after migration 140.
 - Production migration/deployment changes.
 
 ## DELETE

@@ -38,61 +38,59 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                AppColors.pageBackground
-                    .ignoresSafeArea()
+        ZStack {
+            AppColors.pageBackground
+                .ignoresSafeArea()
 
-                GeometryReader { contentProxy in
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 16) {
-                            // 用户信息卡片
-                            userInfoCard
+            GeometryReader { contentProxy in
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        // 用户信息卡片
+                        userInfoCard
 
-                            // 分页至少铺满一个完整可视区，让帖子下方的所有空白
-                            // 也可以拖动切换发布／喜欢／评论／收藏。
-                            ProfileActivityView(
-                                isEmbedded: true,
-                                externalRefreshGeneration: activityRefreshGeneration,
-                                minimumEmbeddedPagerHeight: max(
-                                    contentProxy.size.height + 24,
-                                    320
-                                )
+                        // 分页至少铺满一个完整可视区，让帖子下方的所有空白
+                        // 也可以拖动切换发布／喜欢／评论／收藏。
+                        ProfileActivityView(
+                            isEmbedded: true,
+                            externalRefreshGeneration: activityRefreshGeneration,
+                            minimumEmbeddedPagerHeight: max(
+                                contentProxy.size.height + 24,
+                                320
                             )
-                        }
-                        .frame(
-                            width: max(contentProxy.size.width - 32, 0),
-                            alignment: .top
                         )
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
                     }
-                    .refreshable {
-                        await refreshProfile(force: true)
-                    }
+                    .frame(
+                        width: max(contentProxy.size.width - 32, 0),
+                        alignment: .top
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                }
+                .refreshable {
+                    await refreshProfile(force: true)
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
-            .onAppear {
-                CheeseTabBarVisibilityController.shared.resetVisibility()
-            }
-            .sheet(isPresented: $showingEditProfile) {
-                EditProfileView()
-            }
-            .safeAreaInset(edge: .top) {
-                CheeseInlineTopBar {
-                    EmptyView()
-                } center: {
-                    Text(L10n.tr("Profile", "个人档案"))
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(AppColors.textPrimary)
-                        .lineLimit(1)
-                } trailing: {
-                    NavigationLink(destination: SettingsView()) {
-                        PostToolbarIconCircle(icon: "gearshape")
-                    }
-                    .buttonStyle(.plain)
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            CheeseTabBarVisibilityController.shared.resetVisibility()
+        }
+        .sheet(isPresented: $showingEditProfile) {
+            EditProfileView()
+        }
+        .safeAreaInset(edge: .top) {
+            CheeseInlineTopBar {
+                EmptyView()
+            } center: {
+                Text(L10n.tr("Profile", "个人档案"))
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .lineLimit(1)
+            } trailing: {
+                NavigationLink(destination: SettingsView()) {
+                    PostToolbarIconCircle(icon: "gearshape")
                 }
+                .buttonStyle(.plain)
             }
         }
         .task(id: authService.currentUser?.id) {
@@ -103,7 +101,6 @@ struct ProfileView: View {
             Task { await refreshProfile(force: false) }
         }
         .shareFeedbackToast(message: $uidCopyFeedbackMessage)
-        .enableSwipeBackGesture()
     }
 
     // MARK: - 用户信息卡片

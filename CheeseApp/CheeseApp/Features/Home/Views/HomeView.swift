@@ -65,134 +65,131 @@ struct HomeView: View {
     private static let featuredCategories = HomeFeedTab.allCases
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                AppColors.pageBackground
-                    .ignoresSafeArea()
+        ZStack {
+            AppColors.pageBackground
+                .ignoresSafeArea()
                 
-                // 顶部模块导航固定，只有下面的内容区参与纵向滚动。
-                VStack(spacing: 0) {
-                    homeTopNavigationBar
-                        .padding(.horizontal, 16)
-                        .padding(.top, 14)
-                        .padding(.bottom, 18)
-                        .background(AppColors.pageBackground)
-                        .zIndex(40)
+            // 顶部模块导航固定，只有下面的内容区参与纵向滚动。
+            VStack(spacing: 0) {
+                homeTopNavigationBar
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+                    .padding(.bottom, 18)
+                    .background(AppColors.pageBackground)
+                    .zIndex(40)
 
-                    GeometryReader { contentProxy in
-                        ScrollView(showsIndicators: false) {
-                            VStack(alignment: .leading, spacing: 0) {
-                                // 横向分页本身至少铺满整个可视内容区。帖子较少时，
-                                // 下方空白仍属于分页页面，而不是外层 ScrollView。
-                                featuredSection(
-                                    minimumPagerHeight: max(
-                                        contentProxy.size.height + 24,
-                                        250
-                                    )
+                GeometryReader { contentProxy in
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            // 横向分页本身至少铺满整个可视内容区。帖子较少时，
+                            // 下方空白仍属于分页页面，而不是外层 ScrollView。
+                            featuredSection(
+                                minimumPagerHeight: max(
+                                    contentProxy.size.height + 24,
+                                    250
                                 )
-                                .zIndex(30)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(
-                                .bottom,
-                                CheeseTabBarLayout.contentBottomClearance
                             )
+                            .zIndex(30)
                         }
-                        .id(contentScrollResetID)
-                        .refreshable {
-                            isRefreshing = true
-                            await viewModel.refresh(userID: authService.currentUser?.id)
-                            clearCreatedPostPromotion()
-                            try? await Task.sleep(nanoseconds: 450_000_000)
-                            isRefreshing = false
-                        }
+                        .padding(.horizontal, 16)
+                        .padding(
+                            .bottom,
+                            CheeseTabBarLayout.contentBottomClearance
+                        )
                     }
-                }
-
-                if !showNavigationDrawer {
-                    navigationDrawerEdgeGestureZone
-                        .zIndex(90)
-                }
-
-                if showNavigationDrawer || navigationDrawerReveal > 0 || isNavigationDrawerClosing {
-                    navigationDrawerOverlay
-                        .zIndex(100)
-                }
-            }
-            .overlay(alignment: .top) {
-                if isRefreshing {
-                    HotpotSteamRefreshView()
-                        .padding(.top, 10)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .navigationBarHidden(true)
-            // 导航目标
-            .navigationDestination(isPresented: $showForumList) {
-                ForumListView(initialBoardID: selectedForumBoardID)
-            }
-            .navigationDestination(isPresented: $showSearch) {
-                SearchView(
-                    shouldAutoFocus: $shouldAutoFocusSearch,
-                    showsBackButton: true
-                )
-            }
-            .navigationDestination(isPresented: $showCourseDiscovery) {
-                CourseDiscoveryView(universityName: resolvedHomeUniversityName)
-            }
-            .navigationDestination(item: $selectedForumPost) { post in
-                ForumDetailView(post: post)
-            }
-            .navigationDestination(item: $selectedFeaturedSecondhandItem) { item in
-                SecondhandDetailView(item: item)
-            }
-            .navigationDestination(item: $selectedProfileRoute) { route in
-                UserPostsView(userId: route.id)
-            }
-            .sheet(item: $sharingPost) { payload in
-                CheesePostShareBottomSheet(payload: payload) { targetName in
-                    ShareFeedbackPresenter.show("已分享到 \(targetName)") {
-                        shareActionToastMessage = $0
+                    .id(contentScrollResetID)
+                    .refreshable {
+                        isRefreshing = true
+                        await viewModel.refresh(userID: authService.currentUser?.id)
+                        clearCreatedPostPromotion()
+                        try? await Task.sleep(nanoseconds: 450_000_000)
+                        isRefreshing = false
                     }
                 }
             }
-            .onAppear {
-                CheeseTabBarVisibilityController.shared.resetVisibility()
+
+            if !showNavigationDrawer {
+                navigationDrawerEdgeGestureZone
+                    .zIndex(90)
             }
-            .task(id: homeLoadScopeKey) {
-                async let boards: Void = loadForumBoardsIfNeeded()
-                await viewModel.loadIfNeeded(userID: authService.currentUser?.id)
-                await boards
-            }
-            .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { notification in
-                handlePostChange(notification)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: ProfileSocialEvents.followingDidChange)) { notification in
-                guard let (targetUserID, isFollowing) = ProfileSocialEvents.change(
-                    from: notification
-                ) else { return }
-                viewModel.applyFollowChange(
-                    targetUserID: targetUserID,
-                    isFollowing: isFollowing
-                )
-                Task {
-                    await viewModel.refreshFollowing(userID: authService.currentUser?.id)
-                }
-            }
-            .alert(
-                L10n.tr("Action failed", "操作失败"),
-                isPresented: Binding(
-                    get: { postOpenErrorMessage != nil },
-                    set: { if !$0 { postOpenErrorMessage = nil } }
-                )
-            ) {
-                Button(L10n.tr("OK", "确定"), role: .cancel) {}
-            } message: {
-                Text(postOpenErrorMessage ?? "")
+
+            if showNavigationDrawer || navigationDrawerReveal > 0 || isNavigationDrawerClosing {
+                navigationDrawerOverlay
+                    .zIndex(100)
             }
         }
+        .overlay(alignment: .top) {
+            if isRefreshing {
+                HotpotSteamRefreshView()
+                    .padding(.top, 10)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .navigationBarHidden(true)
+        // 导航目标由 MainTabView 的 Home NavigationStack 承载。
+        .navigationDestination(isPresented: $showForumList) {
+            ForumListView(initialBoardID: selectedForumBoardID)
+        }
+        .navigationDestination(isPresented: $showSearch) {
+            SearchView(
+                shouldAutoFocus: $shouldAutoFocusSearch,
+                showsBackButton: true
+            )
+        }
+        .navigationDestination(isPresented: $showCourseDiscovery) {
+            CourseDiscoveryView(universityName: resolvedHomeUniversityName)
+        }
+        .navigationDestination(item: $selectedForumPost) { post in
+            ForumDetailView(post: post)
+        }
+        .navigationDestination(item: $selectedFeaturedSecondhandItem) { item in
+            SecondhandDetailView(item: item)
+        }
+        .navigationDestination(item: $selectedProfileRoute) { route in
+            UserPostsView(userId: route.id)
+        }
+        .sheet(item: $sharingPost) { payload in
+            CheesePostShareBottomSheet(payload: payload) { targetName in
+                ShareFeedbackPresenter.show("已分享到 \(targetName)") {
+                    shareActionToastMessage = $0
+                }
+            }
+        }
+        .onAppear {
+            CheeseTabBarVisibilityController.shared.resetVisibility()
+        }
+        .task(id: homeLoadScopeKey) {
+            async let boards: Void = loadForumBoardsIfNeeded()
+            await viewModel.loadIfNeeded(userID: authService.currentUser?.id)
+            await boards
+        }
+        .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { notification in
+            handlePostChange(notification)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ProfileSocialEvents.followingDidChange)) { notification in
+            guard let (targetUserID, isFollowing) = ProfileSocialEvents.change(
+                from: notification
+            ) else { return }
+            viewModel.applyFollowChange(
+                targetUserID: targetUserID,
+                isFollowing: isFollowing
+            )
+            Task {
+                await viewModel.refreshFollowing(userID: authService.currentUser?.id)
+            }
+        }
+        .alert(
+            L10n.tr("Action failed", "操作失败"),
+            isPresented: Binding(
+                get: { postOpenErrorMessage != nil },
+                set: { if !$0 { postOpenErrorMessage = nil } }
+            )
+        ) {
+            Button(L10n.tr("OK", "确定"), role: .cancel) {}
+        } message: {
+            Text(postOpenErrorMessage ?? "")
+        }
         .cheeseTabBarHidden(showNavigationDrawer)
-        .enableSwipeBackGesture()
         .shareFeedbackToast(message: $shareActionToastMessage)
     }
 

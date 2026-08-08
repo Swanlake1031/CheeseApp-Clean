@@ -12,7 +12,7 @@ Cheese is a SwiftUI campus community application backed by Supabase. This reposi
 - Direct and generic group chat with private media
 - System Messages, push routing, public share links, and backend lifecycle workers
 
-Secondhand has no comment system. The current backend also rejects Secondhand likes; see the audit before changing that contract. Rentals/Housing and retired Ride/Team/Carpool/Group-Finding flows are not active.
+Secondhand has no comment system and supports bookmarks, not likes. Rentals/Housing and retired Ride/Team/Carpool/Group-Finding flows are not active. These removed surfaces must not be restored from historical code or migrations.
 
 ## Repository Layout
 
@@ -79,4 +79,3 @@ Run the Xcode scheme tests against a concrete simulator when available. Backend-
 - [Architecture](ARCHITECTURE.md) — current layers, feature ownership, loading, navigation, and extension guide
 - [Architecture Audit](ARCHITECTURE_AUDIT.md) — evidence, severities, fixes, deferrals, and deletion decisions
 - [Engineering Handoff](HANDOFF.md) — setup, configuration names, backend dependencies, known debt, and next tasks
-

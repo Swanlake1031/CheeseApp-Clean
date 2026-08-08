@@ -345,6 +345,28 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertTrue(SecondhandCreateFormRules.isValid(title: "Desk", price: "20", imageCount: 1))
     }
 
+    func testPostRoutesAlwaysTargetTheHomeNavigationStack() {
+        let route = PostDeepLinkRoute(kind: .forum, postId: UUID())
+
+        XCTAssertEqual(AppTabNavigationPolicy.tab(for: route), .home)
+        XCTAssertEqual(AppTabNavigationPolicy.tab(for: .post(route)), .home)
+    }
+
+    func testChatNotificationRoutesAlwaysTargetTheChatNavigationStack() {
+        XCTAssertEqual(
+            AppTabNavigationPolicy.tab(for: .conversation(UUID())),
+            .chat
+        )
+        XCTAssertEqual(
+            AppTabNavigationPolicy.tab(for: .group(UUID())),
+            .chat
+        )
+        XCTAssertEqual(
+            AppTabNavigationPolicy.tab(for: .systemMessages(nil)),
+            .chat
+        )
+    }
+
     func testSwipeBackGestureOnlyBeginsForSafeRightwardNavigation() {
         XCTAssertTrue(SwipeBackGesturePolicy.shouldBegin(
             viewControllerCount: 2,

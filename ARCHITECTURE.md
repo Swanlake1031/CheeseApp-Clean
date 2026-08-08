@@ -37,7 +37,7 @@ Views do not directly query Supabase in the current baseline. Feature services a
 | Chat | `ChatService`; room lifecycle controllers | chat repositories, Realtime, private media services | conversation/group/room views |
 | Notifications | `SystemMessageService` and `SystemMessageViewModel` | system-message queries and push router | System Messages inside Chat |
 
-Rentals/Housing is not an active feature. The empty directory structure is not a product surface, `PostKind` has only `forum` and `secondhand`, and migration 127 removes the old Rent contract. Ride-Sharing, Carpooling, Team-Up, and Group-Finding are also retired. Generic group chat remains active.
+Rentals/Housing is not an active feature and must not be restored. The empty directory structure is not a product surface, `PostKind` has only `forum` and `secondhand`, and migration 127 removes the old Rent contract. Ride-Sharing, Carpooling, Team-Up, and Group-Finding are also retired. Generic group chat remains active.
 
 ## Data Flow
 
@@ -75,7 +75,7 @@ Account changes are special: `AuthService` synchronously begins an account trans
 
 `PostInteractionStore.shared` is the canonical viewer-relative state for Forum likes and cross-feature bookmarks. Home, Forum detail/cards, Profile activity, and other consumers read it by post ID; embedded model values are fallbacks for first paint. Batch responses must use `merge(_ updates:)` so one response produces one revision.
 
-The current backend rejects likes for Secondhand posts (migration 140). Secondhand bookmarks are supported. Do not enable a Secondhand like control without a new forward database migration and matching tests.
+The current backend rejects likes for Secondhand posts (migration 140). Secondhand bookmarks are supported. Secondhand likes are outside the product boundary and must not be restored.
 
 ### Forum posts
 
@@ -111,13 +111,15 @@ Lifecycle `.task` handlers must be idempotent. Repeated tab appearances should u
 ## Navigation
 
 - The app root chooses bootstrap, authenticated, or authentication UI.
-- Authenticated content currently has an outer `NavigationStack` used for deep-linked posts.
-- Persistent tabs maintain their own root/navigation behavior inside `MainTabView`.
+- `MainTabView` owns exactly one `NavigationStack` for each persistent tab: Home, Search, Chat, and Profile.
+- Feature roots such as `HomeView` and `ProfileView` declare destinations but do not create a second root stack.
 - Create Post and profile onboarding are full-screen covers.
 - URL/universal-link input goes through `PostDeepLinkCoordinator`; push intent goes through `AppNotificationRouter`.
-- Swipe-back behavior is adapted through the shared navigation extension.
+- Post routes select Home and are presented by the Home stack. Conversation, group, and System Message routes select Chat and are resolved by the Chat stack.
+- Reselecting a tab resets only that tab's stack identity. Switching tabs preserves the other mounted stacks and their histories.
+- Swipe-back behavior is installed once at each persistent tab stack through the shared navigation extension. The Home drawer keeps its separate leading-edge gesture.
 
-The split outer/per-tab stack topology is known debt. Do not casually move destinations or remove stacks: back history, deep links, tab reset behavior, the sidebar edge gesture, and left-edge swipe must be tested together.
+Do not add an authenticated-content `NavigationStack` above `MainTabView`, or add another root stack inside a persistent feature root. A new global route must declare its target tab in `AppTabNavigationPolicy` and be presented by that tab's stack.
 
 ## Shared Components and Infrastructure
 
@@ -146,4 +148,3 @@ The split outer/per-tab stack topology is known debt. Do not casually move desti
 5. Reuse a Shared component only when the domain meaning matches. Promote a component after a second real consumer appears.
 6. Add database changes as forward migrations with RLS, rollback/production-order notes, and tests.
 7. Add target membership, tests, and relevant documentation; run the commands in `AGENTS.md`.
-

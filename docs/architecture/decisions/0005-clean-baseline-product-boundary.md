@@ -36,8 +36,8 @@ Bookmarks are supported.
 - `PostKind` remains limited to `secondhand` and `forum`.
 - Historical migrations keep retired names but active client/worker routes do
   not decode them.
-- Restoring Rent or Secondhand likes requires an explicit product decision,
-  new forward migrations, client/worker changes, and contract tests.
+- Rent and Secondhand likes are outside the accepted product boundary. Do not
+  restore them from historical code or migrations.
 - Course records remain independent of the shared post hierarchy.
 
 ## Validation
@@ -47,4 +47,3 @@ Bookmarks are supported.
 - Run database tests in a local Supabase stack.
 - Classify retired terms as historical migrations, explicit removal tests, or
   current boundary documentation; there must be no live client/worker route.
-

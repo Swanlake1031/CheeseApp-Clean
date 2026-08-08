@@ -16,6 +16,8 @@ Rentals/Housing is not present in the current client or database contract. Ride-
 - Removed the unreachable Forum bell notification stack; System Messages remains the notification inbox.
 - Removed the replaced Favorite Posts service/screen and other confirmed unreferenced files, components, and DTOs.
 - Removed embedded Supabase project configuration and strengthened ignore rules for local credentials/signing artifacts.
+- Removed split root/per-tab navigation ownership; each persistent tab now owns one stack at the `MainTabView` boundary.
+- Routed all post links/notifications to Home and all conversation/group/System Message notifications to Chat through an explicit tab policy with unit-test assertions.
 - Excluded historical recovery artifacts, dependencies, build output, Xcode user state, prototypes, and an unrelated nested website repository from this baseline.
 
 See `ARCHITECTURE_AUDIT.md` for evidence and `ARCHITECTURE.md` for the resulting ownership model.
@@ -31,17 +33,15 @@ See `ARCHITECTURE_AUDIT.md` for evidence and `ARCHITECTURE.md` for the resulting
 - Use System Messages for notification history. Do not revive the deleted Forum bell cache/view model.
 - Use `CachedRemoteImage` for public remote images and the authenticated chat media path for private attachments.
 - Keep full, compact, and search card variants when their information density differs; share narrow semantic components instead of building a flag-heavy mega-card.
+- Keep one `NavigationStack` per persistent tab, owned by `MainTabView`; global route input selects a tab and lets that stack present the destination.
 - Add Supabase changes as new migrations. Do not rewrite history.
 
 ## Known Remaining Technical Debt
 
-- Root deep-link navigation and per-tab navigation use nested ownership. A redesign needs device coverage for tab history, back buttons, left-edge swipe, sidebar gestures, notification routes, and universal links.
 - `ForumService`, `ChatService`, `AuthService`, `ForumDetailView`, `SearchView`, `ProfileSettingsViews`, `HomeView`, and `HomeViewModel` remain large. Split them only along ownership boundaries during relevant feature work.
 - Forum/Secondhand presentation has multiple legitimate density variants, but some author, metric, and domain formatting remains duplicated.
 - Several global services publish related fields separately. Convert to feature snapshots only when solving a concrete inconsistency or render problem; do not introduce a global Redux/TCA store.
-- Product/backend owners must decide whether Rentals/Housing returns.
-- Product/backend owners must decide whether Secondhand likes return; doing so requires a new forward migration after migration 140.
-- Simulator UI automation does not cover every manual gesture and signed-in backend path.
+- Simulator UI automation does not cover every manual gesture and signed-in backend path. On 2026-08-08, the available iOS 26.3 simulator failed before launching XCTest with CoreSimulator Mach error -308; the app and test bundles still compiled successfully.
 
 ## Areas That Should Not Be Casually Changed
 
@@ -49,9 +49,10 @@ See `ARCHITECTURE_AUDIT.md` for evidence and `ARCHITECTURE.md` for the resulting
 - `PostKind` decoding and removed product kinds without coordinated migrations and worker changes.
 - Migration 085 (Ride/Team removal), migration 127 (Rent removal), or migration 140 (Secondhand likes) by editing old files.
 - RLS, SECURITY DEFINER functions, storage visibility, or private chat media handling.
-- Outer/per-tab NavigationStack topology or swipe gesture behavior without device regression tests.
+- The one-stack-per-tab boundary, route-to-tab policy, or swipe gesture behavior without device regression tests.
 - Home refresh publication back to per-source progressive assignment.
 - The distinction between System Messages and push routing.
+- Rentals/Housing and Secondhand likes/comments are explicitly outside the product boundary; do not revive historical implementations.
 
 ## Build the App
 
@@ -107,9 +108,6 @@ Before using a new database, follow the Supabase reset/bootstrap documentation; 
 ## Suggested Next Engineering Tasks
 
 1. Add signed-in UI/integration coverage for Home → Detail → Back, refresh preservation, Search result return, and post interaction reconciliation.
-2. Resolve and document the Rentals/Housing product decision.
-3. Resolve the Secondhand-like product/backend conflict and, if approved, design a forward migration plus client tests.
-4. Plan the navigation ownership cleanup with an explicit route matrix and device gesture tests.
-5. Split Search or Forum service boundaries when those features next receive substantive work.
-6. Incrementally share narrow author/metric presentation components across Forum, Home, Search, and Profile.
-
+2. Add signed-in device coverage for post links/pushes, Chat pushes, per-tab history, and Home drawer/swipe gesture coexistence.
+3. Split Search or Forum service boundaries when those features next receive substantive work.
+4. Incrementally share narrow author/metric presentation components across Forum, Home, Search, and Profile.
