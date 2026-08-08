@@ -1,0 +1,986 @@
+{
+  "source_pdf_count": 316,
+  "source_course_count": 90,
+  "verified_course_count": 87,
+  "existing_batch_1_count": 8,
+  "new_course_count": 79,
+  "deferred": {
+    "1GR0": "The PDF describes the full 2025–26 academic year; the schema requires one term.",
+    "4EL3": "The only supplied PDF is a proposal form with no academic term, not a course outline.",
+    "4SY3": "The only supplied PDF is a proposal form with no academic term, not a course outline."
+  },
+  "batches": {
+    "124": [
+      {
+        "code": "2DA3",
+        "title": "Decision Making with Analytics",
+        "selected_term": "Fall 2025",
+        "source_file": "2DA3/2DA3 - Fall 2025 - C01, C02, C04 - L. Shi.pdf",
+        "course_id": "090f5eec-c94e-5f7e-93b1-a2f8aaeff0e6",
+        "professors": [
+          "Lingling Shi",
+          "Zahra Mashayekhi"
+        ],
+        "sha256": "11a1127a83a28a0c797308689a3fbe15da9761f94ab38c1430d64ade2b9d5d04",
+        "size": 347814
+      },
+      {
+        "code": "2GR0",
+        "title": "DeGroote Student Experience and Development II",
+        "selected_term": "Winter 2026",
+        "source_file": "2GR0/2GR0 - Winter 2026 - C01, C02 - A. Boey.pdf",
+        "course_id": "6b0a04df-808a-5852-a43a-974e89fddaa6",
+        "professors": [
+          "Anita Boey"
+        ],
+        "sha256": "0a6ad9ecf20f74bbcde2a937a10377fff5a064ef2626f14603ca514eff6caf10",
+        "size": 385554
+      },
+      {
+        "code": "2IN0",
+        "title": "Career Development Course",
+        "selected_term": "Winter 2026",
+        "source_file": "2IN0/2IN0 - Winter 2026 - Irving (R), Russell (B), Sandher (A), Jacobs (G).pdf",
+        "course_id": "4f3fd9b3-dd2f-514b-a383-5adf2c7b8f26",
+        "professors": [
+          "Rouxanne Irving",
+          "Brooke Russell",
+          "Amar Sandher",
+          "Gabriel Jacobs"
+        ],
+        "sha256": "d8615323d99279129bdfd471a546ff5ab4145fae23567e90a89868151504fb6e",
+        "size": 381959
+      },
+      {
+        "code": "2NG3",
+        "title": "Negotiations",
+        "selected_term": "Fall 2025",
+        "source_file": "2NG3/2NG3 - Fall 2025 - C01, C02, C05 - A. Boey.pdf",
+        "course_id": "6bc3f9a0-e03a-5a9d-8d10-a983ff6e78f6",
+        "professors": [
+          "Anita Boey",
+          "Rami Alasadi",
+          "Carolyn Capretta"
+        ],
+        "sha256": "79fb91c6b54af40cc924cbbaea8171dd4d0a6f0184b416f513e3857f90392c4e",
+        "size": 317460
+      },
+      {
+        "code": "2OC3",
+        "title": "Operations Management",
+        "selected_term": "Winter 2026",
+        "source_file": "2OC3/2OC3 - Winter 2026 - C01, C02, C03 - Y.Zhou.pdf",
+        "course_id": "efae50c0-c008-5951-a376-20aeecc59b9c",
+        "professors": [
+          "Yun Zhou",
+          "Zeinab Vosooghi"
+        ],
+        "sha256": "e8b5de689c2924407eb5a9fd1bb28d99b811a523ed1f5df8dafaff808b02e695",
+        "size": 1337028
+      },
+      {
+        "code": "3AB3",
+        "title": "Intermediate Financial Accounting I",
+        "selected_term": "Fall 2025",
+        "source_file": "3AB3/3AB3 - Fall 2025 - K. Li _ Y. Kwok.pdf",
+        "course_id": "523023d5-efc8-5080-8ea5-bc05f8826a37",
+        "professors": [
+          "Ken Li",
+          "Yvonne S. Kwok"
+        ],
+        "sha256": "00d04673cfc13e9798453f6f78592f79a46a646bf5857e581222c6288b89eaae",
+        "size": 594758
+      },
+      {
+        "code": "3AC3",
+        "title": "Intermediate Financial Accounting II",
+        "selected_term": "Winter 2026",
+        "source_file": "3AC3/3AC3 - Winter 2026 - J.Jin.pdf",
+        "course_id": "13593b6b-2fb0-5361-8f69-d2a860f7497d",
+        "professors": [
+          "Justin Y. Jin"
+        ],
+        "sha256": "29c79d96bd0260066ca11a49cafdadea38f65b797f098a9bf086404a792377a5",
+        "size": 295540
+      },
+      {
+        "code": "3DA3",
+        "title": "Predictive Analytics",
+        "selected_term": "Winter 2026",
+        "source_file": "3DA3/3DA3 - Winter 2026 - C01 - E. Blasioli.pdf",
+        "course_id": "ed9df52e-89ca-5445-8bb1-c13634c1ba36",
+        "professors": [
+          "Emanuele Blasioli"
+        ],
+        "sha256": "91901dbc398b6b4604b50b55f1b2e0f2475af42613f8c708c56bfbb018354115",
+        "size": 175642
+      },
+      {
+        "code": "3FB3",
+        "title": "Securities Analysis",
+        "selected_term": "Winter 2026",
+        "source_file": "3FB3/3FB3 - Winter 2026 - S. Wang.pdf",
+        "course_id": "c0c133fb-e42c-5001-9b74-0326f2a667c7",
+        "professors": [
+          "Skylar Wang",
+          "Ruohan Jin"
+        ],
+        "sha256": "5c494ec0c80e44f3431c645616fc053b75fcccab126bfd9ca5a123dee30d5ed2",
+        "size": 245880
+      },
+      {
+        "code": "3FD3",
+        "title": "Financial Modelling",
+        "selected_term": "Winter 2026",
+        "source_file": "3FD3/3FD3 - Winter 2026 - Y. Zhao.pdf",
+        "course_id": "f4a0f3ed-a4f2-5bd2-8e8a-7040ce78e228",
+        "professors": [
+          "Yingnan Zhao"
+        ],
+        "sha256": "9a59f67c98b0d2999c746fcddaf00863c3eda8e2743a761e9c8ca281f8de7487",
+        "size": 171865
+      },
+      {
+        "code": "3FH3",
+        "title": "Alternative Investments and Portfolio Management",
+        "selected_term": "Winter 2026",
+        "source_file": "3FH3/3FH3 - Winter 2026 - A. Mahmood.pdf",
+        "course_id": "43e1c98c-9528-5910-b3ac-3f99a03a1f75",
+        "professors": [
+          "Adeel Mahmood"
+        ],
+        "sha256": "29074d9f05f1a16556fcbab4298f96b265b2d87273dc996fdbcb1cf7e2fc6292",
+        "size": 273313
+      },
+      {
+        "code": "3FI3",
+        "title": "Market Trading with Options and Futures",
+        "selected_term": "Winter 2026",
+        "source_file": "3FI3/3FI3 - Winter 2026 - J. Siam.pdf",
+        "course_id": "a895c600-f660-5d40-ae65-a47a3714106d",
+        "professors": [
+          "John J. Siam"
+        ],
+        "sha256": "b43c921ec58fe11e09c1b5782946fd2e3e933edefbb874ceda2b79c7d44fc53b",
+        "size": 386988
+      },
+      {
+        "code": "3FK3",
+        "title": "Intermediate Corporate Finance",
+        "selected_term": "Fall 2025",
+        "source_file": "3FK3/3FK3 - Fall 2025 - C01 - S. Sarkar.pdf",
+        "course_id": "8bf11b18-707a-5c00-83ce-15f7cbad1da0",
+        "professors": [
+          "Sudipto Sarkar"
+        ],
+        "sha256": "7d14e7b7c3c07a5d355f1493592eaedd38f3dd0dc9c8851631c1f815fc7e8fae",
+        "size": 571996
+      },
+      {
+        "code": "3FM3",
+        "title": "The History of Finance",
+        "selected_term": "Winter 2026",
+        "source_file": "3FM3/3FM3 - Winter 2026 - W. Huggins.pdf",
+        "course_id": "685e0de1-39e8-5e0c-9f62-8f283754777c",
+        "professors": [
+          "William Huggins"
+        ],
+        "sha256": "6b139edb808cfac369da177827063b1c927cf71cb86d81d7d11bf2cb584b6b9e",
+        "size": 306266
+      },
+      {
+        "code": "3KA3",
+        "title": "System Analysis and Design",
+        "selected_term": "Fall 2025",
+        "source_file": "3KA3/3KA3 - Fall 2025 - C01 - A. Montazemi.pdf",
+        "course_id": "9d96fe46-f27e-5414-81c7-c5a5fdaff398",
+        "professors": [
+          "Ali Reza Montazemi"
+        ],
+        "sha256": "d306543a16c6f6eaeb8d3a76a85c5439c06a1a454113a99cddb5ebc51590d065",
+        "size": 300728
+      },
+      {
+        "code": "3KD3",
+        "title": "Database Design Management and Applications",
+        "selected_term": "Winter 2026",
+        "source_file": "3KD3/3KD3 - Winter 2026 - C01, C02, C03 - Y. Yuan.pdf",
+        "course_id": "acfa9902-27d9-52ec-aecd-28fcd5f56fc4",
+        "professors": [
+          "Yufei Yuan"
+        ],
+        "sha256": "50e4d6ae92b8d25b208a5f8cd6739e2dfcee4c09c87da98728b1f99890145453",
+        "size": 389265
+      },
+      {
+        "code": "3MB3",
+        "title": "Consumer Behaviour",
+        "selected_term": "Winter 2026",
+        "source_file": "3MB3/3MB3 - Winter 2026 - M. Hupfer.pdf",
+        "course_id": "55ede7dc-ab76-591c-95cc-75621829d02c",
+        "professors": [
+          "Maureen Hupfer"
+        ],
+        "sha256": "8de1585419343e2bbbcd91966467729ee980c3515e709318304f3a95d67dbdc9",
+        "size": 417039
+      },
+      {
+        "code": "3MC3",
+        "title": "Applied Marketing Management",
+        "selected_term": "Winter 2026",
+        "source_file": "3MC3/3MC3 - Winter 2026 - C01, C03 - M. Malik.pdf",
+        "course_id": "c7dbbf55-d35a-5272-ae25-e14d76a3a762",
+        "professors": [
+          "Mandeep Malik",
+          "Kai Christine Lesage",
+          "Marvin Ryder"
+        ],
+        "sha256": "e22f00d75ecd99221f8c3b6c5ab57e4e1f55dda5e2f90c379101e7de88679da5",
+        "size": 481630
+      },
+      {
+        "code": "3MD3",
+        "title": "Introduction to Contemporary Applied Marketing",
+        "selected_term": "Winter 2023",
+        "source_file": "3MD3/3MD3 - Winter 2023 - C01, C02 - Z. Jawed.pdf",
+        "course_id": "bbe11765-bbc5-564c-92c9-7d6b1f98645d",
+        "professors": [
+          "Zobia Jawed"
+        ],
+        "sha256": "d8e2044eab2a69406f58c699dc4fd24c5064219f5483df577a56ce2b99db94c4",
+        "size": 691751
+      },
+      {
+        "code": "3SO3",
+        "title": "Management Skills Development",
+        "selected_term": "Winter 2023",
+        "source_file": "3SO3/3SO3 - Winter 2023 - C01, C02, C03, C04, C05, C06 - C. Capretta.pdf",
+        "course_id": "9cd88f06-6256-5eec-895d-acf8f492774d",
+        "professors": [
+          "Carolyn Capretta",
+          "Shraddha Wilfred",
+          "Karlene Harry"
+        ],
+        "sha256": "35ef763dd5bf52c56d17d3c88e2dd4a4a4a97575c2ecef2fa30ad4e6136ffafe",
+        "size": 286263
+      }
+    ],
+    "125": [
+      {
+        "code": "4AA3",
+        "title": "Managerial Accounting II",
+        "selected_term": "Winter 2026",
+        "source_file": "4AA3/4AA3 - Winter 2026 - A. S. Merali.pdf",
+        "course_id": "b6e6a608-4fad-5699-a468-7d8c7a28f967",
+        "professors": [
+          "A. S. Merali"
+        ],
+        "sha256": "c2d7ac85bcbc4106c663fee3d729afd79265c8833e679b4ec52aa280506b0c7d",
+        "size": 435773
+      },
+      {
+        "code": "4AC3",
+        "title": "Advanced Financial Accounting",
+        "selected_term": "Winter 2026",
+        "source_file": "4AC3/4AC3 - Winter 2026 - Y. Kwok.pdf",
+        "course_id": "9ab60091-6472-5611-8849-f1fdd63c5677",
+        "professors": [
+          "Yvonne S. Kwok"
+        ],
+        "sha256": "ffa90d7fae87a02052b03fcaac17322067a736bb962980b55f4d843e8a99cb00",
+        "size": 416709
+      },
+      {
+        "code": "4AF3",
+        "title": "Accounting Theory",
+        "selected_term": "Winter 2026",
+        "source_file": "4AF3/4AF3 - Winter 2026 - J. Jin.pdf",
+        "course_id": "c1f248b2-b8b4-56d0-a73d-15b517135cd3",
+        "professors": [
+          "Justin Y. Jin"
+        ],
+        "sha256": "88e6376b83c1cb4ddaf85d5c0633e42e02153619a407ae5b3c7c53648f702491",
+        "size": 378266
+      },
+      {
+        "code": "4AK3",
+        "title": "Accounting Information for Decision Making",
+        "selected_term": "Winter 2025",
+        "source_file": "4AK3/4AK3 - Winter 2025 - G. Rombough.pdf",
+        "course_id": "4076138c-68fd-5db3-aa2c-4164b9cc2cf1",
+        "professors": [
+          "Greg Rombough"
+        ],
+        "sha256": "c5b73c988ee2e84e39576d5ee9ba6b2f281aef5d515f8fcb8f2752094ffc31a7",
+        "size": 220230
+      },
+      {
+        "code": "4BB3",
+        "title": "Recruitment and Selection",
+        "selected_term": "Winter 2026",
+        "source_file": "4BB3/4BB3 - Winter 2026 - C01 - Y. Yao.pdf",
+        "course_id": "36371648-e8b9-5a0a-982b-3bab344f3c94",
+        "professors": [
+          "Yao Yao"
+        ],
+        "sha256": "980823733b349a95b781acc3e36d47382f6a3c2ef26ad8d52e43abc7e70f3faf",
+        "size": 146537
+      },
+      {
+        "code": "4BC3",
+        "title": "Collective Bargaining",
+        "selected_term": "Winter 2026",
+        "source_file": "4BC3/4BC3 - Winter 2026 - C01 - R. Smale.pdf",
+        "course_id": "c203fac3-6e6d-56b8-adfb-f765c8c68e78",
+        "professors": [
+          "Richard Smale"
+        ],
+        "sha256": "94de0c1a46db60b36a333878fc3b4a780f557a0b1c9c33f592ce85e11c4c0c74",
+        "size": 474813
+      },
+      {
+        "code": "4BE3",
+        "title": "Strategic Compensation/Reward Systems",
+        "selected_term": "Fall 2025",
+        "source_file": "4BE3/4BE3 - Fall 2025 - C01 - Y. Yao.pdf",
+        "course_id": "319f925d-3c2d-5d36-9850-39fb4f17d546",
+        "professors": [
+          "Yao Yao"
+        ],
+        "sha256": "5a1a2e84a5822286fb2be89b6aa7929ba08b9e4b6b0b6f1eaa6e62356831cdb3",
+        "size": 326032
+      },
+      {
+        "code": "4BF3",
+        "title": "Labour Law and Policy",
+        "selected_term": "Winter 2024",
+        "source_file": "4BF3/4BF3 - Winter 2024 - C01 - J. Fudge.pdf",
+        "course_id": "02f63f29-47ab-5b12-88c8-d590bc3a6380",
+        "professors": [
+          "Judy Fudge"
+        ],
+        "sha256": "c3de34d4ed396dc85b8843717e5db593e4bd42cff62c01b30f2b970030c1c7f4",
+        "size": 315323
+      },
+      {
+        "code": "4BI3",
+        "title": "Training and Development",
+        "selected_term": "Fall 2025",
+        "source_file": "4BI3/4BI3 - Fall 2025 - C01 - H. Chen.pdf",
+        "course_id": "945c079a-b7c7-5601-a3d6-caceef871a03",
+        "professors": [
+          "Helen Chen"
+        ],
+        "sha256": "a5bbc3087cd41dd41b4cc699d09a8ae2b658c5b9a2ae1e8cd6480ebe636cab91",
+        "size": 967560
+      },
+      {
+        "code": "4BL3",
+        "title": "Occupational Health and Safety Management",
+        "selected_term": "Fall 2025",
+        "source_file": "4BL3/4BL3 - Fall 2025 - C01 - L. Djelalian-Pepper.pdf",
+        "course_id": "6edc9f86-ecb1-5457-a158-ef617ca25df7",
+        "professors": [
+          "Lucy Djelalian Pepper"
+        ],
+        "sha256": "e167c5b2646435debf445138bd287139bbf414718cfabdf3f25e2eb0e7e8d2ba",
+        "size": 398167
+      },
+      {
+        "code": "4BM3",
+        "title": "Strategic Human Resource Planning",
+        "selected_term": "Winter 2026",
+        "source_file": "4BM3/4BM3 - Winter 2026 - C01 - Y. Yao.pdf",
+        "course_id": "d42c74a4-6b10-58cc-982e-09e3c5a55236",
+        "professors": [
+          "Yao Yao"
+        ],
+        "sha256": "1b42ca13ba508c8eaaf67f3f2c1f42537735f1b66538558fdb1297a31394b277",
+        "size": 150347
+      },
+      {
+        "code": "4BP3",
+        "title": "Principles of Leadership",
+        "selected_term": "Fall 2025",
+        "source_file": "4BP3/4BP3 - Fall 2025 - C01 - Y. Berson.pdf",
+        "course_id": "d46a9323-083d-5adc-b1d0-a5886135e9b1",
+        "professors": [
+          "Yair Berson"
+        ],
+        "sha256": "7f2e095cfc5cacfc1cf6bfe0f59e405fdd667f88c442f4fcd96b454283f18aaa",
+        "size": 470353
+      },
+      {
+        "code": "4CA3",
+        "title": "Managing and Promoting Health and Healthcare Services",
+        "selected_term": "Winter 2021",
+        "source_file": "4CA3/4CA3 - Winter 2021 - C01 - K. Khaddadine (Harvie).pdf",
+        "course_id": "34d50da7-6430-536c-b6d0-ac3ef3dd916b",
+        "professors": [
+          "Katia Harvie"
+        ],
+        "sha256": "952cdf0fb82f4b1d8264ae3608446f9a55747a0fda1c2ff66ae447ad9d5789f0",
+        "size": 219434
+      },
+      {
+        "code": "4DA3",
+        "title": "Modelling and Prescriptive Analytics",
+        "selected_term": "Fall 2025",
+        "source_file": "4DA3/4DA3 - Fall 2025 - C01 - Z. Vosooghi.pdf",
+        "course_id": "35be3104-54a0-51a8-8d9b-013276dc64c1",
+        "professors": [
+          "Zeinab Vosooghi"
+        ],
+        "sha256": "93af84ebd9c8d66124cc95b0b5cdeac97b0400965c12a357c4bd6086f9b5fbf4",
+        "size": 357115
+      },
+      {
+        "code": "4FA3",
+        "title": "Applied Corporate Finance",
+        "selected_term": "Winter 2026",
+        "source_file": "4FA3/4FA3 - Winter 2026 - A. Danielova.pdf",
+        "course_id": "2f2071b3-a5fa-572c-85d9-aef051bfb768",
+        "professors": [
+          "Anna N. Danielova"
+        ],
+        "sha256": "5f01b6480c56714cccacc1e2714a1a69a491cbbbf8544952babf5d8be5bb26b8",
+        "size": 329432
+      },
+      {
+        "code": "4FB3",
+        "title": "Valuation for Finance Professionals",
+        "selected_term": "Winter 2026",
+        "source_file": "4FB3/4FB3 - Winter 2026 - A. Danielova.pdf",
+        "course_id": "a21aecdc-3ec4-5c50-9f80-5be75f5ca455",
+        "professors": [
+          "Anna N. Danielova"
+        ],
+        "sha256": "6603151c53fc4e3981c7fbdcc234836e3141b0ab1aa0dd6c9912029afe61fb95",
+        "size": 455382
+      },
+      {
+        "code": "4FC3",
+        "title": "Ethics and Professional Practice in Finance",
+        "selected_term": "Fall 2025",
+        "source_file": "4FC3/4FC3 - Fall 2025 - C01 - S. Bose.pdf",
+        "course_id": "9a80a174-be90-5b42-b0c7-e4a8a33a5ba3",
+        "professors": [
+          "Sumit Bose"
+        ],
+        "sha256": "29ff170864cdf44c8401319f469fa005a5a16212774ee959cd3c849fcff657bd",
+        "size": 350799
+      },
+      {
+        "code": "4FD3",
+        "title": "Financial Institutions",
+        "selected_term": "Fall 2024",
+        "source_file": "4FD3/4FD3 - Fall 2024 - S. Mehmood.pdf",
+        "course_id": "a35ec800-9996-5322-8ba3-8a4b276e9ee6",
+        "professors": [
+          "Sultan M. Awan"
+        ],
+        "sha256": "d35d4e5baea59f942cd5948f8465fd1cf2fb266011ebe16a3d492c06083629ea",
+        "size": 375751
+      },
+      {
+        "code": "4FE3",
+        "title": "Options and Futures",
+        "selected_term": "Winter 2025",
+        "source_file": "4FE3/4FE3 - Winter 2025 - R. Luo.pdf",
+        "course_id": "4c6d8fae-d625-59bb-a0d3-370bc5b22479",
+        "professors": [
+          "R. Luo"
+        ],
+        "sha256": "f63077bee0eea71bf3e8908c8698171d0737ee7711c912722f035577ddb80370",
+        "size": 296310
+      },
+      {
+        "code": "4FF3",
+        "title": "Portfolio Theory and Management",
+        "selected_term": "Fall 2024",
+        "source_file": "4FF3/4FF3 - Fall 2024 - A. Aziz.pdf",
+        "course_id": "bfcf3c9d-a087-590e-b08e-d8883a1387f9",
+        "professors": [
+          "Andrew Aziz"
+        ],
+        "sha256": "2b1128758ab5566461dd32fd37b2ea217ce364ccf7e9643d8738f8a2fe6c7200",
+        "size": 274610
+      },
+      {
+        "code": "4FG3",
+        "title": "Financial Theory",
+        "selected_term": "Winter 2023",
+        "source_file": "4FG3/4FG3 - Winter 2023 - I. Abdool.pdf",
+        "course_id": "1d3f0e64-d6be-50b6-9710-d890b41cb26a",
+        "professors": [
+          "Imran Abdool"
+        ],
+        "sha256": "c250bde93ec3e92b9a6785d5305ea281725fec7236bb303d32ebcb8040b36e62",
+        "size": 121021
+      },
+      {
+        "code": "4FH3",
+        "title": "Mergers, Acquisitions and Corporate Control",
+        "selected_term": "Winter 2026",
+        "source_file": "4FH3/4FH3 - Winter 2026 - S. Sarkar.pdf",
+        "course_id": "a83e0070-ebd6-508d-9b54-43981e726fe2",
+        "professors": [
+          "Sudipto Sarkar"
+        ],
+        "sha256": "3de41ffd32d837e222851020c0ef226d93ce67427a0c3265cb6b8006555305dc",
+        "size": 734328
+      },
+      {
+        "code": "4FK3",
+        "title": "Financial Statement Analysis",
+        "selected_term": "Winter 2025",
+        "source_file": "4FK3/4FK3 - Winter 2025 - A. Damley.pdf",
+        "course_id": "1a3e8e58-36c1-5028-8124-eb93673ba883",
+        "professors": [
+          "Alicia Damley"
+        ],
+        "sha256": "d7d7052a73bba1409ad7f6c85bd8c48b9e11960cd41ac361dbf5ada4dd647e1c",
+        "size": 165079
+      },
+      {
+        "code": "4FL3",
+        "title": "Personal Financial Management",
+        "selected_term": "Winter 2026",
+        "source_file": "4FL3/4FL3 - Winter 2026 - S. Bose.pdf",
+        "course_id": "6b23b18f-6c5f-50b8-8089-09bc59959986",
+        "professors": [
+          "Sumit Bose"
+        ],
+        "sha256": "e0638b0f1c24646b8ac9c29ca47c981eb8df94d0feba09fce319c743f5def891",
+        "size": 357037
+      },
+      {
+        "code": "4FM3",
+        "title": "Personal Financial Planning and Advising",
+        "selected_term": "Winter 2026",
+        "source_file": "4FM3/4FM3 - Winter 2026 - S. Bose.pdf",
+        "course_id": "22f7b586-bb6a-53e9-89ac-68b42f03ea2e",
+        "professors": [
+          "Sumit Bose"
+        ],
+        "sha256": "482344de1e70fa598628d54981f7a43b566e787ba38908ff6981e7ec935535ad",
+        "size": 351300
+      },
+      {
+        "code": "4FN3",
+        "title": "Financial Risk Management",
+        "selected_term": "Fall 2025",
+        "source_file": "4FN3/4FN3 - Fall 2025 - Damley.pdf",
+        "course_id": "d70a91bb-c7a6-5824-b260-95c57c3ca5ea",
+        "professors": [
+          "Alicia Damley"
+        ],
+        "sha256": "3500d54edbabcc483852f682590a69fde096b502156546ae98faabddcda38f84",
+        "size": 141134
+      },
+      {
+        "code": "4FO3",
+        "title": "Small Business and Entrepreneurial Finance",
+        "selected_term": "Fall 2023",
+        "source_file": "4FO3/4FO3 - Fall 2023 - W. Ahmad.pdf",
+        "course_id": "9d645975-9018-5cc6-8dac-3c1e49efc771",
+        "professors": [
+          "Waquar Ahmad"
+        ],
+        "sha256": "90da5e0ef208b810ccc5ca368f189da331dda2857bef666dbd207c17c4759a10",
+        "size": 336881
+      },
+      {
+        "code": "4FP3",
+        "title": "Personal Finance",
+        "selected_term": "Fall 2025",
+        "source_file": "4FP3/4FP3 - Fall 2025 - S. Cheung.pdf",
+        "course_id": "bd0433ee-75d1-5e3d-a363-3604b4778d74",
+        "professors": [
+          "C. Sherman Cheung"
+        ],
+        "sha256": "0cd1218e3f2098346ba69237e82f48ff46114384fc897ef9375a8811919b4c26",
+        "size": 328220
+      },
+      {
+        "code": "4FQ3",
+        "title": "Working Capital Management",
+        "selected_term": "Winter 2023",
+        "source_file": "4FQ3/4FQ3 - Winter 2023 - S. Sarkar.pdf",
+        "course_id": "5df6871a-eca2-5b92-8d78-86ff654f6819",
+        "professors": [
+          "Sudipto Sarkar"
+        ],
+        "sha256": "bf05cd51a78f27efd59952a61528a2d119dbae140c077048cd9fa8a58880fdb7",
+        "size": 569592
+      },
+      {
+        "code": "4FR3",
+        "title": "Insurance and Risk Management",
+        "selected_term": "Fall 2024",
+        "source_file": "4FR3/4FR3 - Fall 2024 - S. Bose.pdf",
+        "course_id": "f4238e45-f45e-5a6f-8aba-97fb3b3694be",
+        "professors": [
+          "Sumit Bose"
+        ],
+        "sha256": "8992a07125534b86aacc54301a4ebc3ca1f302878746e464418ec538113f6209",
+        "size": 298760
+      }
+    ],
+    "126": [
+      {
+        "code": "4FS3",
+        "title": "Pension, Retirement and Estate Planning",
+        "selected_term": "Winter 2025",
+        "source_file": "4FS3/4FS3 - Winter 2025 - C01 - S. Bose.pdf",
+        "course_id": "b65d7329-c360-546a-8be7-73b306bbaac4",
+        "professors": [
+          "Sumit Bose"
+        ],
+        "sha256": "f75edd3c003468c502df63bac4be66a9f91bb88ada00a6a38a5653ad5697b7be",
+        "size": 282717
+      },
+      {
+        "code": "4FT3",
+        "title": "Real Estate Finance and Investment",
+        "selected_term": "Winter 2026",
+        "source_file": "4FT3/4FT3 - Winter 2026 - A. Mahmood.pdf",
+        "course_id": "5a12c7a4-dcb1-539d-a403-b2525352f7de",
+        "professors": [
+          "Adeel Mahmood"
+        ],
+        "sha256": "91b93135b027bc32b33f6a5418a107d1f4a2354cc28060dd1f32942f5c95fc32",
+        "size": 264566
+      },
+      {
+        "code": "4FU3",
+        "title": "Behavioural Finance: The Psychology of Markets",
+        "selected_term": "Fall 2025",
+        "source_file": "4FU3/4FU3 - Fall 2025 - C01 - S. Bose.pdf",
+        "course_id": "0cbe9680-9176-56ae-b850-c50dbfb9f114",
+        "professors": [
+          "Sumit Bose"
+        ],
+        "sha256": "32cab9583cc391b2382e45c3d0c8cdac2965ae9ebb09b9bd0dff7ba8c4cc5ebb",
+        "size": 374467
+      },
+      {
+        "code": "4FV3",
+        "title": "Venture Capital",
+        "selected_term": "Fall 2025",
+        "source_file": "4FV3/4FV3 - Fall 2025 - A. Mahmood.pdf",
+        "course_id": "a0322229-2e76-5370-91af-bbbd5b5839e3",
+        "professors": [
+          "Adeel Mahmood"
+        ],
+        "sha256": "9e4b52ba5f5a1934ed6a5fd4f1adcc4cf132f987e7b73cfa2200c5594d35f536",
+        "size": 298233
+      },
+      {
+        "code": "4FW3",
+        "title": "Finance for Entrepreneurs",
+        "selected_term": "Fall 2025",
+        "source_file": "4FW3/4FW3 - Fall 2025 - T. Chamberlain.pdf",
+        "course_id": "eb50b1b1-8939-5721-8fdc-54e2170d25b1",
+        "professors": [
+          "Trevor Chamberlain"
+        ],
+        "sha256": "c1a6d88c72cbb05d973cd52a3ced42cb64bdf97e874c3a2ceabbdf6fa0cf08ce",
+        "size": 224967
+      },
+      {
+        "code": "4FX3",
+        "title": "Special Topics in Finance",
+        "selected_term": "Fall 2024",
+        "source_file": "4FX3/4FX3 - Fall 2024 - L. Waverman.pdf",
+        "course_id": "67308986-55fe-506e-aff5-897ea4fd48b4",
+        "professors": [
+          "Leonard Waverman"
+        ],
+        "sha256": "f8c6c079594f6cf6309456c1ff9d36e5db56b15f8ff25464324d65157acc5afd",
+        "size": 311862
+      },
+      {
+        "code": "4KF3",
+        "title": "Project Management",
+        "selected_term": "Winter 2026",
+        "source_file": "4KF3/4KF3 - Winter 2026 - C01, C02 - N.Wagner.pdf",
+        "course_id": "ac739e15-6341-5f3a-8117-775f0760009c",
+        "professors": [
+          "Nicole Wagner"
+        ],
+        "sha256": "f5dc41af7c0bdd8886ada9ee62a04f3aec2a81f969ed95344397def5926dc0ba",
+        "size": 327981
+      },
+      {
+        "code": "4KG3",
+        "title": "Data Mining For Business Analytics",
+        "selected_term": "Winter 2025",
+        "source_file": "4KG3/4KG3 - Winter 2025 - C01, C02, C03 - K. Wind.pdf",
+        "course_id": "76296225-46d1-585f-986b-15427f0d138e",
+        "professors": [
+          "Keiwan Wind"
+        ],
+        "sha256": "6a6a0dab074a63063bfd1b6e5e8ee8fd2ce2e7ff6f49ad96dffdb432d02944ff",
+        "size": 260406
+      },
+      {
+        "code": "4KH3",
+        "title": "Strategies for Electronic and Mobile Business",
+        "selected_term": "Fall 2025",
+        "source_file": "4KH3/4KH3 - Fall 2025 - C01 - A. Montazemi.pdf",
+        "course_id": "71e1a40d-c1f8-5742-8d2e-f5d85f728742",
+        "professors": [
+          "Ali Reza Montazemi"
+        ],
+        "sha256": "ce8287d7213e0105211cc7ca05fd8047734458e4b9cf4e85904f43db30c8b955",
+        "size": 405150
+      },
+      {
+        "code": "4KI3",
+        "title": "Business Process Management",
+        "selected_term": "Fall 2024",
+        "source_file": "4KI3/4KI3 - Fall 2024 - C01 - A. Montazemi.pdf",
+        "course_id": "4d4eb5d4-f1ff-5b38-ba3c-0a4ad6a3b7a2",
+        "professors": [
+          "Ali Reza Montazemi"
+        ],
+        "sha256": "ee370614bed709a60efaee42ad5a51e0678aafcf19d2a489b378e96bc71b4923",
+        "size": 146058
+      },
+      {
+        "code": "4MA3",
+        "title": "Advertising and Integrated Marketing Communication",
+        "selected_term": "Winter 2026",
+        "source_file": "4MA3/4MA3 - Winter 2026 - C. DeVries.pdf",
+        "course_id": "b928488e-5e8b-5d67-97d8-13f8b2d5b74e",
+        "professors": [
+          "Christina DeVries"
+        ],
+        "sha256": "2424c5e3c1b59c355f1ee86107dd22ae328f8206dceccc94e22fdf57b42e123e",
+        "size": 247480
+      },
+      {
+        "code": "4MC3",
+        "title": "New Product Marketing",
+        "selected_term": "Winter 2026",
+        "source_file": "4MC3/4MC3 - Winter 2026 - K. C. Lesage.pdf",
+        "course_id": "8740b613-f4cd-56d3-bfba-bb83f49071fa",
+        "professors": [
+          "Kai Christine Lesage"
+        ],
+        "sha256": "b73c2a42a8cebe2863272ab7b689b6a975426d42fc3a17223437aa01eea7e5e4",
+        "size": 469006
+      },
+      {
+        "code": "4ME3",
+        "title": "Sales Management",
+        "selected_term": "Winter 2026",
+        "source_file": "4ME3/4ME3 - Winter 2026 - M. Malik.pdf",
+        "course_id": "03b0f744-76ad-5cc1-95d1-7c4e292f80bc",
+        "professors": [
+          "Mandeep Malik"
+        ],
+        "sha256": "2310d31d466316849ce52b632a69bde8e4533aab49b2e5d6aaf3d106e2ee8283",
+        "size": 414156
+      },
+      {
+        "code": "4MF3",
+        "title": "Retailing Management",
+        "selected_term": "Fall 2024",
+        "source_file": "4MF3/4MF3 - Fall 2024 - V. Kumar.pdf",
+        "course_id": "3219121a-1456-5fc6-ba35-c855a5cc8a51",
+        "professors": [
+          "Vijay Kumar"
+        ],
+        "sha256": "a069d827292f03c6f36cbbe28417056abb4125e0a597c281781e8c0a074507b0",
+        "size": 263908
+      },
+      {
+        "code": "4MG3",
+        "title": "Strategic Philanthropy and Leadership",
+        "selected_term": "Fall 2021",
+        "source_file": "4MG3/4MG3 - Fall 2021 - C01 - C. Siklosi, L. Fergusson.pdf",
+        "course_id": "94bc1832-6f7c-577d-93ea-d9301d73d50c",
+        "professors": [
+          "Lynn Fergusson",
+          "Kate Siklosi"
+        ],
+        "sha256": "c267224f810b929c8282aaba450343d269ae946ee5bb3c27747fef3a9b9a4f9a",
+        "size": 508265
+      },
+      {
+        "code": "4OB3",
+        "title": "Analysis of Production/Operations Problems",
+        "selected_term": "Fall 2024",
+        "source_file": "4OB3/4OB3 - Fall 2024 - C01 - P. Abad.pdf",
+        "course_id": "43769a50-cbcd-5da5-b72a-b33acb9e8887",
+        "professors": [
+          "Prakash Abad"
+        ],
+        "sha256": "ec2fa3e7d9a965e556d111f023dd3cb83c68ee7b86fddadf3d44bec1e02e80cd",
+        "size": 262002
+      },
+      {
+        "code": "4OD3",
+        "title": "Purchasing and Supply Management",
+        "selected_term": "Winter 2026",
+        "source_file": "4OD3/4OD3 - Winter 2026 - C01 - K. Huang.pdf",
+        "course_id": "54946a52-aacc-50d1-998a-32f11942dbe2",
+        "professors": [
+          "Kai Huang"
+        ],
+        "sha256": "f32a6e6cc751c1000deb08fdf663867e88327dc3437a875bfd770160a41dd778",
+        "size": 652798
+      },
+      {
+        "code": "4OI3",
+        "title": "Supply Chain Management",
+        "selected_term": "Fall 2025",
+        "source_file": "4OI3/4OI3 - Fall 2025 - C01 - K. Huang.pdf",
+        "course_id": "f2260789-a24c-5177-b026-7f8590d0cc0a",
+        "professors": [
+          "Kai Huang"
+        ],
+        "sha256": "811b2654a5596c7a86d841295b9aca1166bde032d9a4c4435d7be9f21eeb27af",
+        "size": 1223766
+      },
+      {
+        "code": "4PA3",
+        "title": "Business Policy: Strategic Management",
+        "selected_term": "Winter 2026",
+        "source_file": "4PA3/4PA3 - Winter 2026 - R. Cossa, G. Huang, A. Ali.pdf",
+        "course_id": "2ef8d5a5-1fe6-5802-aa7f-a521d707f1f4",
+        "professors": [
+          "Rita Cossa",
+          "Grace Huang",
+          "Ahzam Ali"
+        ],
+        "sha256": "7e4635ab9443d187a00c9b6625aa049ae55161a213a8d9a8c354c7ff4300ef50",
+        "size": 293460
+      },
+      {
+        "code": "4QA3",
+        "title": "Operations Modelling and Analysis",
+        "selected_term": "Winter 2026",
+        "source_file": "4QA3/4QA3 - Winter 2026 - C01 - A. Foda.pdf",
+        "course_id": "0265eff8-7126-594f-bea3-42e8e5689e9c",
+        "professors": [
+          "Ahmed Foda"
+        ],
+        "sha256": "95cd43e30ca6cb6cf3868ea903b6c92a166995eb7f91a18e53ffd80b37e2229f",
+        "size": 345197
+      },
+      {
+        "code": "4SA3",
+        "title": "International Business",
+        "selected_term": "Winter 2026",
+        "source_file": "4SA3/4SA3 - Winter 2026 - P. Balaji, J. Han, A. Taherizadeh.pdf",
+        "course_id": "503a128f-6bff-59f2-9aac-1d6b13ed23f1",
+        "professors": [
+          "Pavithra Balaji",
+          "Jukyeong (Judy) Han",
+          "Amir Taherizadeh"
+        ],
+        "sha256": "b6c450dd72fc95eb1a35341d6ed7b534f72dcf508ed218cf58bd7057744268dd",
+        "size": 450631
+      },
+      {
+        "code": "4SB3",
+        "title": "Introduction to Canadian Taxation",
+        "selected_term": "Fall 2025",
+        "source_file": "4SB3/4SB3 - Fall 2025 - E. Bentzen-Bilkvist.pdf",
+        "course_id": "c4b44871-8f3c-5c72-ac10-6795439a6cd3",
+        "professors": [
+          "Eric Bentzen-Bilkvist"
+        ],
+        "sha256": "b70e7dcb7b4a0640d0591d7f834fc93d6b78fe10c50eb8f514e8792eded82d15",
+        "size": 211893
+      },
+      {
+        "code": "4SC3",
+        "title": "Advanced Canadian Taxation",
+        "selected_term": "Winter 2026",
+        "source_file": "4SC3/4SC3 - Winter 2026 - E. Bentzen Bilkvist.pdf",
+        "course_id": "c682ae9d-c8d7-5649-97f7-e3d8caa82bab",
+        "professors": [
+          "Eric Bentzen-Bilkvist"
+        ],
+        "sha256": "3b6dd83ce85bc0b16c9763f630d08146459a5127715c3e1bdbc477d89932324d",
+        "size": 397564
+      },
+      {
+        "code": "4SD3",
+        "title": "Commercial Law",
+        "selected_term": "Winter 2026",
+        "source_file": "4SD3/4SD3 - Winter 2026 - K. Ketsetzis.pdf",
+        "course_id": "92b3fe12-f0dd-5736-ab81-d66083a35aa3",
+        "professors": [
+          "Konstantine Ketsetzis"
+        ],
+        "sha256": "cb45c0237868db5554f644f8cad327b9e38354187e3a1abbb0cb6f709f9b9790",
+        "size": 508991
+      },
+      {
+        "code": "4SE3",
+        "title": "Entrepreneurship",
+        "selected_term": "Fall 2025",
+        "source_file": "4SE3/4SE3 - Fall 2025 - M. Ryder.pdf",
+        "course_id": "3336076d-1b96-5753-9beb-7154d9919b32",
+        "professors": [
+          "Marvin Ryder"
+        ],
+        "sha256": "0e8aae2fce57a2d0a3908dc9481134be85ea0785b01b658837371540f4f50df6",
+        "size": 534720
+      },
+      {
+        "code": "4SG3",
+        "title": "Sustainability: Corporations and Society",
+        "selected_term": "Winter 2026",
+        "source_file": "4SG3/4SG3 - Winter 2026 - C. Capretta.pdf",
+        "course_id": "93f7c483-3783-5071-a71b-72c2af8b4066",
+        "professors": [
+          "Carolyn Capretta"
+        ],
+        "sha256": "06377f3c2e4c7e6d8421fb5fc811e20730cf63063169ac169fc4f1686eda273f",
+        "size": 346070
+      },
+      {
+        "code": "4SH3",
+        "title": "Case Analysis and Presentation Skills",
+        "selected_term": "Fall 2019",
+        "source_file": "4SH3/4SH3 - Fall 2019 - C01 - F. Neville.pdf",
+        "course_id": "26521ca5-5346-58e4-9ba9-17fc4e3340f6",
+        "professors": [
+          "François Neville"
+        ],
+        "sha256": "72fc07e8b3cee75a50582480d242d1a859a31f38e019bfb3a58c5812f808bb74",
+        "size": 143403
+      },
+      {
+        "code": "4SM3",
+        "title": "Sports Management",
+        "selected_term": "Winter 2026",
+        "source_file": "4SM3/4SM3 - Winter 2026 - G. Huang.pdf",
+        "course_id": "ca453e0a-a694-5dd3-ac70-2e2aecfcdd48",
+        "professors": [
+          "Grace Huang"
+        ],
+        "sha256": "91457f913bbed6398ffad55d16bd9feb4beeeb2dac2b288b6125e9a2deac9025",
+        "size": 327981
+      },
+      {
+        "code": "4SX3",
+        "title": "Special Topics in Strategic Management: White Collar Crime",
+        "selected_term": "Summer 2020",
+        "source_file": "4SX3/4SX3 - Summer 2020 - C01 - D. Sorbara.pdf",
+        "course_id": "0cc3d097-72b3-54e9-a5c4-e611e3a046c7",
+        "professors": [
+          "Dom Sorbara"
+        ],
+        "sha256": "4142c7056cd1643e654d018b31fdc5e3ea468a87ce6be629a07a2bea58556b5f",
+        "size": 265750
+      }
+    ]
+  }
+}

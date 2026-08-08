@@ -1,0 +1,16 @@
+{
+  "name": "cheeseapp-share-worker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Cloudflare Worker for Cheese public share links and universal-link support",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "find src -name '*.js' -print0 | xargs -0 -n1 node --check",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "wrangler": "^4.10.0"
+  }
+}

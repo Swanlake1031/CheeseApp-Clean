@@ -1,0 +1,29 @@
+name = "cheeseapp-share"
+main = "src/index.js"
+compatibility_date = "2026-04-07"
+
+routes = [
+  { pattern = "cheeseapp.org/posts/*", zone_name = "cheeseapp.org" },
+  { pattern = "cheeseapp.org/open/*", zone_name = "cheeseapp.org" },
+  { pattern = "cheeseapp.org/download*", zone_name = "cheeseapp.org" },
+  { pattern = "cheeseapp.org/apple-app-site-association*", zone_name = "cheeseapp.org" },
+  { pattern = "cheeseapp.org/.well-known/apple-app-site-association*", zone_name = "cheeseapp.org" },
+  { pattern = "cheeseapp.org/apple-touch-icon*", zone_name = "cheeseapp.org" },
+  { pattern = "cheeseapp.org/favicon*", zone_name = "cheeseapp.org" },
+  { pattern = "cheeseapp.org/manifest.webmanifest*", zone_name = "cheeseapp.org" },
+  { pattern = "cheeseapp.org/og/default.png*", zone_name = "cheeseapp.org" },
+  { pattern = "www.cheeseapp.org/*", zone_name = "cheeseapp.org" },
+]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+[vars]
+APP_ID = "59RCF5754W.com.timonayf.cheeseapp"
+CANONICAL_HOST = "cheeseapp.org"
+APP_SCHEME = "cheeseapp://post"
+
+[triggers]
+crons = ["* * * * *"]

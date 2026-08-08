@@ -1,0 +1,1488 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		001 /* CheeseAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100 /* CheeseAppApp.swift */; };
+		002 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101 /* MainTabView.swift */; };
+		010 /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110 /* SupabaseClient.swift */; };
+		021 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121 /* User.swift */; };
+		022 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 122 /* ChatMessage.swift */; };
+		030 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130 /* AuthService.swift */; };
+		AUTHCRED02 /* AuthCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUTHCRED01 /* AuthCredentialStore.swift */; };
+		031 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131 /* ChatService.swift */; };
+		032 /* ImageUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 132 /* ImageUploadService.swift */; };
+		034 /* SchoolDirectoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 134 /* SchoolDirectoryService.swift */; };
+		040 /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 140 /* Formatters.swift */; };
+		041 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 141 /* Constants.swift */; };
+		050 /* Date+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 150 /* Date+Extensions.swift */; };
+		051 /* View+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151 /* View+Extensions.swift */; };
+		IMGPRBLD1 /* ImagePreview+View.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMGPRFILE1 /* ImagePreview+View.swift */; };
+		CHATCFBLD1 /* PressEnterComposerField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHATCFFILE1 /* PressEnterComposerField.swift */; };
+		061 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 161 /* LoadingView.swift */; };
+		062 /* ErrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162 /* ErrorView.swift */; };
+		063 /* ImagePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163 /* ImagePicker.swift */; };
+		064 /* ContentCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 164 /* ContentCardView.swift */; };
+		070 /* Colors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 170 /* Colors.swift */; };
+		071 /* Fonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 171 /* Fonts.swift */; };
+		090 /* SecondhandPost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 190 /* SecondhandPost.swift */; };
+		091 /* SecondhandListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 191 /* SecondhandListView.swift */; };
+		092 /* SecondhandService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192 /* SecondhandService.swift */; };
+		093 /* CreateSecondhandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 193 /* CreateSecondhandView.swift */; };
+		0C0 /* ForumPost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0 /* ForumPost.swift */; };
+		0C1 /* ForumListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1 /* ForumListView.swift */; };
+		FCARDBLD1 /* ForumPostCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCARDFILE1 /* ForumPostCardView.swift */; };
+		FDETBLD1 /* ForumDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDETFILE1 /* ForumDetailView.swift */; };
+		FBRDBLD1 /* ForumBoardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBRDFILE1 /* ForumBoardViews.swift */; };
+		FSRCBLD1 /* ForumSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FSRCFILE1 /* ForumSearchView.swift */; };
+		FREFBLD1 /* HotpotSteamRefreshView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FREFFILE1 /* HotpotSteamRefreshView.swift */; };
+		0C2 /* ForumService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C2 /* ForumService.swift */; };
+		0C3 /* CreateForumView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C3 /* CreateForumView.swift */; };
+		0D1 /* ChatListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D1 /* ChatListView.swift */; };
+		0D2 /* ChatRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2 /* ChatRoomView.swift */; };
+		CMSGCBLD1 /* ChatMessageContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CMSGCFILE1 /* ChatMessageContentView.swift */; };
+		CRSUPBLD1 /* ChatRoomSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRSUPFILE1 /* ChatRoomSupportingViews.swift */; };
+		CRUTLBLD1 /* ChatRoomUtilityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRUTLFILE1 /* ChatRoomUtilityViews.swift */; };
+		CRGRPBLD1 /* ChatRoomGroupCreationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRGRPFILE1 /* ChatRoomGroupCreationViews.swift */; };
+		CGRPBLD1 /* ChatGroupCreationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CGRPFILE1 /* ChatGroupCreationViews.swift */; };
+		CFOLBLD1 /* ChatFollowSearchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFOLFILE1 /* ChatFollowSearchViews.swift */; };
+		CROWBLD1 /* ChatConversationRowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CROWFILE1 /* ChatConversationRowViews.swift */; };
+		0D3 /* ChatInboxSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D3 /* ChatInboxSupport.swift */; };
+		0D4 /* ChatInboxPresentationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D4 /* ChatInboxPresentationState.swift */; };
+		0D5 /* ChatGroupConversationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D5 /* ChatGroupConversationViews.swift */; };
+		0D6 /* ChatConversationStateUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D6 /* ChatConversationStateUpdater.swift */; };
+		0D7 /* ChatRoomLifecycleController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D7 /* ChatRoomLifecycleController.swift */; };
+		CRVMBLD1 /* ChatRoomViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRVMFILE1 /* ChatRoomViewModel.swift */; };
+		GCVMBLD1 /* GroupChatViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = GCVMFILE1 /* GroupChatViewModels.swift */; };
+		CHVMBLD1 /* ChatRoomHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHVMFILE1 /* ChatRoomHistoryViewModel.swift */; };
+		CFVMBLD1 /* ChatFollowSearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFVMFILE1 /* ChatFollowSearchViewModel.swift */; };
+		CGDTBLD1 /* ChatGroupDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CGDTFILE1 /* ChatGroupDetailsView.swift */; };
+		CRSVBLD1 /* ChatRoomServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRSVFILE1 /* ChatRoomServices.swift */; };
+		0D8 /* ChatServiceRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D8 /* ChatServiceRepository.swift */; };
+		0D9 /* ChatPrivacyActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D9 /* ChatPrivacyActions.swift */; };
+		0E1 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E1 /* ProfileView.swift */; };
+		PSOCBLD1 /* ProfileSocialViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSOCFILE1 /* ProfileSocialViews.swift */; };
+		PEDTBLD1 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PEDTFILE1 /* EditProfileView.swift */; };
+		PSETBLD1 /* ProfileSettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSETFILE1 /* ProfileSettingsViews.swift */; };
+		PLEGALBLD1 /* LegalDocumentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PLEGALFILE1 /* LegalDocumentViews.swift */; };
+		PACCBLD1 /* ProfileAccountViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PACCFILE1 /* ProfileAccountViews.swift */; };
+		PCOLBLD1 /* ProfileCollectionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PCOLFILE1 /* ProfileCollectionViews.swift */; };
+		PACTSVBLD1 /* ProfileActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = PACTSVFILE1 /* ProfileActivityService.swift */; };
+		PACTVWBLD1 /* ProfileActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PACTVWFILE1 /* ProfileActivityView.swift */; };
+		0E2 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E2 /* AuthView.swift */; };
+		IMGCH02 /* CachedRemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMGCH01 /* CachedRemoteImage.swift */; };
+		AVCRP02 /* AvatarImageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AVCRP01 /* AvatarImageViews.swift */; };
+		0F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1F0 /* Assets.xcassets */; };
+		200A /* PostKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200 /* PostKind.swift */; };
+		201A /* CommunityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 201 /* CommunityService.swift */; };
+		202A /* UserPostSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202 /* UserPostSummary.swift */; };
+		203A /* UserPostsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 203 /* UserPostsService.swift */; };
+		210A /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 210 /* ProfileService.swift */; };
+		211A /* ProfileSocialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 211 /* ProfileSocialService.swift */; };
+		204A /* ReportPostSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 204 /* ReportPostSheet.swift */; };
+		205A /* SupportCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 205 /* SupportCenterView.swift */; };
+		206A /* UserPostsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 206 /* UserPostsView.swift */; };
+		207A /* PostReactionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207 /* PostReactionService.swift */; };
+		208A /* EditPostSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 208 /* EditPostSheet.swift */; };
+		20AA /* PostEditorComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A /* PostEditorComponents.swift */; };
+		20BA /* PostEditorFeatureSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B /* PostEditorFeatureSections.swift */; };
+		20CA /* PostEditorFeatureForms.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C /* PostEditorFeatureForms.swift */; };
+		FEDITBLD1 /* ForumPostEditorSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEDITFILE1 /* ForumPostEditorSurface.swift */; };
+		20DA /* PostSharePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D /* PostSharePresentation.swift */; };
+		20EA /* PostDeepLinkPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20E /* PostDeepLinkPresentation.swift */; };
+		PDRBLD1 /* PostDeepLinkRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = PDRFILE1 /* PostDeepLinkRoute.swift */; };
+		PSPBLD1 /* PostSharePayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSPFILE1 /* PostSharePayload.swift */; };
+		CR1 /* CreatePostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CR11 /* CreatePostView.swift */; };
+		DBA54B9C2F2D43DA0073E17A /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54B9B2F2D43DA0073E17A /* Auth */; };
+		DBA54B9E2F2D43DA0073E17A /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54B9D2F2D43DA0073E17A /* Functions */; };
+		DBA54BA02F2D43DA0073E17A /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54B9F2F2D43DA0073E17A /* PostgREST */; };
+		DBA54BA22F2D43DA0073E17A /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA12F2D43DA0073E17A /* Realtime */; };
+		DBA54BA42F2D43DA0073E17A /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA32F2D43DA0073E17A /* Storage */; };
+		DBA54BA72F2D44C30073E17A /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA62F2D44C30073E17A /* Supabase */; };
+		H01 /* HomeCardItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = H11 /* HomeCardItem.swift */; };
+		H03 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = H21 /* HomeViewModel.swift */; };
+		H04 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = H31 /* HomeView.swift */; };
+		H07 /* QuickActionsRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = H43 /* QuickActionsRowView.swift */; };
+		C01A /* CourseSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01 /* CourseSummary.swift */; };
+		C04A /* CourseDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04 /* CourseDiscoveryView.swift */; };
+		C05A /* CourseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05 /* CourseDetailView.swift */; };
+		C06A /* CourseOutline.swift in Sources */ = {isa = PBXBuildFile; fileRef = C06 /* CourseOutline.swift */; };
+		C07A /* CourseOutlineService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07 /* CourseOutlineService.swift */; };
+		C08A /* CourseOutlineViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C08 /* CourseOutlineViewerView.swift */; };
+		C09A /* CourseReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09 /* CourseReview.swift */; };
+		C10A /* CourseReviewService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10 /* CourseReviewService.swift */; };
+		C11A /* CourseReviewViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11 /* CourseReviewViewModel.swift */; };
+		C12A /* CourseReviewSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12 /* CourseReviewSection.swift */; };
+		C13A /* CourseCatalogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13 /* CourseCatalogService.swift */; };
+		C14A /* CourseDiscoveryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14 /* CourseDiscoveryViewModel.swift */; };
+		C15A /* CoursePageBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15 /* CoursePageBackground.swift */; };
+		H09 /* HomeFeedService.swift in Sources */ = {isa = PBXBuildFile; fileRef = H51 /* HomeFeedService.swift */; };
+		S01 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = S11 /* SearchView.swift */; };
+		S02 /* SearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = S12 /* SearchService.swift */; };
+		S03 /* SearchProfileResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = S13 /* SearchProfileResult.swift */; };
+		SYSMSGBLD1 /* SystemMessagesFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYSMSGFILE1 /* SystemMessagesFeature.swift */; };
+		SYSMENBLD1 /* MentionFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYSMENFILE1 /* MentionFeature.swift */; };
+		SYSVIEWBLD1 /* SystemMessageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYSVIEWFILE1 /* SystemMessageViews.swift */; };
+		TSTBLD03 /* ChatInboxPresentationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE03 /* ChatInboxPresentationStateTests.swift */; };
+		TSTBLD04 /* ChatConversationStateUpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE04 /* ChatConversationStateUpdaterTests.swift */; };
+		TSTBLD05 /* ChatRoomLifecycleControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE05 /* ChatRoomLifecycleControllerTests.swift */; };
+		TSTBLDCHATGH1 /* ChatGroupAndHistoryViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILECHATGH1 /* ChatGroupAndHistoryViewModelTests.swift */; };
+		TSTBLD06 /* PostCorrectnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE06 /* PostCorrectnessTests.swift */; };
+		TSTBLD07 /* ProfileSocialServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE07 /* ProfileSocialServiceTests.swift */; };
+		TSTBLD08 /* HomeFeedServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE08 /* HomeFeedServiceTests.swift */; };
+		TSTBLD09 /* SearchProfileResultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE09 /* SearchProfileResultTests.swift */; };
+		TSTBLD10 /* AuthCredentialStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE10 /* AuthCredentialStoreTests.swift */; };
+		TSTBLD11 /* CourseOutlineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE11 /* CourseOutlineTests.swift */; };
+		TSTBLD12 /* CourseReviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE12 /* CourseReviewTests.swift */; };
+		TSTBLD13 /* SearchPaginationViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE13 /* SearchPaginationViewModelTests.swift */; };
+		TSTBLD14 /* CourseDiscoveryFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE14 /* CourseDiscoveryFilterTests.swift */; };
+		TSTBLD15 /* ChatAccountIsolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE15 /* ChatAccountIsolationTests.swift */; };
+		TSTBLD16 /* SystemMessageViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE16 /* SystemMessageViewModelTests.swift */; };
+		TSTBLD17 /* MentionTextLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE17 /* MentionTextLogicTests.swift */; };
+		TSTBLD18 /* ProfileActivityServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE18 /* ProfileActivityServiceTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		TSTPROXY01 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = PRJ /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CCC;
+			remoteInfo = CheeseApp;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		100 /* CheeseAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheeseAppApp.swift; sourceTree = "<group>"; };
+		101 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		SYSMSGFILE1 /* SystemMessagesFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMessagesFeature.swift; sourceTree = "<group>"; };
+		SYSMENFILE1 /* MentionFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionFeature.swift; sourceTree = "<group>"; };
+		SYSVIEWFILE1 /* SystemMessageViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMessageViews.swift; sourceTree = "<group>"; };
+		110 /* SupabaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
+		121 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+		122 /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
+		130 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		AUTHCRED01 /* AuthCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthCredentialStore.swift; sourceTree = "<group>"; };
+		131 /* ChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatService.swift; sourceTree = "<group>"; };
+		132 /* ImageUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageUploadService.swift; sourceTree = "<group>"; };
+		134 /* SchoolDirectoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchoolDirectoryService.swift; sourceTree = "<group>"; };
+		140 /* Formatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatters.swift; sourceTree = "<group>"; };
+		141 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
+		150 /* Date+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Date+Extensions.swift"; sourceTree = "<group>"; };
+		151 /* View+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Extensions.swift"; sourceTree = "<group>"; };
+		IMGPRFILE1 /* ImagePreview+View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImagePreview+View.swift"; sourceTree = "<group>"; };
+		CHATCFFILE1 /* PressEnterComposerField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PressEnterComposerField.swift; sourceTree = "<group>"; };
+		161 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
+		162 /* ErrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorView.swift; sourceTree = "<group>"; };
+		163 /* ImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePicker.swift; sourceTree = "<group>"; };
+		164 /* ContentCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentCardView.swift; sourceTree = "<group>"; };
+		170 /* Colors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Colors.swift; sourceTree = "<group>"; };
+		171 /* Fonts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fonts.swift; sourceTree = "<group>"; };
+		190 /* SecondhandPost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondhandPost.swift; sourceTree = "<group>"; };
+		191 /* SecondhandListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondhandListView.swift; sourceTree = "<group>"; };
+		192 /* SecondhandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondhandService.swift; sourceTree = "<group>"; };
+		193 /* CreateSecondhandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateSecondhandView.swift; sourceTree = "<group>"; };
+		1C0 /* ForumPost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumPost.swift; sourceTree = "<group>"; };
+		1C1 /* ForumListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumListView.swift; sourceTree = "<group>"; };
+		FCARDFILE1 /* ForumPostCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumPostCardView.swift; sourceTree = "<group>"; };
+		FDETFILE1 /* ForumDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumDetailView.swift; sourceTree = "<group>"; };
+		FBRDFILE1 /* ForumBoardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumBoardViews.swift; sourceTree = "<group>"; };
+		FSRCFILE1 /* ForumSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumSearchView.swift; sourceTree = "<group>"; };
+		FREFFILE1 /* HotpotSteamRefreshView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotpotSteamRefreshView.swift; sourceTree = "<group>"; };
+		1C2 /* ForumService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumService.swift; sourceTree = "<group>"; };
+		1C3 /* CreateForumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateForumView.swift; sourceTree = "<group>"; };
+		1D1 /* ChatListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatListView.swift; sourceTree = "<group>"; };
+		1D2 /* ChatRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomView.swift; sourceTree = "<group>"; };
+		CMSGCFILE1 /* ChatMessageContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessageContentView.swift; sourceTree = "<group>"; };
+		CRSUPFILE1 /* ChatRoomSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomSupportingViews.swift; sourceTree = "<group>"; };
+		CRUTLFILE1 /* ChatRoomUtilityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomUtilityViews.swift; sourceTree = "<group>"; };
+		CRGRPFILE1 /* ChatRoomGroupCreationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomGroupCreationViews.swift; sourceTree = "<group>"; };
+		CGRPFILE1 /* ChatGroupCreationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGroupCreationViews.swift; sourceTree = "<group>"; };
+		CFOLFILE1 /* ChatFollowSearchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFollowSearchViews.swift; sourceTree = "<group>"; };
+		CROWFILE1 /* ChatConversationRowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatConversationRowViews.swift; sourceTree = "<group>"; };
+		1D3 /* ChatInboxSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInboxSupport.swift; sourceTree = "<group>"; };
+		1D4 /* ChatInboxPresentationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInboxPresentationState.swift; sourceTree = "<group>"; };
+		1D5 /* ChatGroupConversationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGroupConversationViews.swift; sourceTree = "<group>"; };
+		1D6 /* ChatConversationStateUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatConversationStateUpdater.swift; sourceTree = "<group>"; };
+		1D7 /* ChatRoomLifecycleController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomLifecycleController.swift; sourceTree = "<group>"; };
+		CRVMFILE1 /* ChatRoomViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomViewModel.swift; sourceTree = "<group>"; };
+		GCVMFILE1 /* GroupChatViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupChatViewModels.swift; sourceTree = "<group>"; };
+		CHVMFILE1 /* ChatRoomHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomHistoryViewModel.swift; sourceTree = "<group>"; };
+		CFVMFILE1 /* ChatFollowSearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFollowSearchViewModel.swift; sourceTree = "<group>"; };
+		CGDTFILE1 /* ChatGroupDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGroupDetailsView.swift; sourceTree = "<group>"; };
+		CRSVFILE1 /* ChatRoomServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomServices.swift; sourceTree = "<group>"; };
+		1D8 /* ChatServiceRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatServiceRepository.swift; sourceTree = "<group>"; };
+		1D9 /* ChatPrivacyActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatPrivacyActions.swift; sourceTree = "<group>"; };
+		1E1 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		PSOCFILE1 /* ProfileSocialViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSocialViews.swift; sourceTree = "<group>"; };
+		PEDTFILE1 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
+		PSETFILE1 /* ProfileSettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsViews.swift; sourceTree = "<group>"; };
+		PLEGALFILE1 /* LegalDocumentViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalDocumentViews.swift; sourceTree = "<group>"; };
+		PACCFILE1 /* ProfileAccountViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAccountViews.swift; sourceTree = "<group>"; };
+		PCOLFILE1 /* ProfileCollectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileCollectionViews.swift; sourceTree = "<group>"; };
+		PACTSVFILE1 /* ProfileActivityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityService.swift; sourceTree = "<group>"; };
+		PACTVWFILE1 /* ProfileActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityView.swift; sourceTree = "<group>"; };
+		1E2 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		IMGCH01 /* CachedRemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedRemoteImage.swift; sourceTree = "<group>"; };
+		AVCRP01 /* AvatarImageViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarImageViews.swift; sourceTree = "<group>"; };
+		1F0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		200 /* PostKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostKind.swift; sourceTree = "<group>"; };
+		201 /* CommunityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityService.swift; sourceTree = "<group>"; };
+		202 /* UserPostSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPostSummary.swift; sourceTree = "<group>"; };
+		203 /* UserPostsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPostsService.swift; sourceTree = "<group>"; };
+		210 /* ProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileService.swift; sourceTree = "<group>"; };
+		211 /* ProfileSocialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSocialService.swift; sourceTree = "<group>"; };
+		204 /* ReportPostSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportPostSheet.swift; sourceTree = "<group>"; };
+		205 /* SupportCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportCenterView.swift; sourceTree = "<group>"; };
+		206 /* UserPostsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPostsView.swift; sourceTree = "<group>"; };
+		207 /* PostReactionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostReactionService.swift; sourceTree = "<group>"; };
+		208 /* EditPostSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditPostSheet.swift; sourceTree = "<group>"; };
+		20A /* PostEditorComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostEditorComponents.swift; sourceTree = "<group>"; };
+		20B /* PostEditorFeatureSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostEditorFeatureSections.swift; sourceTree = "<group>"; };
+		20C /* PostEditorFeatureForms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostEditorFeatureForms.swift; sourceTree = "<group>"; };
+		FEDITFILE1 /* ForumPostEditorSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumPostEditorSurface.swift; sourceTree = "<group>"; };
+		20D /* PostSharePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostSharePresentation.swift; sourceTree = "<group>"; };
+		20E /* PostDeepLinkPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDeepLinkPresentation.swift; sourceTree = "<group>"; };
+		PDRFILE1 /* PostDeepLinkRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDeepLinkRoute.swift; sourceTree = "<group>"; };
+		PSPFILE1 /* PostSharePayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostSharePayload.swift; sourceTree = "<group>"; };
+		20F /* Resources/CheeseApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Resources/CheeseApp.entitlements; sourceTree = "<group>"; };
+		AAA /* CheeseApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CheeseApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CR11 /* CreatePostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreatePostView.swift; sourceTree = "<group>"; };
+		H11 /* HomeCardItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeCardItem.swift; sourceTree = "<group>"; };
+		H21 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
+		H31 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		H43 /* QuickActionsRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionsRowView.swift; sourceTree = "<group>"; };
+		C01 /* CourseSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseSummary.swift; sourceTree = "<group>"; };
+		C04 /* CourseDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseDiscoveryView.swift; sourceTree = "<group>"; };
+		C05 /* CourseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseDetailView.swift; sourceTree = "<group>"; };
+		C06 /* CourseOutline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseOutline.swift; sourceTree = "<group>"; };
+		C07 /* CourseOutlineService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseOutlineService.swift; sourceTree = "<group>"; };
+		C08 /* CourseOutlineViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseOutlineViewerView.swift; sourceTree = "<group>"; };
+		C09 /* CourseReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseReview.swift; sourceTree = "<group>"; };
+		C10 /* CourseReviewService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseReviewService.swift; sourceTree = "<group>"; };
+		C11 /* CourseReviewViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseReviewViewModel.swift; sourceTree = "<group>"; };
+		C12 /* CourseReviewSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseReviewSection.swift; sourceTree = "<group>"; };
+		C13 /* CourseCatalogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseCatalogService.swift; sourceTree = "<group>"; };
+		C14 /* CourseDiscoveryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseDiscoveryViewModel.swift; sourceTree = "<group>"; };
+		C15 /* CoursePageBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoursePageBackground.swift; sourceTree = "<group>"; };
+		H51 /* HomeFeedService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFeedService.swift; sourceTree = "<group>"; };
+		S11 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
+		S12 /* SearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchService.swift; sourceTree = "<group>"; };
+		S13 /* SearchProfileResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchProfileResult.swift; sourceTree = "<group>"; };
+		TSTFILE03 /* ChatInboxPresentationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInboxPresentationStateTests.swift; sourceTree = "<group>"; };
+		TSTFILE04 /* ChatConversationStateUpdaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatConversationStateUpdaterTests.swift; sourceTree = "<group>"; };
+		TSTFILE05 /* ChatRoomLifecycleControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomLifecycleControllerTests.swift; sourceTree = "<group>"; };
+		TSTFILECHATGH1 /* ChatGroupAndHistoryViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGroupAndHistoryViewModelTests.swift; sourceTree = "<group>"; };
+		TSTFILE06 /* PostCorrectnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostCorrectnessTests.swift; sourceTree = "<group>"; };
+		TSTFILE07 /* ProfileSocialServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSocialServiceTests.swift; sourceTree = "<group>"; };
+		TSTFILE08 /* HomeFeedServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFeedServiceTests.swift; sourceTree = "<group>"; };
+		TSTFILE09 /* SearchProfileResultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchProfileResultTests.swift; sourceTree = "<group>"; };
+		TSTFILE10 /* AuthCredentialStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthCredentialStoreTests.swift; sourceTree = "<group>"; };
+		TSTFILE11 /* CourseOutlineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseOutlineTests.swift; sourceTree = "<group>"; };
+		TSTFILE12 /* CourseReviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseReviewTests.swift; sourceTree = "<group>"; };
+		TSTFILE13 /* SearchPaginationViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchPaginationViewModelTests.swift; sourceTree = "<group>"; };
+		TSTFILE14 /* CourseDiscoveryFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseDiscoveryFilterTests.swift; sourceTree = "<group>"; };
+		TSTFILE15 /* ChatAccountIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAccountIsolationTests.swift; sourceTree = "<group>"; };
+		TSTFILE16 /* SystemMessageViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMessageViewModelTests.swift; sourceTree = "<group>"; };
+		TSTFILE17 /* MentionTextLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionTextLogicTests.swift; sourceTree = "<group>"; };
+		TSTFILE18 /* ProfileActivityServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityServiceTests.swift; sourceTree = "<group>"; };
+		TSTPROD01 /* CheeseAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CheeseAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		BBB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DBA54BA02F2D43DA0073E17A /* PostgREST in Frameworks */,
+				DBA54B9E2F2D43DA0073E17A /* Functions in Frameworks */,
+				DBA54BA72F2D44C30073E17A /* Supabase in Frameworks */,
+				DBA54B9C2F2D43DA0073E17A /* Auth in Frameworks */,
+				DBA54BA42F2D43DA0073E17A /* Storage in Frameworks */,
+				DBA54BA22F2D43DA0073E17A /* Realtime in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TSTFRMWK /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		DBA54BA52F2D44BE0073E17A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		GC5 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				C13 /* CourseCatalogService.swift */,
+				C07 /* CourseOutlineService.swift */,
+				C10 /* CourseReviewService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		GC6 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				C14 /* CourseDiscoveryViewModel.swift */,
+				C11 /* CourseReviewViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		G00 = {
+			isa = PBXGroup;
+			children = (
+				G01 /* CheeseApp */,
+				GT0 /* CheeseAppTests */,
+				G02 /* Products */,
+				DBA54BA52F2D44BE0073E17A /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		G01 /* CheeseApp */ = {
+			isa = PBXGroup;
+			children = (
+				100 /* CheeseAppApp.swift */,
+				101 /* MainTabView.swift */,
+				GAPP /* App */,
+				G10 /* Core */,
+				G20 /* Shared */,
+				G30 /* Features */,
+				1F0 /* Assets.xcassets */,
+				20F /* Resources/CheeseApp.entitlements */,
+			);
+			path = CheeseApp;
+			sourceTree = "<group>";
+		};
+		GAPP /* App */ = {
+			isa = PBXGroup;
+			children = (
+				GAPPNAV /* Navigation */,
+				GAPPSHARE /* Sharing */,
+				GAPPEDIT /* PostEditing */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		GAPPNAV /* Navigation */ = {
+			isa = PBXGroup;
+			children = (
+				20E /* PostDeepLinkPresentation.swift */,
+			);
+			path = Navigation;
+			sourceTree = "<group>";
+		};
+		GAPPSHARE /* Sharing */ = {
+			isa = PBXGroup;
+			children = (
+				20D /* PostSharePresentation.swift */,
+			);
+			path = Sharing;
+			sourceTree = "<group>";
+		};
+		GAPPEDIT /* PostEditing */ = {
+			isa = PBXGroup;
+			children = (
+				208 /* EditPostSheet.swift */,
+				20B /* PostEditorFeatureSections.swift */,
+				20C /* PostEditorFeatureForms.swift */,
+				FEDITFILE1 /* ForumPostEditorSurface.swift */,
+			);
+			path = PostEditing;
+			sourceTree = "<group>";
+		};
+		G02 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AAA /* CheeseApp.app */,
+				TSTPROD01 /* CheeseAppTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		G10 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				G11 /* Config */,
+				G12 /* Models */,
+				G13 /* Services */,
+				G14 /* Utils */,
+				G15 /* Extensions */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		G11 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				110 /* SupabaseClient.swift */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		G12 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				121 /* User.swift */,
+				200 /* PostKind.swift */,
+				PDRFILE1 /* PostDeepLinkRoute.swift */,
+				PSPFILE1 /* PostSharePayload.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G13 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				130 /* AuthService.swift */,
+				AUTHCRED01 /* AuthCredentialStore.swift */,
+				132 /* ImageUploadService.swift */,
+				134 /* SchoolDirectoryService.swift */,
+				201 /* CommunityService.swift */,
+				207 /* PostReactionService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G14 /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				140 /* Formatters.swift */,
+				141 /* Constants.swift */,
+			);
+			path = Utils;
+			sourceTree = "<group>";
+		};
+		G15 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				150 /* Date+Extensions.swift */,
+				151 /* View+Extensions.swift */,
+				IMGPRFILE1 /* ImagePreview+View.swift */,
+				CHATCFFILE1 /* PressEnterComposerField.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		G20 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				G21 /* Components */,
+				G22 /* Theme */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		G21 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				161 /* LoadingView.swift */,
+				162 /* ErrorView.swift */,
+				163 /* ImagePicker.swift */,
+				IMGCH01 /* CachedRemoteImage.swift */,
+				AVCRP01 /* AvatarImageViews.swift */,
+				204 /* ReportPostSheet.swift */,
+				20A /* PostEditorComponents.swift */,
+				G23 /* Card */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		G22 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				170 /* Colors.swift */,
+				171 /* Fonts.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		G23 /* Card */ = {
+			isa = PBXGroup;
+			children = (
+				164 /* ContentCardView.swift */,
+			);
+			path = Card;
+			sourceTree = "<group>";
+		};
+		G30 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				GH0 /* Home */,
+				GS0 /* Search */,
+				GCR /* Create */,
+				G32 /* Secondhand */,
+				G34 /* Courses */,
+				G35 /* Forum */,
+				G36 /* Chat */,
+				G37 /* Profile */,
+				G38 /* SystemMessages */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		G38 /* SystemMessages */ = {
+			isa = PBXGroup;
+			children = (
+				SYSMSGFILE1 /* SystemMessagesFeature.swift */,
+				SYSMENFILE1 /* MentionFeature.swift */,
+				SYSVIEWFILE1 /* SystemMessageViews.swift */,
+			);
+			path = SystemMessages;
+			sourceTree = "<group>";
+		};
+		G34 /* Courses */ = {
+			isa = PBXGroup;
+			children = (
+				GC4 /* Models */,
+				GC5 /* Services */,
+				GC6 /* ViewModels */,
+				GC7 /* Views */,
+			);
+			path = Courses;
+			sourceTree = "<group>";
+		};
+		GC4 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				C01 /* CourseSummary.swift */,
+				C06 /* CourseOutline.swift */,
+				C09 /* CourseReview.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		GC7 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				C04 /* CourseDiscoveryView.swift */,
+				C05 /* CourseDetailView.swift */,
+				C08 /* CourseOutlineViewerView.swift */,
+				C12 /* CourseReviewSection.swift */,
+				GC8 /* Components */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		GC8 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				C15 /* CoursePageBackground.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		G32 /* Secondhand */ = {
+			isa = PBXGroup;
+			children = (
+				G32A /* Models */,
+				G32S /* Services */,
+				G32E /* Views */,
+			);
+			path = Secondhand;
+			sourceTree = "<group>";
+		};
+		G32A /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				190 /* SecondhandPost.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G32E /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				191 /* SecondhandListView.swift */,
+				193 /* CreateSecondhandView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		G32S /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				192 /* SecondhandService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G35 /* Forum */ = {
+			isa = PBXGroup;
+			children = (
+				G35A /* Models */,
+				G35S /* Services */,
+				G35E /* Views */,
+			);
+			path = Forum;
+			sourceTree = "<group>";
+		};
+		G35A /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				1C0 /* ForumPost.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G35E /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				1C1 /* ForumListView.swift */,
+				FCARDFILE1 /* ForumPostCardView.swift */,
+				FDETFILE1 /* ForumDetailView.swift */,
+				FBRDFILE1 /* ForumBoardViews.swift */,
+				FSRCFILE1 /* ForumSearchView.swift */,
+				FREFFILE1 /* HotpotSteamRefreshView.swift */,
+				1C3 /* CreateForumView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		G35S /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				1C2 /* ForumService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G36 /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				G36M /* Models */,
+				G36S /* Services */,
+				G36D /* ViewModels */,
+				G36E /* Views */,
+			);
+			path = Chat;
+			sourceTree = "<group>";
+		};
+		G36M /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				122 /* ChatMessage.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G36C /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				1D3 /* ChatInboxSupport.swift */,
+				CMSGCFILE1 /* ChatMessageContentView.swift */,
+				CGRPFILE1 /* ChatGroupCreationViews.swift */,
+				CFOLFILE1 /* ChatFollowSearchViews.swift */,
+				CROWFILE1 /* ChatConversationRowViews.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		G36D /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				1D4 /* ChatInboxPresentationState.swift */,
+				1D7 /* ChatRoomLifecycleController.swift */,
+				CRVMFILE1 /* ChatRoomViewModel.swift */,
+				GCVMFILE1 /* GroupChatViewModels.swift */,
+				CHVMFILE1 /* ChatRoomHistoryViewModel.swift */,
+				CFVMFILE1 /* ChatFollowSearchViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		G36S /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				131 /* ChatService.swift */,
+				1D6 /* ChatConversationStateUpdater.swift */,
+				1D8 /* ChatServiceRepository.swift */,
+				1D9 /* ChatPrivacyActions.swift */,
+				CRSVFILE1 /* ChatRoomServices.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G36E /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				G36C /* Components */,
+				1D5 /* ChatGroupConversationViews.swift */,
+				CGDTFILE1 /* ChatGroupDetailsView.swift */,
+				1D1 /* ChatListView.swift */,
+				1D2 /* ChatRoomView.swift */,
+				CRSUPFILE1 /* ChatRoomSupportingViews.swift */,
+				CRUTLFILE1 /* ChatRoomUtilityViews.swift */,
+				CRGRPFILE1 /* ChatRoomGroupCreationViews.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		G37 /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				G37A /* Models */,
+				G37S /* Services */,
+				G37D /* ViewModels */,
+				G37E /* Views */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		G37A /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				202 /* UserPostSummary.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G37D /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		G37E /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				1E1 /* ProfileView.swift */,
+				PSOCFILE1 /* ProfileSocialViews.swift */,
+				PEDTFILE1 /* EditProfileView.swift */,
+				PSETFILE1 /* ProfileSettingsViews.swift */,
+				PLEGALFILE1 /* LegalDocumentViews.swift */,
+				PACCFILE1 /* ProfileAccountViews.swift */,
+				PCOLFILE1 /* ProfileCollectionViews.swift */,
+				PACTVWFILE1 /* ProfileActivityView.swift */,
+				1E2 /* AuthView.swift */,
+				205 /* SupportCenterView.swift */,
+				206 /* UserPostsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		G37S /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				203 /* UserPostsService.swift */,
+				210 /* ProfileService.swift */,
+				211 /* ProfileSocialService.swift */,
+				PACTSVFILE1 /* ProfileActivityService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		GCR /* Create */ = {
+			isa = PBXGroup;
+			children = (
+				GCRE /* Views */,
+			);
+			path = Create;
+			sourceTree = "<group>";
+		};
+		GCRE /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				CR11 /* CreatePostView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		GH0 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				GH1 /* Models */,
+				GH5 /* Services */,
+				GH2 /* ViewModels */,
+				GH3 /* Views */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		GH1 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				H11 /* HomeCardItem.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		GH5 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				H51 /* HomeFeedService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		GH2 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				H21 /* HomeViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		GH3 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				H31 /* HomeView.swift */,
+				GH4 /* Components */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		GH4 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				H43 /* QuickActionsRowView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		GS0 /* Search */ = {
+			isa = PBXGroup;
+			children = (
+				GSM /* Models */,
+				GSF /* Services */,
+				GSE /* Views */,
+			);
+			path = Search;
+			sourceTree = "<group>";
+		};
+		GSM /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				S13 /* SearchProfileResult.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		GSF /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				S12 /* SearchService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		GSE /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				S11 /* SearchView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		GT0 /* CheeseAppTests */ = {
+			isa = PBXGroup;
+			children = (
+				TSTFILE03 /* ChatInboxPresentationStateTests.swift */,
+				TSTFILE04 /* ChatConversationStateUpdaterTests.swift */,
+				TSTFILE05 /* ChatRoomLifecycleControllerTests.swift */,
+				TSTFILECHATGH1 /* ChatGroupAndHistoryViewModelTests.swift */,
+				TSTFILE06 /* PostCorrectnessTests.swift */,
+				TSTFILE07 /* ProfileSocialServiceTests.swift */,
+				TSTFILE08 /* HomeFeedServiceTests.swift */,
+				TSTFILE09 /* SearchProfileResultTests.swift */,
+				TSTFILE10 /* AuthCredentialStoreTests.swift */,
+				TSTFILE11 /* CourseOutlineTests.swift */,
+				TSTFILE12 /* CourseReviewTests.swift */,
+				TSTFILE13 /* SearchPaginationViewModelTests.swift */,
+				TSTFILE14 /* CourseDiscoveryFilterTests.swift */,
+				TSTFILE15 /* ChatAccountIsolationTests.swift */,
+				TSTFILE16 /* SystemMessageViewModelTests.swift */,
+				TSTFILE17 /* MentionTextLogicTests.swift */,
+				TSTFILE18 /* ProfileActivityServiceTests.swift */,
+			);
+			path = CheeseAppTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		CCC /* CheeseApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EEE /* Build configuration list for PBXNativeTarget "CheeseApp" */;
+			buildPhases = (
+				DDD /* Sources */,
+				BBB /* Frameworks */,
+				FFF /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CheeseApp;
+			packageProductDependencies = (
+				DBA54B9B2F2D43DA0073E17A /* Auth */,
+				DBA54B9D2F2D43DA0073E17A /* Functions */,
+				DBA54B9F2F2D43DA0073E17A /* PostgREST */,
+				DBA54BA12F2D43DA0073E17A /* Realtime */,
+				DBA54BA32F2D43DA0073E17A /* Storage */,
+				DBA54BA62F2D44C30073E17A /* Supabase */,
+			);
+			productName = CheeseApp;
+			productReference = AAA /* CheeseApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+		TSTTARGET /* CheeseAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = TSTCLIST /* Build configuration list for PBXNativeTarget "CheeseAppTests" */;
+			buildPhases = (
+				TSTSRC /* Sources */,
+				TSTFRMWK /* Frameworks */,
+				TSTRES /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				TSTDEP01 /* PBXTargetDependency */,
+			);
+			name = CheeseAppTests;
+			packageProductDependencies = (
+			);
+			productName = CheeseAppTests;
+			productReference = TSTPROD01 /* CheeseAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		PRJ /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					CCC = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					TSTTARGET = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = CCC;
+					};
+				};
+			};
+			buildConfigurationList = BCL /* Build configuration list for PBXProject "CheeseApp" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				"zh-Hans",
+			);
+			mainGroup = G00;
+			packageReferences = (
+				PKGREF1 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
+			productRefGroup = G02 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				CCC /* CheeseApp */,
+				TSTTARGET /* CheeseAppTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		FFF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0F0 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TSTRES /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		DDD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				001 /* CheeseAppApp.swift in Sources */,
+				002 /* MainTabView.swift in Sources */,
+				010 /* SupabaseClient.swift in Sources */,
+				021 /* User.swift in Sources */,
+				022 /* ChatMessage.swift in Sources */,
+				030 /* AuthService.swift in Sources */,
+				AUTHCRED02 /* AuthCredentialStore.swift in Sources */,
+				031 /* ChatService.swift in Sources */,
+				032 /* ImageUploadService.swift in Sources */,
+				034 /* SchoolDirectoryService.swift in Sources */,
+				040 /* Formatters.swift in Sources */,
+				041 /* Constants.swift in Sources */,
+				050 /* Date+Extensions.swift in Sources */,
+				051 /* View+Extensions.swift in Sources */,
+				IMGPRBLD1 /* ImagePreview+View.swift in Sources */,
+				CHATCFBLD1 /* PressEnterComposerField.swift in Sources */,
+				061 /* LoadingView.swift in Sources */,
+				062 /* ErrorView.swift in Sources */,
+				063 /* ImagePicker.swift in Sources */,
+				IMGCH02 /* CachedRemoteImage.swift in Sources */,
+				AVCRP02 /* AvatarImageViews.swift in Sources */,
+				064 /* ContentCardView.swift in Sources */,
+				070 /* Colors.swift in Sources */,
+				071 /* Fonts.swift in Sources */,
+				090 /* SecondhandPost.swift in Sources */,
+				091 /* SecondhandListView.swift in Sources */,
+				0C0 /* ForumPost.swift in Sources */,
+				0C1 /* ForumListView.swift in Sources */,
+				FCARDBLD1 /* ForumPostCardView.swift in Sources */,
+				FDETBLD1 /* ForumDetailView.swift in Sources */,
+				FBRDBLD1 /* ForumBoardViews.swift in Sources */,
+				FSRCBLD1 /* ForumSearchView.swift in Sources */,
+				FREFBLD1 /* HotpotSteamRefreshView.swift in Sources */,
+				0D1 /* ChatListView.swift in Sources */,
+				0D2 /* ChatRoomView.swift in Sources */,
+				CMSGCBLD1 /* ChatMessageContentView.swift in Sources */,
+				CRSUPBLD1 /* ChatRoomSupportingViews.swift in Sources */,
+				CRUTLBLD1 /* ChatRoomUtilityViews.swift in Sources */,
+				CRGRPBLD1 /* ChatRoomGroupCreationViews.swift in Sources */,
+				CGRPBLD1 /* ChatGroupCreationViews.swift in Sources */,
+				CFOLBLD1 /* ChatFollowSearchViews.swift in Sources */,
+				CROWBLD1 /* ChatConversationRowViews.swift in Sources */,
+				0D3 /* ChatInboxSupport.swift in Sources */,
+				0D5 /* ChatGroupConversationViews.swift in Sources */,
+				0D4 /* ChatInboxPresentationState.swift in Sources */,
+				0D6 /* ChatConversationStateUpdater.swift in Sources */,
+				0D7 /* ChatRoomLifecycleController.swift in Sources */,
+				CRVMBLD1 /* ChatRoomViewModel.swift in Sources */,
+				GCVMBLD1 /* GroupChatViewModels.swift in Sources */,
+				CHVMBLD1 /* ChatRoomHistoryViewModel.swift in Sources */,
+				CFVMBLD1 /* ChatFollowSearchViewModel.swift in Sources */,
+				CGDTBLD1 /* ChatGroupDetailsView.swift in Sources */,
+				CRSVBLD1 /* ChatRoomServices.swift in Sources */,
+				0D8 /* ChatServiceRepository.swift in Sources */,
+				0D9 /* ChatPrivacyActions.swift in Sources */,
+				0E1 /* ProfileView.swift in Sources */,
+				PSOCBLD1 /* ProfileSocialViews.swift in Sources */,
+				PEDTBLD1 /* EditProfileView.swift in Sources */,
+				PSETBLD1 /* ProfileSettingsViews.swift in Sources */,
+				PLEGALBLD1 /* LegalDocumentViews.swift in Sources */,
+				PACCBLD1 /* ProfileAccountViews.swift in Sources */,
+				PCOLBLD1 /* ProfileCollectionViews.swift in Sources */,
+				PACTVWBLD1 /* ProfileActivityView.swift in Sources */,
+				0E2 /* AuthView.swift in Sources */,
+				200A /* PostKind.swift in Sources */,
+				201A /* CommunityService.swift in Sources */,
+				202A /* UserPostSummary.swift in Sources */,
+				203A /* UserPostsService.swift in Sources */,
+				210A /* ProfileService.swift in Sources */,
+				211A /* ProfileSocialService.swift in Sources */,
+				PACTSVBLD1 /* ProfileActivityService.swift in Sources */,
+				204A /* ReportPostSheet.swift in Sources */,
+				205A /* SupportCenterView.swift in Sources */,
+				206A /* UserPostsView.swift in Sources */,
+				207A /* PostReactionService.swift in Sources */,
+				20DA /* PostSharePresentation.swift in Sources */,
+				20EA /* PostDeepLinkPresentation.swift in Sources */,
+				PDRBLD1 /* PostDeepLinkRoute.swift in Sources */,
+				PSPBLD1 /* PostSharePayload.swift in Sources */,
+				208A /* EditPostSheet.swift in Sources */,
+				20AA /* PostEditorComponents.swift in Sources */,
+				20BA /* PostEditorFeatureSections.swift in Sources */,
+				20CA /* PostEditorFeatureForms.swift in Sources */,
+				FEDITBLD1 /* ForumPostEditorSurface.swift in Sources */,
+				H01 /* HomeCardItem.swift in Sources */,
+				H03 /* HomeViewModel.swift in Sources */,
+				H04 /* HomeView.swift in Sources */,
+				H07 /* QuickActionsRowView.swift in Sources */,
+				C01A /* CourseSummary.swift in Sources */,
+				C04A /* CourseDiscoveryView.swift in Sources */,
+				C05A /* CourseDetailView.swift in Sources */,
+				C06A /* CourseOutline.swift in Sources */,
+				C07A /* CourseOutlineService.swift in Sources */,
+				C08A /* CourseOutlineViewerView.swift in Sources */,
+				C09A /* CourseReview.swift in Sources */,
+				C10A /* CourseReviewService.swift in Sources */,
+				C11A /* CourseReviewViewModel.swift in Sources */,
+				C12A /* CourseReviewSection.swift in Sources */,
+				C13A /* CourseCatalogService.swift in Sources */,
+				C14A /* CourseDiscoveryViewModel.swift in Sources */,
+				C15A /* CoursePageBackground.swift in Sources */,
+				H09 /* HomeFeedService.swift in Sources */,
+				S01 /* SearchView.swift in Sources */,
+				S02 /* SearchService.swift in Sources */,
+				S03 /* SearchProfileResult.swift in Sources */,
+				SYSMSGBLD1 /* SystemMessagesFeature.swift in Sources */,
+				SYSMENBLD1 /* MentionFeature.swift in Sources */,
+				SYSVIEWBLD1 /* SystemMessageViews.swift in Sources */,
+				CR1 /* CreatePostView.swift in Sources */,
+				092 /* SecondhandService.swift in Sources */,
+				093 /* CreateSecondhandView.swift in Sources */,
+				0C2 /* ForumService.swift in Sources */,
+				0C3 /* CreateForumView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TSTSRC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				TSTBLD03 /* ChatInboxPresentationStateTests.swift in Sources */,
+				TSTBLD04 /* ChatConversationStateUpdaterTests.swift in Sources */,
+				TSTBLD05 /* ChatRoomLifecycleControllerTests.swift in Sources */,
+				TSTBLDCHATGH1 /* ChatGroupAndHistoryViewModelTests.swift in Sources */,
+				TSTBLD06 /* PostCorrectnessTests.swift in Sources */,
+				TSTBLD07 /* ProfileSocialServiceTests.swift in Sources */,
+				TSTBLD08 /* HomeFeedServiceTests.swift in Sources */,
+				TSTBLD09 /* SearchProfileResultTests.swift in Sources */,
+				TSTBLD10 /* AuthCredentialStoreTests.swift in Sources */,
+				TSTBLD11 /* CourseOutlineTests.swift in Sources */,
+				TSTBLD12 /* CourseReviewTests.swift in Sources */,
+				TSTBLD13 /* SearchPaginationViewModelTests.swift in Sources */,
+				TSTBLD14 /* CourseDiscoveryFilterTests.swift in Sources */,
+				TSTBLD15 /* ChatAccountIsolationTests.swift in Sources */,
+				TSTBLD16 /* SystemMessageViewModelTests.swift in Sources */,
+				TSTBLD17 /* MentionTextLogicTests.swift in Sources */,
+				TSTBLD18 /* ProfileActivityServiceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		TSTDEP01 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CCC /* CheeseApp */;
+			targetProxy = TSTPROXY01 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		BC1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		BC2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		TC1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				APS_ENVIRONMENT = development;
+				CODE_SIGN_ENTITLEMENTS = CheeseApp/Resources/CheeseApp.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				DEVELOPMENT_TEAM = 59RCF5754W;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CheeseApp/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.timonayf.cheeseapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		TC2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				APS_ENVIRONMENT = production;
+				CODE_SIGN_ENTITLEMENTS = CheeseApp/Resources/CheeseApp.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				DEVELOPMENT_TEAM = 59RCF5754W;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CheeseApp/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.timonayf.cheeseapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		TSTDBG /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 59RCF5754W;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.timonayf.cheeseappTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CheeseApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CheeseApp";
+				TEST_TARGET_NAME = CheeseApp;
+			};
+			name = Debug;
+		};
+		TSTREL /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 59RCF5754W;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.timonayf.cheeseappTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CheeseApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CheeseApp";
+				TEST_TARGET_NAME = CheeseApp;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		BCL /* Build configuration list for PBXProject "CheeseApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BC1 /* Debug */,
+				BC2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EEE /* Build configuration list for PBXNativeTarget "CheeseApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				TC1 /* Debug */,
+				TC2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		TSTCLIST /* Build configuration list for PBXNativeTarget "CheeseAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				TSTDBG /* Debug */,
+				TSTREL /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		PKGREF1 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		DBA54B9B2F2D43DA0073E17A /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = PKGREF1 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		DBA54B9D2F2D43DA0073E17A /* Functions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = PKGREF1 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Functions;
+		};
+		DBA54B9F2F2D43DA0073E17A /* PostgREST */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = PKGREF1 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = PostgREST;
+		};
+		DBA54BA12F2D43DA0073E17A /* Realtime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = PKGREF1 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Realtime;
+		};
+		DBA54BA32F2D43DA0073E17A /* Storage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = PKGREF1 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Storage;
+		};
+		DBA54BA62F2D44C30073E17A /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = PKGREF1 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = PRJ /* Project object */;
+}

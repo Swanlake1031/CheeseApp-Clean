@@ -1,0 +1,13 @@
+project_id = "CheeseApp"
+
+[storage.buckets.course-outlines]
+public = false
+file_size_limit = "20MiB"
+allowed_mime_types = ["application/pdf"]
+objects_path = "./course-outlines"
+
+[functions.push-dispatch]
+verify_jwt = false
+
+[functions.mcmaster-verification]
+verify_jwt = false

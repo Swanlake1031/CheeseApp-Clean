@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#F5F0E0"/>
+  <rect x="48" y="42" width="1104" height="546" rx="34" fill="white"/>
+  <rect x="48" y="42" width="1104" height="108" rx="34" fill="#F6E5B9"/>
+  <rect x="92" y="72" width="54" height="54" rx="17" fill="#F2C94C"/>
+  <text x="168" y="96" font-size="30" font-weight="700" fill="#171717" font-family="Arial, sans-serif">Cheese App</text>
+  <text x="168" y="126" font-size="19" font-weight="600" fill="#6B6358" font-family="Arial, sans-serif">Canadian student community sharing</text>
+  <rect x="898" y="72" width="210" height="50" rx="25" fill="white"/>
+  <text x="1003" y="104" text-anchor="middle" font-size="24" font-weight="700" fill="#6E5312" font-family="Arial, sans-serif">Shared Post</text>
+  <rect x="92" y="184" width="676" height="262" rx="28" fill="#F7F7F7"/>
+  <text x="92" y="508" font-size="58" font-weight="700" fill="#171717" font-family="Arial, sans-serif">Cheese</text>
+  <text x="92" y="556" font-size="28" font-weight="500" fill="#6B6358" font-family="Arial, sans-serif">Open in Cheese App to view the full post</text>
+  <circle cx="966" cy="280" r="112" fill="#F3E2A5"/>
+  <text x="966" y="333" text-anchor="middle" font-size="164" font-weight="700" fill="#866C1F" font-family="Arial, sans-serif">C</text>
+</svg>

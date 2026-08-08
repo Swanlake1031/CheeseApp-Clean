@@ -1,0 +1,939 @@
+import SwiftUI
+
+private struct ProfileActivityPageHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: [ProfileActivityKind: CGFloat] = [:]
+
+    static func reduce(
+        value: inout [ProfileActivityKind: CGFloat],
+        nextValue: () -> [ProfileActivityKind: CGFloat]
+    ) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
+    }
+}
+
+struct ProfileActivityView: View {
+    @EnvironmentObject private var authService: AuthService
+    @StateObject private var userPostsService = UserPostsService()
+    @State private var selectedKind: ProfileActivityKind
+    @State private var selectedPublishedKind: PostKind?
+    @State private var refreshGeneration = 0
+    @State private var destination: ProfileActivityDestination?
+    @State private var editingPost: UserPostSummary?
+    @State private var openingPostID: UUID?
+    @State private var openingRequestID: UUID?
+    @State private var editingPostID: UUID?
+    @State private var editingRequestID: UUID?
+    @State private var updatingPrivacyPostID: UUID?
+    @State private var deletingPostID: UUID?
+    @State private var deletingItem: ProfileActivityItem?
+    @State private var navigationErrorMessage: String?
+    @State private var embeddedPageHeights: [ProfileActivityKind: CGFloat] = [:]
+    private let showsKindPicker: Bool
+    private let isEmbedded: Bool
+    private let externalRefreshGeneration: Int
+    private let minimumEmbeddedPagerHeight: CGFloat
+
+    init(
+        initialKind: ProfileActivityKind = .published,
+        showsKindPicker: Bool = true,
+        isEmbedded: Bool = false,
+        externalRefreshGeneration: Int = 0,
+        minimumEmbeddedPagerHeight: CGFloat = 220
+    ) {
+        _selectedKind = State(initialValue: initialKind)
+        _selectedPublishedKind = State(initialValue: nil)
+        self.showsKindPicker = showsKindPicker
+        self.isEmbedded = isEmbedded
+        self.externalRefreshGeneration = externalRefreshGeneration
+        self.minimumEmbeddedPagerHeight = minimumEmbeddedPagerHeight
+    }
+
+    var body: some View {
+        ZStack {
+            if !isEmbedded {
+                AppColors.pageBackground.ignoresSafeArea()
+            }
+
+            if isEmbedded {
+                embeddedContent
+            } else {
+                fullPageContent
+            }
+        }
+        .if(!isEmbedded) { content in
+            content.cheesePageTopBar(
+                title: showsKindPicker ? "我的活动" : selectedKind.title
+            )
+        }
+        .navigationDestination(item: $destination) { target in
+            ProfileActivityPostDetailRouter(destination: target)
+        }
+        .navigationDestination(item: $editingPost) { post in
+            EditPostSheet(post: post) { payload in
+                try await userPostsService.update(payload: payload)
+                refreshGeneration &+= 1
+            }
+        }
+        .onChange(of: destination) { previous, current in
+            guard previous != nil, current == nil else { return }
+            refreshGeneration &+= 1
+        }
+        .task(id: authService.currentUser?.id) {
+            cancelPendingPostActions()
+            editingPost = nil
+        }
+        .alert(
+            "操作失败",
+            isPresented: Binding(
+                get: { navigationErrorMessage != nil },
+                set: { if !$0 { navigationErrorMessage = nil } }
+            )
+        ) {
+            Button("确定", role: .cancel) {}
+        } message: {
+            Text(navigationErrorMessage ?? "")
+        }
+        .confirmationDialog(
+            "确定删除这篇贴文？",
+            isPresented: Binding(
+                get: { deletingItem != nil },
+                set: { if !$0 { deletingItem = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("取消", role: .cancel) {
+                deletingItem = nil
+            }
+            Button("删除", role: .destructive) {
+                guard let item = deletingItem else { return }
+                deletingItem = nil
+                Task { await deletePost(item) }
+            }
+        } message: {
+            Text("删除后无法复原。")
+        }
+    }
+
+    private var fullPageContent: some View {
+        VStack(spacing: 0) {
+            if showsKindPicker {
+                activityPicker
+            }
+            TabView(selection: selectedKindBinding) {
+                ForEach(activityKinds) { kind in
+                    activityPage(for: kind, embedsInParentScroll: false)
+                        .tag(kind)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private var embeddedContent: some View {
+        VStack(spacing: 0) {
+            embeddedActivityPicker
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(ProfileActivityKind.allCases) { kind in
+                        activityPage(for: kind, embedsInParentScroll: true)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .containerRelativeFrame(.horizontal)
+                            .background {
+                                // Keep intrinsic height measurement separate
+                                // from the full-height pager hit region.
+                                GeometryReader { proxy in
+                                    Color.clear.preference(
+                                        key: ProfileActivityPageHeightPreferenceKey.self,
+                                        value: [kind: proxy.size.height]
+                                    )
+                                }
+                            }
+                            .frame(
+                                minHeight: embeddedPagerHeight,
+                                alignment: .top
+                            )
+                            .background(AppColors.pageBackground)
+                            .contentShape(Rectangle())
+                            .id(kind)
+                    }
+                }
+                .scrollTargetLayout()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: embeddedSelectedKindBinding)
+            .frame(height: embeddedPagerHeight, alignment: .top)
+            .background(AppColors.pageBackground)
+            .clipped()
+            .contentShape(Rectangle())
+            .onPreferenceChange(ProfileActivityPageHeightPreferenceKey.self) { heights in
+                for (kind, height) in heights where height > 0 {
+                    guard abs((embeddedPageHeights[kind] ?? 0) - height) > 0.5 else {
+                        continue
+                    }
+                    embeddedPageHeights[kind] = height
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func activityPage(
+        for kind: ProfileActivityKind,
+        embedsInParentScroll: Bool
+    ) -> some View {
+        ProfileActivityPageView(
+            kind: kind,
+            userID: authService.currentUser?.id,
+            refreshGeneration: refreshGeneration &+ externalRefreshGeneration,
+            openingPostID: openingPostID,
+            editingPostID: editingPostID,
+            updatingPrivacyPostID: updatingPrivacyPostID,
+            deletingPostID: deletingPostID,
+            publishedPostKind: selectedPublishedKind,
+            embedsInParentScroll: embedsInParentScroll,
+            onOpen: { item in
+                Task { await openPost(item) }
+            },
+            onEdit: { item in
+                Task {
+                    await preparePostForEditing(
+                        item,
+                        activityKind: kind
+                    )
+                }
+            },
+            onSetPrivacy: { item, hidden in
+                Task { await setPostPrivacy(item, hidden: hidden) }
+            },
+            onDelete: { item in
+                deletingItem = item
+            },
+            onSelectPublishedKind: { kind in
+                selectPublishedPostKind(kind)
+            }
+        )
+    }
+
+    private var activityPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(ProfileActivityKind.allCases) { kind in
+                Button {
+                    cancelPendingPostActions()
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        selectedKind = kind
+                    }
+                } label: {
+                    Text(kind.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(
+                            selectedKind == kind
+                                ? Color.black
+                                : AppColors.textMuted
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(
+                            selectedKind == kind
+                                ? AppColors.accent
+                                : Color.white
+                        )
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    private var embeddedActivityPicker: some View {
+        HStack(spacing: 0) {
+            ForEach(ProfileActivityKind.allCases) { kind in
+                Button {
+                    selectActivityKind(kind)
+                } label: {
+                    VStack(spacing: 9) {
+                        Text(kind.title)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(
+                                selectedKind == kind
+                                    ? AppColors.textPrimary
+                                    : AppColors.textMuted
+                            )
+
+                        Capsule()
+                            .fill(
+                                selectedKind == kind
+                                    ? AppColors.accentStrong
+                                    : Color.clear
+                            )
+                            .frame(width: 28, height: 3)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 14)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(AppColors.textMuted.opacity(0.14))
+                .frame(height: 1)
+        }
+    }
+
+    private func selectActivityKind(_ kind: ProfileActivityKind) {
+        guard selectedKind != kind else { return }
+        cancelPendingPostActions()
+        withAnimation(.easeInOut(duration: 0.24)) {
+            selectedKind = kind
+        }
+    }
+
+    private func selectPublishedPostKind(_ kind: PostKind?) {
+        guard selectedPublishedKind != kind else { return }
+        cancelPendingPostActions()
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) {
+            selectedPublishedKind = kind
+        }
+    }
+
+    private var embeddedSelectedKindBinding: Binding<ProfileActivityKind?> {
+        Binding(
+            get: { selectedKind },
+            set: { kind in
+                guard let kind, kind != selectedKind else { return }
+                cancelPendingPostActions()
+                selectedKind = kind
+            }
+        )
+    }
+
+    private var embeddedPagerHeight: CGFloat {
+        max(
+            embeddedPageHeights.values.max() ?? minimumEmbeddedPagerHeight,
+            minimumEmbeddedPagerHeight
+        )
+    }
+
+    private var activityKinds: [ProfileActivityKind] {
+        showsKindPicker ? ProfileActivityKind.allCases : [selectedKind]
+    }
+
+    private var selectedKindBinding: Binding<ProfileActivityKind> {
+        Binding(
+            get: { selectedKind },
+            set: { kind in
+                guard selectedKind != kind else { return }
+                cancelPendingPostActions()
+                selectedKind = kind
+            }
+        )
+    }
+
+    @MainActor
+    private func openPost(_ item: ProfileActivityItem) async {
+        guard openingPostID == nil,
+              editingPostID == nil,
+              let kind = item.kind
+        else { return }
+        let requestID = UUID()
+        openingPostID = item.postID
+        openingRequestID = requestID
+        navigationErrorMessage = nil
+        defer {
+            if openingRequestID == requestID {
+                cancelPendingPostOpen()
+            }
+        }
+
+        do {
+            let resolvedDestination: ProfileActivityDestination
+            switch kind {
+            case .secondhand:
+                resolvedDestination = .secondhand(
+                    try await SecondhandService.shared.fetchItem(
+                        postId: item.postID
+                    )
+                )
+            case .forum:
+                resolvedDestination = .forum(
+                    try await ForumService.shared.fetchPost(
+                        postId: item.postID
+                    ),
+                    commentID: item.commentID
+                )
+            }
+            guard openingRequestID == requestID else { return }
+            destination = resolvedDestination
+        } catch {
+            guard openingRequestID == requestID else { return }
+            if error.isCancellationLike { return }
+            navigationErrorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func preparePostForEditing(
+        _ item: ProfileActivityItem,
+        activityKind: ProfileActivityKind
+    ) async {
+        guard activityKind == .published,
+              openingPostID == nil,
+              editingPostID == nil,
+              let userID = authService.currentUser?.id,
+              let kind = item.kind
+        else { return }
+
+        let requestID = UUID()
+        editingPostID = item.postID
+        editingRequestID = requestID
+        navigationErrorMessage = nil
+        defer {
+            if editingRequestID == requestID {
+                cancelPendingPostEdit()
+            }
+        }
+
+        do {
+            async let privacy = userPostsService.fetchPostPrivacy(
+                postId: item.postID,
+                userId: userID
+            )
+
+            var resolvedPost: UserPostSummary
+            switch kind {
+            case .secondhand:
+                resolvedPost = try await SecondhandService.shared.fetchItem(
+                    postId: item.postID
+                ).editableSummary
+            case .forum:
+                resolvedPost = try await ForumService.shared.fetchPost(
+                    postId: item.postID
+                ).editableSummary
+            }
+            resolvedPost.isPrivate = try await privacy
+
+            guard editingRequestID == requestID,
+                  authService.currentUser?.id == userID
+            else { return }
+            editingPost = resolvedPost
+        } catch {
+            guard editingRequestID == requestID else { return }
+            if error.isCancellationLike { return }
+            navigationErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func cancelPendingPostOpen() {
+        openingPostID = nil
+        openingRequestID = nil
+    }
+
+    private func cancelPendingPostEdit() {
+        editingPostID = nil
+        editingRequestID = nil
+    }
+
+    private func cancelPendingPostActions() {
+        cancelPendingPostOpen()
+        cancelPendingPostEdit()
+    }
+
+    @MainActor
+    private func setPostPrivacy(
+        _ item: ProfileActivityItem,
+        hidden: Bool
+    ) async {
+        guard updatingPrivacyPostID == nil,
+              deletingPostID == nil
+        else { return }
+        updatingPrivacyPostID = item.postID
+        defer { updatingPrivacyPostID = nil }
+
+        do {
+            try await userPostsService.setPostHidden(
+                postId: item.postID,
+                hidden: hidden
+            )
+            if let kind = item.kind,
+               let authorID = authService.currentUser?.id {
+                PostFeatureEvents.postDidChange(
+                    kind: kind,
+                    authorId: authorID
+                )
+            }
+            refreshGeneration &+= 1
+        } catch {
+            if error.isCancellationLike { return }
+            navigationErrorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func deletePost(_ item: ProfileActivityItem) async {
+        guard deletingPostID == nil,
+              updatingPrivacyPostID == nil
+        else { return }
+        deletingPostID = item.postID
+        defer {
+            deletingPostID = nil
+            deletingItem = nil
+        }
+
+        do {
+            try await userPostsService.delete(postId: item.postID)
+            refreshGeneration &+= 1
+        } catch {
+            if error.isCancellationLike { return }
+            navigationErrorMessage = error.localizedDescription
+        }
+    }
+
+}
+
+private struct ProfileActivityPageView: View {
+    let kind: ProfileActivityKind
+    let userID: UUID?
+    let refreshGeneration: Int
+    let openingPostID: UUID?
+    let editingPostID: UUID?
+    let updatingPrivacyPostID: UUID?
+    let deletingPostID: UUID?
+    let publishedPostKind: PostKind?
+    let embedsInParentScroll: Bool
+    let onOpen: (ProfileActivityItem) -> Void
+    let onEdit: (ProfileActivityItem) -> Void
+    let onSetPrivacy: (ProfileActivityItem, Bool) -> Void
+    let onDelete: (ProfileActivityItem) -> Void
+    let onSelectPublishedKind: (PostKind?) -> Void
+
+    @StateObject private var service: ProfileActivityService
+    @StateObject private var activityMutations = PostActivityMutationCenter.shared
+    @State private var appliedRefreshGeneration = 0
+
+    init(
+        kind: ProfileActivityKind,
+        userID: UUID?,
+        refreshGeneration: Int,
+        openingPostID: UUID?,
+        editingPostID: UUID?,
+        updatingPrivacyPostID: UUID?,
+        deletingPostID: UUID?,
+        publishedPostKind: PostKind?,
+        embedsInParentScroll: Bool,
+        onOpen: @escaping (ProfileActivityItem) -> Void,
+        onEdit: @escaping (ProfileActivityItem) -> Void,
+        onSetPrivacy: @escaping (ProfileActivityItem, Bool) -> Void,
+        onDelete: @escaping (ProfileActivityItem) -> Void,
+        onSelectPublishedKind: @escaping (PostKind?) -> Void
+    ) {
+        self.kind = kind
+        self.userID = userID
+        self.refreshGeneration = refreshGeneration
+        self.openingPostID = openingPostID
+        self.editingPostID = editingPostID
+        self.updatingPrivacyPostID = updatingPrivacyPostID
+        self.deletingPostID = deletingPostID
+        self.publishedPostKind = publishedPostKind
+        self.embedsInParentScroll = embedsInParentScroll
+        self.onOpen = onOpen
+        self.onEdit = onEdit
+        self.onSetPrivacy = onSetPrivacy
+        self.onDelete = onDelete
+        self.onSelectPublishedKind = onSelectPublishedKind
+        _service = StateObject(
+            wrappedValue: ProfileActivityService(initialKind: kind)
+        )
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if kind == .published {
+                ProfilePostKindFilterBar(
+                    availableKinds: PostKind.allCases,
+                    selectedKind: publishedPostKind,
+                    onSelect: onSelectPublishedKind
+                )
+                .padding(.horizontal, embedsInParentScroll ? 12 : 16)
+                .padding(.top, 12)
+            }
+
+            content
+        }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: embedsInParentScroll ? nil : .infinity
+            )
+            .task(id: loadTaskID) {
+                service.activateAccount(userID)
+                await service.select(
+                    kind,
+                    publishedPostKind: publishedPostKind
+                )
+            }
+            .task(id: refreshGeneration) {
+                guard refreshGeneration > appliedRefreshGeneration else { return }
+                appliedRefreshGeneration = refreshGeneration
+                service.activateAccount(userID)
+                let shouldForceRefresh = service.hasResolvedInitialLoad
+                await service.loadInitial(force: shouldForceRefresh)
+            }
+            .task(id: relevantActivityRevision) {
+                guard relevantActivityRevision > 0 else { return }
+                do {
+                    try await Task.sleep(for: .milliseconds(250))
+                } catch {
+                    return
+                }
+                service.activateAccount(userID)
+                await service.loadInitial(force: true)
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch service.loadState {
+        case .unresolved, .initialLoading:
+            activityStatePlaceholder {
+                ProgressView()
+            }
+        case .empty:
+            activityStatePlaceholder {
+                VStack(spacing: 10) {
+                    Image(systemName: emptyIcon)
+                        .font(.system(size: 34))
+                        .foregroundStyle(kind == .liked ? AppColors.likeActive : AppColors.textMuted)
+                    Text(kind.emptyTitle)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(AppColors.textMuted)
+                }
+            }
+        case .error(let message):
+            activityStatePlaceholder {
+                ErrorView(message) {
+                    Task { await service.loadInitial(force: true) }
+                }
+            }
+        case .loaded:
+            activityList
+        }
+    }
+
+    private func activityStatePlaceholder<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack {
+            if !embedsInParentScroll { Spacer() }
+            content()
+            if !embedsInParentScroll { Spacer() }
+        }
+        .frame(minHeight: embedsInParentScroll ? 220 : nil)
+    }
+
+    @ViewBuilder
+    private var activityList: some View {
+        if embedsInParentScroll {
+            activityRows
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+        } else {
+            ScrollView(showsIndicators: false) {
+                activityRows
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 90)
+            }
+            .refreshable {
+                await service.loadInitial(force: true)
+            }
+        }
+    }
+
+    private var activityRows: some View {
+        LazyVStack(spacing: 10) {
+            ForEach(service.items) { item in
+                ProfileActivityRow(
+                    item: item,
+                    activityKind: kind,
+                    isOpening: openingPostID == item.postID,
+                    isEditing: editingPostID == item.postID,
+                    isUpdatingPrivacy: updatingPrivacyPostID == item.postID,
+                    isDeleting: deletingPostID == item.postID,
+                    isPrivate: service.isPostPrivate(item.postID),
+                    onOpen: { onOpen(item) },
+                    onEdit: { onEdit(item) },
+                    onSetPrivacy: { hidden in
+                        onSetPrivacy(item, hidden)
+                    },
+                    onDelete: { onDelete(item) },
+                    onRemove: {
+                        Task { await service.removeReaction(item) }
+                    }
+                )
+                .onAppear {
+                    Task {
+                        await service.loadNextPageIfNeeded(currentItem: item)
+                    }
+                }
+            }
+
+            if service.isLoadingNextPage {
+                ProgressView().padding(.vertical, 12)
+            } else if service.errorMessage != nil {
+                Button("加载失败，点此重试") {
+                    guard let last = service.items.last else { return }
+                    Task {
+                        await service.loadNextPageIfNeeded(currentItem: last)
+                    }
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var loadTaskID: String {
+        "\(userID?.uuidString ?? "signed-out"):\(kind.rawValue):\(publishedPostKind?.rawValue ?? "all")"
+    }
+
+    private var relevantActivityRevision: UInt64 {
+        switch kind {
+        case .liked:
+            return activityMutations.likedRevision
+        case .favorited:
+            return activityMutations.favoritedRevision
+        case .published, .commented:
+            return 0
+        }
+    }
+
+    private var emptyIcon: String {
+        switch kind {
+        case .published: return "square.and.pencil"
+        case .liked: return "heart"
+        case .commented: return "bubble.left"
+        case .favorited: return "bookmark"
+        }
+    }
+}
+
+private struct ProfileActivityRow: View {
+    let item: ProfileActivityItem
+    let activityKind: ProfileActivityKind
+    let isOpening: Bool
+    let isEditing: Bool
+    let isUpdatingPrivacy: Bool
+    let isDeleting: Bool
+    let isPrivate: Bool
+    let onOpen: () -> Void
+    let onEdit: () -> Void
+    let onSetPrivacy: (Bool) -> Void
+    let onDelete: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    cover
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(item.kind?.displayName ?? "内容")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(AppColors.link)
+                            Spacer()
+                            Text(
+                                Formatters.formatCompactTimeAgo(
+                                    item.activityCreatedAt,
+                                    useJustNow: true
+                                )
+                            )
+                            .font(.system(size: 10))
+                            .foregroundStyle(AppColors.textMuted)
+                        }
+
+                        Text(item.postTitle)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(AppColors.textPrimary)
+                            .lineLimit(2)
+
+                        Text(activityKind == .commented
+                            ? item.activitySummary
+                            : item.postSummary)
+                            .font(.system(size: 12))
+                            .foregroundStyle(AppColors.textMuted)
+                            .lineLimit(2)
+                    }
+                }
+
+                if isOpening {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 18, height: 18)
+                        .accessibilityLabel("正在打开内容")
+                } else if activityKind == .liked || activityKind == .favorited {
+                    Button(action: onRemove) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.red.opacity(0.8))
+                            .accessibilityLabel(actionKindTitle)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if activityKind == .published {
+                HStack(spacing: 10) {
+                    Spacer()
+
+                    Menu {
+                        Button {
+                            onSetPrivacy(false)
+                        } label: {
+                            Label("公开可见", systemImage: "eye")
+                        }
+
+                        Button {
+                            onSetPrivacy(true)
+                        } label: {
+                            Label("仅自己可见", systemImage: "eye.slash")
+                        }
+                    } label: {
+                        activityActionIcon(
+                            systemName: isPrivate ? "eye.slash" : "eye",
+                            color: AppColors.textPrimary,
+                            isLoading: isUpdatingPrivacy
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isPublishedActionDisabled)
+                    .accessibilityLabel("更改帖子可见范围")
+
+                    Button(action: onEdit) {
+                        activityActionIcon(
+                            systemName: "square.and.pencil",
+                            color: AppColors.textPrimary,
+                            isLoading: isEditing
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isPublishedActionDisabled)
+                    .accessibilityLabel(isEditing ? "正在载入编辑内容" : "编辑帖子")
+
+                    Button(role: .destructive, action: onDelete) {
+                        activityActionIcon(
+                            systemName: "trash",
+                            color: .red,
+                            isLoading: isDeleting
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isPublishedActionDisabled)
+                    .accessibilityLabel(isDeleting ? "正在删除帖子" : "删除帖子")
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .cheeseCardChrome(cornerRadius: 15)
+        .contentShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .onTapGesture {
+            guard !isOpening,
+                  !isEditing,
+                  !isUpdatingPrivacy,
+                  !isDeleting
+            else { return }
+            onOpen()
+        }
+    }
+
+    @ViewBuilder
+    private var cover: some View {
+        if let coverImage = item.coverImage,
+           let url = URL(string: coverImage) {
+            CachedRemoteImage(url: url, targetPixelWidth: 192) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                coverFallback
+            }
+            .frame(width: 62, height: 62)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        } else {
+            coverFallback
+        }
+    }
+
+    private var coverFallback: some View {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(AppColors.accent.opacity(0.18))
+            .frame(width: 62, height: 62)
+            .overlay {
+                Image(systemName: item.kind?.icon ?? "doc.text")
+                    .foregroundStyle(AppColors.textMuted)
+            }
+    }
+
+    private var actionKindTitle: String {
+        activityKind == .liked ? "取消喜欢" : "取消收藏"
+    }
+
+    private var isPublishedActionDisabled: Bool {
+        isOpening || isEditing || isUpdatingPrivacy || isDeleting
+    }
+
+    private func activityActionIcon(
+        systemName: String,
+        color: Color,
+        isLoading: Bool
+    ) -> some View {
+        Group {
+            if isLoading {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Image(systemName: systemName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(color)
+            }
+        }
+        .frame(width: 34, height: 30)
+        .background(Color(.systemGray6))
+        .clipShape(Capsule())
+    }
+}
+
+private enum ProfileActivityDestination: Identifiable, Hashable {
+    case secondhand(SecondhandItem)
+    case forum(ForumPostItem, commentID: UUID?)
+
+    var id: String {
+        switch self {
+        case .secondhand(let item):
+            return "secondhand:\(item.id)"
+        case .forum(let post, let commentID):
+            return "forum:\(post.id):\(commentID?.uuidString ?? "")"
+        }
+    }
+}
+
+private struct ProfileActivityPostDetailRouter: View {
+    let destination: ProfileActivityDestination
+
+    var body: some View {
+        switch destination {
+        case .secondhand(let item):
+            SecondhandDetailView(item: item)
+        case .forum(let post, let commentID):
+            ForumDetailView(
+                post: post,
+                initialCommentID: commentID
+            )
+        }
+    }
+}
