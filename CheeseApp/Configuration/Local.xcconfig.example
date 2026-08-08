@@ -1,0 +1,7 @@
+// Copy this file to Local.xcconfig and replace the placeholders.
+// Keep $() between URL slashes: xcconfig otherwise treats // as a comment.
+SUPABASE_URL = https:/$()/your-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY = your-publishable-key
+
+// Optional; Shared.xcconfig already supplies this default.
+// SUPABASE_AUTH_REDIRECT_URL = cheeseapp:/$()/auth/callback

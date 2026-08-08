@@ -93,6 +93,8 @@ Do not commit values. The iOS app reads environment values first and the built I
 
 Tests use a non-production placeholder only when loaded under XCTest; production/development launches fail fast when required iOS configuration is missing.
 
+For iOS development, copy `CheeseApp/Configuration/Local.xcconfig.example` to the Git-ignored `Local.xcconfig` and supply the public client values. If an existing local worker `wrangler.toml` already contains those public values, run `scripts/configure-ios-local.sh --from-worker /path/to/wrangler.toml`. The Xcode app target imports this file through `Shared.xcconfig`; no scheme editing is required. Keep the documented `$()` URL escaping because raw `//` starts an xcconfig comment.
+
 For Cloudflare, configure `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` as deployment variables and privileged values with `wrangler secret put` or Secrets Store. See `cheeseapp-share-worker/README.md`.
 
 ## Important Backend Dependencies

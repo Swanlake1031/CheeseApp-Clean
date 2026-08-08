@@ -47,7 +47,17 @@ Configure these values locally; never commit their values:
 - `SUPABASE_PUBLISHABLE_KEY`
 - optional `SUPABASE_AUTH_REDIRECT_URL`
 
-Add them to the CheeseApp Xcode scheme environment for local runs, or provide matching Xcode build settings so the Info.plist placeholders are expanded. Worker deployment configuration is listed in [HANDOFF.md](HANDOFF.md) and `cheeseapp-share-worker/README.md`.
+The Xcode target loads the ignored `CheeseApp/Configuration/Local.xcconfig`. Either copy `Local.xcconfig.example` and fill it in, or generate it from an existing local worker configuration:
+
+```sh
+cp CheeseApp/Configuration/Local.xcconfig.example CheeseApp/Configuration/Local.xcconfig
+# Edit Local.xcconfig, keeping the documented $() URL escaping.
+
+# Alternatively, reuse public client values already present in a local worker config:
+scripts/configure-ios-local.sh --from-worker /path/to/wrangler.toml
+```
+
+Restart the app after changing configuration. Worker deployment configuration is listed in [HANDOFF.md](HANDOFF.md) and `cheeseapp-share-worker/README.md`.
 
 Install worker dependencies when needed:
 

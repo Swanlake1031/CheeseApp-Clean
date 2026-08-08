@@ -1,0 +1,5 @@
+// Safe defaults shared by every CheeseApp build configuration.
+// Developer-specific Supabase values belong in Local.xcconfig, which Git ignores.
+SUPABASE_AUTH_REDIRECT_URL = cheeseapp:/$()/auth/callback
+
+#include? "Local.xcconfig"

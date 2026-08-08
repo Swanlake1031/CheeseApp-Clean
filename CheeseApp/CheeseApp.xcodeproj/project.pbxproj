@@ -157,6 +157,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		CFGSHARED /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		100 /* CheeseAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheeseAppApp.swift; sourceTree = "<group>"; };
 		101 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		SYSMSGFILE1 /* SystemMessagesFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMessagesFeature.swift; sourceTree = "<group>"; };
@@ -346,11 +347,20 @@
 		G00 = {
 			isa = PBXGroup;
 			children = (
+				GCONFIG /* Configuration */,
 				G01 /* CheeseApp */,
 				GT0 /* CheeseAppTests */,
 				G02 /* Products */,
 				DBA54BA52F2D44BE0073E17A /* Frameworks */,
 			);
+			sourceTree = "<group>";
+		};
+		GCONFIG /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				CFGSHARED /* Shared.xcconfig */,
+			);
+			path = Configuration;
 			sourceTree = "<group>";
 		};
 		G01 /* CheeseApp */ = {
@@ -1298,6 +1308,7 @@
 		};
 		TC1 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = CFGSHARED /* Shared.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -1330,6 +1341,7 @@
 		};
 		TC2 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = CFGSHARED /* Shared.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
