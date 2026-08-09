@@ -44,9 +44,7 @@ struct HomeView: View {
     @State private var selectedForumBoardID: UUID?
     @State private var showCourseDiscovery = false
     @State private var showNavigationDrawer = false
-    @State private var navigationDrawerReveal: CGFloat = 0
-    @State private var isNavigationDrawerEdgeDragging = false
-    @State private var isNavigationDrawerClosing = false
+    @State private var navigationDrawerOpenRequest: UInt = 0
     @State private var selectedForumPost: ForumPostItem?
     @State private var selectedFeaturedSecondhandItem: SecondhandItem?
     @State private var selectedProfileRoute: HomeProfileRoute?
@@ -108,15 +106,34 @@ struct HomeView: View {
                 }
             }
 
-            if !showNavigationDrawer {
-                navigationDrawerEdgeGestureZone
-                    .zIndex(90)
-            }
-
-            if showNavigationDrawer || navigationDrawerReveal > 0 || isNavigationDrawerClosing {
-                navigationDrawerOverlay
-                    .zIndex(100)
-            }
+            HomeNavigationDrawerContainer(
+                openRequest: navigationDrawerOpenRequest,
+                boards: forumService.boards,
+                onPresentationChange: { showNavigationDrawer = $0 },
+                onForumTap: {
+                    selectedForumBoardID = nil
+                    showForumList = true
+                },
+                onBoardTap: { board in
+                    selectedForumBoardID = board.id
+                    showForumList = true
+                },
+                onSecondhandTap: {
+                    selectedSecondhandCategory = nil
+                    selectFeaturedCategory(.secondhand)
+                },
+                onSecondhandCategoryTap: { category in
+                    selectedSecondhandCategory = category
+                    selectFeaturedCategory(.secondhand)
+                },
+                onCourseTap: {
+                    showCourseDiscovery = true
+                },
+                onCourseRadarTap: {
+                    openURL(AppExternalLinks.courseRadar)
+                }
+            )
+            .zIndex(100)
         }
         .overlay(alignment: .top) {
             if isRefreshing {
@@ -198,10 +215,7 @@ struct HomeView: View {
             selectedModule: selectedFeaturedCategory,
             onSelect: selectFeaturedCategory,
             onMenuTap: {
-                isNavigationDrawerClosing = false
-                withAnimation(.easeOut(duration: 0.22)) {
-                    showNavigationDrawer = true
-                }
+                navigationDrawerOpenRequest &+= 1
             },
             onSearchTap: {
                 shouldAutoFocusSearch = true
@@ -209,126 +223,6 @@ struct HomeView: View {
             }
         )
         .contentShape(Rectangle())
-    }
-
-    private var navigationDrawerOverlay: some View {
-        GeometryReader { proxy in
-            let drawerWidth = min(304, proxy.size.width * 0.80)
-            let reveal = min(max(navigationDrawerReveal, 0), drawerWidth)
-            let revealProgress = showNavigationDrawer ? 1 : reveal / max(drawerWidth, 1)
-
-            ZStack(alignment: .leading) {
-                Color.black.opacity(0.30 * revealProgress)
-                    .ignoresSafeArea()
-                    .onTapGesture(perform: closeNavigationDrawer)
-
-                HomeNavigationDrawerView(
-                    boards: forumService.boards,
-                    topSafeAreaInset: max(proxy.safeAreaInsets.top, 52),
-                    onClose: closeNavigationDrawer,
-                    onForumTap: {
-                        selectedForumBoardID = nil
-                        closeNavigationDrawer()
-                        showForumList = true
-                    },
-                    onBoardTap: { board in
-                        selectedForumBoardID = board.id
-                        closeNavigationDrawer()
-                        showForumList = true
-                    },
-                    onSecondhandTap: {
-                        selectedSecondhandCategory = nil
-                        selectFeaturedCategory(.secondhand)
-                        closeNavigationDrawer()
-                    },
-                    onSecondhandCategoryTap: { category in
-                        selectedSecondhandCategory = category
-                        selectFeaturedCategory(.secondhand)
-                        closeNavigationDrawer()
-                    },
-                    onCourseTap: {
-                        closeNavigationDrawer()
-                        showCourseDiscovery = true
-                    },
-                    onCourseRadarTap: {
-                        closeNavigationDrawer()
-                        openURL(AppExternalLinks.courseRadar)
-                    }
-                )
-                .frame(width: drawerWidth)
-                .frame(maxHeight: .infinity)
-                .clipShape(
-                    UnevenRoundedRectangle(
-                        bottomTrailingRadius: 28,
-                        topTrailingRadius: 28
-                    )
-                )
-                .shadow(color: .black.opacity(0.18), radius: 24, x: 8)
-                .offset(x: showNavigationDrawer ? 0 : -drawerWidth + reveal)
-                .transition(.move(edge: .leading))
-            }
-        }
-        .ignoresSafeArea()
-        .transition(.asymmetric(insertion: .opacity, removal: .identity))
-    }
-
-    private var navigationDrawerEdgeGestureZone: some View {
-        HStack(spacing: 0) {
-            Color.clear
-                .frame(width: 24)
-                .contentShape(Rectangle())
-                .gesture(navigationDrawerOpenGesture)
-            Spacer(minLength: 0)
-        }
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
-    }
-
-    private var navigationDrawerOpenGesture: some Gesture {
-        DragGesture(minimumDistance: 4, coordinateSpace: .global)
-            .onChanged { value in
-                let horizontal = value.translation.width
-                let vertical = value.translation.height
-                guard horizontal > 0, abs(horizontal) > abs(vertical) else { return }
-                isNavigationDrawerEdgeDragging = true
-                navigationDrawerReveal = horizontal
-            }
-            .onEnded { value in
-                guard isNavigationDrawerEdgeDragging else {
-                    navigationDrawerReveal = 0
-                    return
-                }
-                let horizontal = max(value.translation.width, 0)
-                let predictedHorizontal = max(value.predictedEndTranslation.width, 0)
-                let shouldOpen = horizontal >= 88 || predictedHorizontal >= 170
-
-                if shouldOpen {
-                    isNavigationDrawerClosing = false
-                    withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.88)) {
-                        showNavigationDrawer = true
-                        navigationDrawerReveal = 0
-                        isNavigationDrawerEdgeDragging = false
-                    }
-                } else {
-                    closeNavigationDrawer()
-                }
-            }
-    }
-
-    private func closeNavigationDrawer() {
-        guard showNavigationDrawer || navigationDrawerReveal > 0 else { return }
-        isNavigationDrawerClosing = true
-
-        withAnimation(.easeInOut(duration: 0.24)) {
-            showNavigationDrawer = false
-            navigationDrawerReveal = 0
-            isNavigationDrawerEdgeDragging = false
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            guard !showNavigationDrawer else { return }
-            isNavigationDrawerClosing = false
-        }
     }
 
     private var homeLoadScopeKey: String {

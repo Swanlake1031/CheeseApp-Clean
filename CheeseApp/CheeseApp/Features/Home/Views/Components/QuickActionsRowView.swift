@@ -89,6 +89,162 @@ struct HomeModuleGridView: View {
     }
 }
 
+struct HomeNavigationDrawerContainer: View {
+    let openRequest: UInt
+    let boards: [ForumBoard]
+    let onPresentationChange: (Bool) -> Void
+    let onForumTap: () -> Void
+    let onBoardTap: (ForumBoard) -> Void
+    let onSecondhandTap: () -> Void
+    let onSecondhandCategoryTap: (SecondhandPost.Category) -> Void
+    let onCourseTap: () -> Void
+    let onCourseRadarTap: () -> Void
+
+    @State private var isOpen = false
+    @State private var reveal: CGFloat = 0
+    @State private var isClosing = false
+
+    var body: some View {
+        ZStack {
+            if !isOpen {
+                edgeGestureZone
+                    .zIndex(0)
+            }
+
+            if isOpen || reveal > 0 || isClosing {
+                drawerOverlay
+                    .zIndex(1)
+            }
+        }
+        .onChange(of: openRequest) { _, _ in
+            openDrawer(animation: .easeOut(duration: 0.22))
+        }
+    }
+
+    private var drawerOverlay: some View {
+        GeometryReader { proxy in
+            let drawerWidth = min(304, proxy.size.width * 0.80)
+            let boundedReveal = min(max(reveal, 0), drawerWidth)
+            let revealProgress = isOpen ? 1 : boundedReveal / max(drawerWidth, 1)
+
+            ZStack(alignment: .leading) {
+                Color.black.opacity(0.30 * revealProgress)
+                    .ignoresSafeArea()
+                    .onTapGesture(perform: closeDrawer)
+
+                HomeNavigationDrawerView(
+                    boards: boards,
+                    topSafeAreaInset: max(proxy.safeAreaInsets.top, 52),
+                    onClose: closeDrawer,
+                    onForumTap: {
+                        closeDrawer()
+                        onForumTap()
+                    },
+                    onBoardTap: { board in
+                        closeDrawer()
+                        onBoardTap(board)
+                    },
+                    onSecondhandTap: {
+                        closeDrawer()
+                        onSecondhandTap()
+                    },
+                    onSecondhandCategoryTap: { category in
+                        closeDrawer()
+                        onSecondhandCategoryTap(category)
+                    },
+                    onCourseTap: {
+                        closeDrawer()
+                        onCourseTap()
+                    },
+                    onCourseRadarTap: {
+                        closeDrawer()
+                        onCourseRadarTap()
+                    }
+                )
+                .frame(width: drawerWidth)
+                .frame(maxHeight: .infinity)
+                .clipShape(
+                    UnevenRoundedRectangle(
+                        bottomTrailingRadius: 28,
+                        topTrailingRadius: 28
+                    )
+                )
+                .compositingGroup()
+                .shadow(color: .black.opacity(0.18), radius: 24, x: 8)
+                .offset(x: isOpen ? 0 : -drawerWidth + boundedReveal)
+                .transition(.move(edge: .leading))
+            }
+        }
+        .ignoresSafeArea()
+        .transition(.asymmetric(insertion: .opacity, removal: .identity))
+    }
+
+    private var edgeGestureZone: some View {
+        HStack(spacing: 0) {
+            Color.clear
+                .frame(width: 24)
+                .contentShape(Rectangle())
+                .gesture(openGesture)
+            Spacer(minLength: 0)
+        }
+        .ignoresSafeArea()
+        .accessibilityHidden(true)
+    }
+
+    private var openGesture: some Gesture {
+        DragGesture(minimumDistance: 4, coordinateSpace: .global)
+            .onChanged { value in
+                let horizontal = value.translation.width
+                let vertical = value.translation.height
+                guard horizontal > 0, abs(horizontal) > abs(vertical) else { return }
+                reveal = horizontal
+            }
+            .onEnded { value in
+                let horizontal = max(value.translation.width, 0)
+                let vertical = value.translation.height
+                guard horizontal > 0, abs(horizontal) > abs(vertical) else {
+                    closeDrawer()
+                    return
+                }
+
+                let predictedHorizontal = max(value.predictedEndTranslation.width, 0)
+                if horizontal >= 88 || predictedHorizontal >= 170 {
+                    openDrawer(animation: .interactiveSpring(response: 0.28, dampingFraction: 0.88))
+                } else {
+                    closeDrawer()
+                }
+            }
+    }
+
+    private func openDrawer(animation: Animation) {
+        guard !isOpen else { return }
+        isClosing = false
+        onPresentationChange(true)
+
+        withAnimation(animation) {
+            isOpen = true
+            reveal = 0
+        }
+    }
+
+    private func closeDrawer() {
+        guard isOpen || reveal > 0 else { return }
+        isClosing = true
+
+        withAnimation(
+            .easeInOut(duration: 0.24),
+            completionCriteria: .logicallyComplete
+        ) {
+            isOpen = false
+            reveal = 0
+        } completion: {
+            guard !isOpen else { return }
+            isClosing = false
+            onPresentationChange(false)
+        }
+    }
+}
+
 struct HomeNavigationDrawerView: View {
     let boards: [ForumBoard]
     let topSafeAreaInset: CGFloat
