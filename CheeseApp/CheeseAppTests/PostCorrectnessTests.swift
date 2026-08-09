@@ -150,6 +150,45 @@ final class PostCorrectnessTests: XCTestCase {
         }
     }
 
+    func testPostShareOffersMutualFriendsWithoutExistingConversation() {
+        let existingUserID = UUID()
+        let newFriendID = UUID()
+        let duplicateFriendID = UUID()
+        let profiles = [
+            MutualFollowProfile(
+                id: existingUserID,
+                fullName: "Existing chat",
+                avatarURL: nil,
+                university: nil
+            ),
+            MutualFollowProfile(
+                id: newFriendID,
+                fullName: "Zoe",
+                avatarURL: nil,
+                university: "McMaster University"
+            ),
+            MutualFollowProfile(
+                id: duplicateFriendID,
+                fullName: "Alex",
+                avatarURL: nil,
+                university: nil
+            ),
+            MutualFollowProfile(
+                id: duplicateFriendID,
+                fullName: "Alex duplicate",
+                avatarURL: nil,
+                university: nil
+            )
+        ]
+
+        let available = PostShareRecipientPolicy.friendsWithoutConversation(
+            profiles,
+            existingDirectUserIDs: [existingUserID]
+        )
+
+        XCTAssertEqual(available.map(\.id), [duplicateFriendID, newFriendID])
+    }
+
     func testSharedEditableTextViewExposesNativeSelectionActions() {
         let textView = CheeseEditableTextView()
         textView.text = "Cheese App"

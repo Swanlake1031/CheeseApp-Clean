@@ -143,12 +143,16 @@ struct CheesePostShareBottomSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var chatService = ChatService.shared
 
-    @State private var sendingTargetId: UUID?
+    @State private var sendingTargetId: String?
     @State private var showSystemShareSheet = false
     @State private var statusMessage: String?
     @State private var statusIsError = false
-    @State private var selectedTargetIDs: Set<UUID> = []
+    @State private var selectedTargetIDs: Set<String> = []
     @State private var shareNote = ""
+    @State private var targetQuery = ""
+    @State private var friendProfiles: [MutualFollowProfile] = []
+    @State private var isLoadingFriends = false
+    @State private var friendsErrorMessage: String?
 
     private var directTargets: [PostChatShareTarget] {
         var seen = Set<UUID>()
@@ -158,7 +162,7 @@ struct CheesePostShareBottomSheet: View {
 
         return conversations.map { conversation in
             PostChatShareTarget(
-                id: conversation.id,
+                id: "direct:\(conversation.id.uuidString)",
                 kind: .direct(conversation),
                 title: chatService.displayName(for: conversation),
                 subtitle: conversationPreviewText(conversation),
@@ -171,7 +175,7 @@ struct CheesePostShareBottomSheet: View {
     private var groupTargets: [PostChatShareTarget] {
         chatService.groupConversations.map { group in
             PostChatShareTarget(
-                id: group.id,
+                id: "group:\(group.id.uuidString)",
                 kind: .group(group),
                 title: group.displayName,
                 subtitle: L10n.tr("Group · \(group.memberCount) people", "群聊 · \(group.memberCount)人"),
@@ -181,13 +185,50 @@ struct CheesePostShareBottomSheet: View {
         }
     }
 
-    private var recentTargets: [PostChatShareTarget] {
-        (directTargets + groupTargets)
+    private var friendTargets: [PostChatShareTarget] {
+        let existingDirectUserIDs = Set(
+            (chatService.conversations + chatService.messageRequests)
+                .map(\.otherUserId)
+        )
+
+        return PostShareRecipientPolicy
+            .friendsWithoutConversation(
+                friendProfiles,
+                existingDirectUserIDs: existingDirectUserIDs
+            )
+            .map { profile in
+                PostChatShareTarget(
+                    id: "friend:\(profile.id.uuidString)",
+                    kind: .friend(profile),
+                    title: profile.fullName,
+                    subtitle: profile.university
+                        ?? L10n.tr("Mutual friend", "互关好友"),
+                    avatarURL: profile.avatarURL,
+                    lastActiveAt: .distantPast
+                )
+            }
+    }
+
+    private var allTargets: [PostChatShareTarget] {
+        let recent = (directTargets + groupTargets)
             .sorted { lhs, rhs in lhs.lastActiveAt > rhs.lastActiveAt }
+        return recent + friendTargets
+    }
+
+    private var visibleTargets: [PostChatShareTarget] {
+        let normalized = targetQuery
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        guard !normalized.isEmpty else { return allTargets }
+
+        return allTargets.filter {
+            $0.title.lowercased().contains(normalized)
+                || $0.subtitle.lowercased().contains(normalized)
+        }
     }
 
     private var selectedTargets: [PostChatShareTarget] {
-        recentTargets.filter { selectedTargetIDs.contains($0.id) }
+        allTargets.filter { selectedTargetIDs.contains($0.id) }
     }
 
     private var bottomSafeAreaInset: CGFloat {
@@ -199,7 +240,7 @@ struct CheesePostShareBottomSheet: View {
     }
 
     private var preferredSheetHeight: CGFloat {
-        let minHeight: CGFloat = selectedTargets.isEmpty ? 284 : 392
+        let minHeight: CGFloat = selectedTargets.isEmpty ? 338 : 446
         let maxHeight = UIScreen.main.bounds.height * 0.78
         return min(minHeight, maxHeight)
     }
@@ -276,9 +317,9 @@ struct CheesePostShareBottomSheet: View {
         .presentationBackground(AppColors.pageBackground)
         .presentationCornerRadius(28)
         .task {
-            await chatService.refreshConversations()
+            await loadShareTargets()
         }
-        .onChange(of: recentTargets.map(\.id)) { _, latestIds in
+        .onChange(of: allTargets.map(\.id)) { _, latestIds in
             selectedTargetIDs = selectedTargetIDs.intersection(Set(latestIds))
         }
         .sheet(isPresented: $showSystemShareSheet) {
@@ -288,49 +329,94 @@ struct CheesePostShareBottomSheet: View {
 
     @ViewBuilder
     private var shareTargetsSection: some View {
-        if chatService.isLoadingConversations && recentTargets.isEmpty {
+        if (chatService.isLoadingConversations || isLoadingFriends)
+            && allTargets.isEmpty {
             VStack(spacing: 10) {
                 ProgressView()
-                Text(L10n.tr("Loading recent chats...", "正在加载最近聊天..."))
+                Text(L10n.tr("Loading friends and chats...", "正在加载好友和聊天..."))
                     .font(.system(size: 13))
                     .foregroundStyle(AppColors.textMuted)
             }
-            .frame(maxWidth: .infinity, minHeight: 108, maxHeight: 108)
-        } else if recentTargets.isEmpty {
+            .frame(maxWidth: .infinity, minHeight: 158, maxHeight: 158)
+        } else if allTargets.isEmpty {
             VStack(spacing: 10) {
                 Image(systemName: "bubble.left.and.bubble.right")
                     .font(.system(size: 30))
                     .foregroundStyle(AppColors.textMuted)
-                Text(L10n.tr("No recent chats", "暂无可分享的聊天"))
+                Text(L10n.tr("No friends or chats available", "暂无可分享的好友或聊天"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(AppColors.textPrimary)
-                Text(L10n.tr("Go to Messages first, then come back to share.", "先去消息页发起聊天，再回来分享。"))
+                Text(
+                    friendsErrorMessage
+                        ?? L10n.tr(
+                            "Mutual friends will appear here even before your first message.",
+                            "互关好友即使还没聊过，也会显示在这里。"
+                        )
+                )
                     .font(.system(size: 12))
                     .foregroundStyle(AppColors.textMuted)
+                    .multilineTextAlignment(.center)
             }
-            .frame(maxWidth: .infinity, minHeight: 108, maxHeight: 108)
+            .frame(maxWidth: .infinity, minHeight: 158, maxHeight: 158)
             .padding(.horizontal, 18)
         } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 14) {
-                    ForEach(recentTargets.prefix(14)) { target in
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(AppColors.textMuted)
+                    TextField(
+                        L10n.tr("Search friends or chats", "搜索好友或聊天"),
+                        text: $targetQuery
+                    )
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .font(.system(size: 13))
+
+                    if !targetQuery.isEmpty {
                         Button {
-                            toggleTargetSelection(target)
+                            targetQuery = ""
                         } label: {
-                            PostChatShareTargetAvatar(
-                                target: target,
-                                isSending: sendingTargetId == target.id,
-                                isSelected: selectedTargetIDs.contains(target.id)
-                            )
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(AppColors.textMuted)
                         }
                         .buttonStyle(.plain)
-                        .disabled(sendingTargetId != nil)
                     }
                 }
+                .padding(.horizontal, 12)
+                .frame(height: 36)
+                .background(Color.black.opacity(0.05))
+                .clipShape(Capsule())
                 .padding(.horizontal, 18)
-                .padding(.vertical, 4)
+
+                if visibleTargets.isEmpty {
+                    Text(L10n.tr("No matching friend or chat", "没有匹配的好友或聊天"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppColors.textMuted)
+                        .frame(maxWidth: .infinity, minHeight: 104)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(alignment: .top, spacing: 14) {
+                            ForEach(visibleTargets) { target in
+                                Button {
+                                    toggleTargetSelection(target)
+                                } label: {
+                                    PostChatShareTargetAvatar(
+                                        target: target,
+                                        isSending: sendingTargetId == target.id,
+                                        isSelected: selectedTargetIDs.contains(target.id)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(sendingTargetId != nil)
+                            }
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 4)
+                    }
+                    .frame(height: 104)
+                }
             }
-            .frame(height: 104)
+            .frame(height: 148)
         }
     }
 
@@ -492,6 +578,21 @@ struct CheesePostShareBottomSheet: View {
                         groupId: group.id,
                         card: card
                     )
+                case .friend(let profile):
+                    let conversation = try await chatService.getOrCreateConversation(
+                        otherUserId: profile.id,
+                        relatedPostId: payload.postId
+                    )
+                    if !note.isEmpty {
+                        _ = try await chatService.sendMessage(
+                            conversationId: conversation.id,
+                            content: note
+                        )
+                    }
+                    _ = try await chatService.sendSharedPostCardMessage(
+                        conversationId: conversation.id,
+                        card: card
+                    )
                 }
             }
 
@@ -521,15 +622,56 @@ struct CheesePostShareBottomSheet: View {
             }
         }
     }
+
+    @MainActor
+    private func loadShareTargets() async {
+        guard !isLoadingFriends else { return }
+        isLoadingFriends = true
+        defer { isLoadingFriends = false }
+        friendsErrorMessage = nil
+
+        async let conversationRefresh: Void = chatService.refreshConversations()
+        async let friendsLoad: [MutualFollowProfile] = chatService
+            .fetchMutualFollowProfiles(limit: 200)
+
+        await conversationRefresh
+
+        do {
+            let loadedFriends = try await friendsLoad
+            guard !Task.isCancelled else { return }
+            friendProfiles = loadedFriends
+        } catch {
+            guard !Task.isCancelled else { return }
+            friendProfiles = []
+            friendsErrorMessage = error.localizedDescription
+        }
+
+    }
+}
+
+enum PostShareRecipientPolicy {
+    static func friendsWithoutConversation(
+        _ profiles: [MutualFollowProfile],
+        existingDirectUserIDs: Set<UUID>
+    ) -> [MutualFollowProfile] {
+        var seen = existingDirectUserIDs
+        return profiles
+            .filter { seen.insert($0.id).inserted }
+            .sorted {
+                $0.fullName.localizedCaseInsensitiveCompare($1.fullName)
+                    == .orderedAscending
+            }
+    }
 }
 
 private struct PostChatShareTarget: Identifiable {
     enum Kind {
         case direct(ChatConversationPreview)
         case group(ChatGroupPreview)
+        case friend(MutualFollowProfile)
     }
 
-    let id: UUID
+    let id: String
     let kind: Kind
     let title: String
     let subtitle: String
