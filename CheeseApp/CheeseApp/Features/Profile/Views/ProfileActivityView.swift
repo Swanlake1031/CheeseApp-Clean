@@ -904,6 +904,22 @@ private struct ProfileActivityRow: View {
                 HStack(spacing: 10) {
                     Spacer()
 
+                    Button(action: onShare) {
+                        HStack(spacing: 5) {
+                            Text("分享")
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
+                        .background(Color(.systemGray6))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isPublishedActionDisabled)
+                    .accessibilityLabel("分享帖子")
+
                     Menu {
                         Button {
                             onSetPrivacy(!isPrivate)
