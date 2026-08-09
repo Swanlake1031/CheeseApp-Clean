@@ -527,6 +527,26 @@ final class PostCorrectnessTests: XCTestCase {
         ))
     }
 
+    func testProfileActivityPagerDisablesBounceWithoutChangingOuterVerticalScroll() {
+        let verticalScrollView = UIScrollView()
+        verticalScrollView.bounces = true
+
+        let horizontalPager = UIScrollView()
+        horizontalPager.bounces = true
+        horizontalPager.alwaysBounceHorizontal = true
+        horizontalPager.isDirectionalLockEnabled = false
+        verticalScrollView.addSubview(horizontalPager)
+
+        let configurationView = ProfileActivityPagerConfigurationView()
+        horizontalPager.addSubview(configurationView)
+        configurationView.configureEnclosingScrollView()
+
+        XCTAssertFalse(horizontalPager.bounces)
+        XCTAssertFalse(horizontalPager.alwaysBounceHorizontal)
+        XCTAssertTrue(horizontalPager.isDirectionalLockEnabled)
+        XCTAssertTrue(verticalScrollView.bounces)
+    }
+
     func testSecondhandEditPayloadDoesNotOverwriteCategoryOrStatus() throws {
         let payload = SecondhandService.makeDetailUpdate(
             price: 20,

@@ -1,4 +1,61 @@
 import SwiftUI
+import UIKit
+
+private struct ProfileActivityPagerScrollViewConfiguration: UIViewRepresentable {
+    func makeUIView(context: Context) -> ProfileActivityPagerConfigurationView {
+        let view = ProfileActivityPagerConfigurationView()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(
+        _ uiView: ProfileActivityPagerConfigurationView,
+        context: Context
+    ) {
+        uiView.configureEnclosingScrollView()
+    }
+}
+
+final class ProfileActivityPagerConfigurationView: UIView {
+    private weak var configuredScrollView: UIScrollView?
+
+    override func didMoveToSuperview() {
+        super.didMoveToSuperview()
+        configureEnclosingScrollView()
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        configureEnclosingScrollView()
+    }
+
+    func configureEnclosingScrollView() {
+        var ancestor = superview
+
+        while let currentView = ancestor {
+            if let scrollView = currentView as? UIScrollView {
+                guard configuredScrollView !== scrollView
+                    || scrollView.bounces
+                    || scrollView.alwaysBounceHorizontal
+                    || !scrollView.isDirectionalLockEnabled
+                else { return }
+
+                // The picker sits outside this horizontal pager, so allowing
+                // the pager to rubber-band makes the two regions visibly
+                // separate after a Menu dismissal drag. Keep bounce disabled
+                // only for this pager; the profile's vertical ScrollView keeps
+                // its normal system behavior.
+                scrollView.bounces = false
+                scrollView.alwaysBounceHorizontal = false
+                scrollView.isDirectionalLockEnabled = true
+                configuredScrollView = scrollView
+                return
+            }
+
+            ancestor = currentView.superview
+        }
+    }
+}
 
 private struct ProfileActivityPageHeightPreferenceKey: PreferenceKey {
     static var defaultValue: [ProfileActivityKind: CGFloat] = [:]
@@ -182,14 +239,10 @@ struct ProfileActivityView: View {
                 }
                 .scrollTargetLayout()
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .background(ProfileActivityPagerScrollViewConfiguration())
             }
             .scrollTargetBehavior(.paging)
             .scrollPosition(id: embeddedSelectedKindBinding)
-            // The fixed activity picker is the navigation control for the
-            // embedded profile section. Disabling direct pager dragging keeps
-            // a drag that follows native Menu dismissal from rubber-banding
-            // the entire activity page sideways under the fixed picker.
-            .scrollDisabled(true)
             .frame(height: embeddedPagerHeight, alignment: .top)
             .background(AppColors.pageBackground)
             .clipped()
