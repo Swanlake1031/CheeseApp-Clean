@@ -94,6 +94,9 @@ class AuthService: ObservableObject {
     private let legacyRecentLoginAccountsKey = "auth.recent_login_accounts.v1"
     private let maxSavedAccounts = 3
     private let maxRecentLoginAccounts = 5
+    private static let googleOAuthQueryParams: [(name: String, value: String?)] = [
+        (name: "prompt", value: "select_account")
+    ]
     private var suppressSessionValidation = false
     private let bootstrapTimeoutNanoseconds: UInt64 = 8_000_000_000
     private var accountTransitionHandler: AccountTransitionHandler?
@@ -361,7 +364,8 @@ class AuthService: ObservableObject {
             let session = try await supabase.auth.signInWithOAuth(
                 provider: .google,
                 redirectTo: redirectURL,
-                scopes: "openid email profile"
+                scopes: "openid email profile",
+                queryParams: Self.googleOAuthQueryParams
             )
 
             isAuthenticated = true
@@ -480,7 +484,8 @@ class AuthService: ObservableObject {
                 try await supabase.auth.linkIdentity(
                     provider: .google,
                     scopes: "openid email profile",
-                    redirectTo: redirectURL
+                    redirectTo: redirectURL,
+                    queryParams: Self.googleOAuthQueryParams
                 )
             case .apple:
                 try await supabase.auth.linkIdentity(
@@ -732,7 +737,8 @@ class AuthService: ObservableObject {
                 return try await supabase.auth.signInWithOAuth(
                     provider: .google,
                     redirectTo: redirectURL,
-                    scopes: "openid email profile"
+                    scopes: "openid email profile",
+                    queryParams: Self.googleOAuthQueryParams
                 )
             } catch {
                 // 某些设备回跳后会先抛错，这里做一次会话兜底。
