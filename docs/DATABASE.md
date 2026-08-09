@@ -35,7 +35,7 @@ review, and aggregate contracts; they are not represented as post types.
 
 | Table | Key Relationship | Notes |
 |---|---|---|
-| `secondhand_posts` | `id` references `posts(id)` | Marketplace price, category, condition, stock/sold and expiry fields |
+| `secondhand_posts` | `id` references `posts(id)` | Marketplace price, category, condition, stock/sold, and the next lifecycle deadline |
 | `forum_posts` | `id` references `posts(id)` | Required board relationship, comment flags, pinned/locked state, metrics |
 
 The app reads module data mainly through:

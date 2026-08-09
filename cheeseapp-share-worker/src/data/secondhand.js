@@ -21,11 +21,11 @@ export async function fetchSecondhandMetadata({
     config,
     table: "secondhand_posts_view",
     select:
-      "id,title,description,price,condition,images,is_expired,category,is_negotiable,created_at,user_name,user_avatar",
+      "id,title,description,price,condition,images,category,is_negotiable,created_at,user_name,user_avatar",
     postID
   });
 
-  if (!row || row.is_expired === true) {
+  if (!row) {
     return unavailableMetadata("secondhand");
   }
 

@@ -61,6 +61,7 @@ struct UserPostsView: View {
 
     @State private var editingPost: UserPostSummary?
     @State private var reportingPost: UserPostSummary?
+    @State private var sharingPost: PostSharePayload?
     @State private var deletingPost: UserPostSummary?
     @State private var selectedResolvedPost: UserPostResolvedDestination?
     @State private var activeConversation: ChatConversationPreview?
@@ -96,13 +97,18 @@ struct UserPostsView: View {
             && ["male", "female", "non_binary"].contains(service.profile?.gender ?? "")
     }
 
+    private var managedPosts: [UserPostSummary] {
+        guard isCurrentUser else { return service.posts }
+        return service.posts.filter { !$0.isPrivate }
+    }
+
     private var visiblePosts: [UserPostSummary] {
-        guard let selectedKindFilter else { return service.posts }
-        return service.posts.filter { $0.kind == selectedKindFilter }
+        guard let selectedKindFilter else { return managedPosts }
+        return managedPosts.filter { $0.kind == selectedKindFilter }
     }
 
     private var availableKinds: [PostKind] {
-        let kinds = Set(service.posts.map(\.kind))
+        let kinds = Set(managedPosts.map(\.kind))
         return PostKind.allCases.filter { kinds.contains($0) }
     }
 
@@ -204,6 +210,13 @@ struct UserPostsView: View {
                     postKind: post.kind
                 )
             }
+            .sheet(item: $sharingPost) { payload in
+                CheesePostShareBottomSheet(payload: payload) { message in
+                    ShareFeedbackPresenter.show(message) {
+                        uidCopyFeedbackMessage = $0
+                    }
+                }
+            }
     }
 
     private var presentedScene: some View {
@@ -281,6 +294,26 @@ struct UserPostsView: View {
         } else {
             VStack(spacing: 14) {
                 profileHeader
+                if isCurrentUser {
+                    NavigationLink(destination: PrivateContentView()) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "lock.fill")
+                                .foregroundStyle(AppColors.textPrimary)
+                            Text("私密内容")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(AppColors.textPrimary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(AppColors.textMuted)
+                        }
+                        .padding(14)
+                        .background(AppColors.cardBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .cheeseCardChrome(cornerRadius: 14)
+                    }
+                    .buttonStyle(.plain)
+                }
                 categoryFilterBar
                 postListSection
             }
@@ -462,7 +495,7 @@ struct UserPostsView: View {
 
     @ViewBuilder
     private var categoryFilterBar: some View {
-        if service.isLoading || service.posts.isEmpty {
+        if service.isLoading || managedPosts.isEmpty {
             EmptyView()
         } else {
             ProfilePostKindFilterBar(
@@ -491,6 +524,7 @@ struct UserPostsView: View {
                                 onToggleHidden: {
                                     Task { await toggleHidden(post) }
                                 },
+                                onShare: { sharingPost = post.sharePayload },
                                 onReport: { reportingPost = post },
                                 onDelete: { deletingPost = post }
                             )
@@ -870,6 +904,7 @@ private struct UserPostCard: View {
     let onOpen: () -> Void
     let onEdit: () -> Void
     let onToggleHidden: () -> Void
+    let onShare: () -> Void
     let onReport: () -> Void
     let onDelete: () -> Void
 
@@ -913,19 +948,24 @@ private struct UserPostCard: View {
                 Menu {
                     if isCurrentUser {
                         Button {
+                            onToggleHidden()
+                        } label: {
+                            Label("隐藏", systemImage: "eye.slash")
+                        }
+
+                        Button {
                             onEdit()
                         } label: {
                             Label("编辑", systemImage: "square.and.pencil")
                         }
 
                         Button {
-                            onToggleHidden()
+                            onShare()
                         } label: {
-                            Label(
-                                post.isPrivate ? "公开帖子" : "隐藏帖子",
-                                systemImage: post.isPrivate ? "eye" : "eye.slash"
-                            )
+                            Label("分享", systemImage: "square.and.arrow.up")
                         }
+
+                        Divider()
 
                         Button(role: .destructive) {
                             onDelete()
@@ -942,46 +982,53 @@ private struct UserPostCard: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 15, weight: .semibold))
+                    HStack(spacing: 5) {
+                        Text("编辑")
+                        Image(systemName: "ellipsis")
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .padding(.horizontal, 10)
+                    .frame(height: 30)
+                    .background(Color(.systemGray6))
+                    .clipShape(Capsule())
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(post.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .singleLineEllipsized()
+
+                if !post.description.isEmpty {
+                    Text(post.description)
+                        .font(.system(size: 14))
                         .foregroundStyle(AppColors.textMuted)
-                        .frame(width: 28, height: 28)
-                }
-            }
-
-            Text(post.title)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(AppColors.textPrimary)
-                .singleLineEllipsized()
-
-            if !post.description.isEmpty {
-                Text(post.description)
-                    .font(.system(size: 14))
-                    .foregroundStyle(AppColors.textMuted)
-                    .lineLimit(2)
-            }
-
-            HStack(spacing: 8) {
-                if let priceText = post.priceDisplayText {
-                    Text(priceText)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(AppColors.link)
+                        .lineLimit(2)
                 }
 
-                Text(post.subtitle)
-                    .font(.system(size: 13))
-                    .foregroundStyle(AppColors.textMuted)
-                    .lineLimit(1)
+                HStack(spacing: 8) {
+                    if let priceText = post.priceDisplayText {
+                        Text(priceText)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(AppColors.link)
+                    }
+
+                    Text(post.subtitle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(AppColors.textMuted)
+                        .lineLimit(1)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onOpen)
         }
         .padding(14)
         .background(AppColors.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .cheeseCardChrome(cornerRadius: 16)
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .onTapGesture {
-            onOpen()
-        }
     }
 }
 

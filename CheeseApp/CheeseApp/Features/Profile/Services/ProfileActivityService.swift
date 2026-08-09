@@ -28,6 +28,16 @@ enum ProfileActivityKind: String, CaseIterable, Identifiable {
     }
 }
 
+enum PublishedPostVisibility: String, Hashable {
+    case visible
+    case hidden
+}
+
+enum PostHiddenReason: String, Decodable, Hashable {
+    case user
+    case autoExpired = "auto_expired"
+}
+
 struct ProfileActivityItem: Decodable, Identifiable, Hashable {
     let activityID: UUID
     let postID: UUID
@@ -72,6 +82,7 @@ final class ProfileActivityService: ObservableObject {
     typealias PageLoader = (
         ProfileActivityKind,
         PostKind?,
+        PublishedPostVisibility,
         ProfileActivityCursor?,
         Int
     ) async throws -> ProfileActivityPage
@@ -79,20 +90,26 @@ final class ProfileActivityService: ObservableObject {
         ProfileActivityKind,
         [UUID]
     ) async throws -> Set<UUID>
+    private typealias VisibilityLoader = (
+        ProfileActivityKind,
+        [UUID]
+    ) async throws -> ProfileActivityVisibilitySnapshot
 
     @Published private(set) var selectedKind: ProfileActivityKind
     @Published private(set) var selectedPublishedPostKind: PostKind?
+    @Published private(set) var selectedPublishedVisibility: PublishedPostVisibility
     @Published private(set) var items: [ProfileActivityItem] = []
     @Published private(set) var isLoading = false
     @Published private(set) var isLoadingNextPage = false
     @Published private(set) var hasResolvedInitialLoad = false
     @Published private(set) var hasMore = true
     @Published private(set) var privatePostIDs: Set<UUID> = []
+    @Published private(set) var autoHiddenPostIDs: Set<UUID> = []
     @Published var errorMessage: String?
 
     private let pageSize: Int
     private let loadPage: PageLoader
-    private let loadPrivatePostIDs: PrivacyLoader
+    private let loadVisibility: VisibilityLoader
     private var ownerID: UUID?
     private var generation: UInt64 = 0
     private var cursor: ProfileActivityCursor?
@@ -100,16 +117,28 @@ final class ProfileActivityService: ObservableObject {
 
     init(
         initialKind: ProfileActivityKind = .published,
+        initialPublishedVisibility: PublishedPostVisibility = .visible,
         pageSize: Int = 30,
         loadPage: PageLoader? = nil,
         privacyLoader: PrivacyLoader? = nil
     ) {
         selectedKind = initialKind
         selectedPublishedPostKind = nil
+        selectedPublishedVisibility = initialPublishedVisibility
         self.pageSize = pageSize
         self.loadPage = loadPage ?? Self.remotePage
-        self.loadPrivatePostIDs = privacyLoader
-            ?? (loadPage == nil ? Self.remotePrivatePostIDs : { _, _ in [] })
+        if let privacyLoader {
+            self.loadVisibility = { kind, postIDs in
+                ProfileActivityVisibilitySnapshot(
+                    privatePostIDs: try await privacyLoader(kind, postIDs),
+                    autoHiddenPostIDs: []
+                )
+            }
+        } else {
+            self.loadVisibility = loadPage == nil
+                ? Self.remoteVisibility
+                : { _, _ in .empty }
+        }
     }
 
     var loadState: CollectionLoadState {
@@ -131,19 +160,24 @@ final class ProfileActivityService: ObservableObject {
 
     func select(
         _ kind: ProfileActivityKind,
-        publishedPostKind: PostKind? = nil
+        publishedPostKind: PostKind? = nil,
+        publishedVisibility: PublishedPostVisibility = .visible
     ) async {
         let normalizedPostKind = kind == .published ? publishedPostKind : nil
+        let normalizedVisibility = kind == .published ? publishedVisibility : .visible
         if selectedKind != kind
-            || selectedPublishedPostKind != normalizedPostKind {
+            || selectedPublishedPostKind != normalizedPostKind
+            || selectedPublishedVisibility != normalizedVisibility {
             cacheCurrentPageIfResolved()
             selectedKind = kind
             selectedPublishedPostKind = normalizedPostKind
+            selectedPublishedVisibility = normalizedVisibility
             generation &+= 1
             restoreCachedPageOrReset(
                 for: ActivityCacheKey(
                     kind: kind,
-                    publishedPostKind: normalizedPostKind
+                    publishedPostKind: normalizedPostKind,
+                    publishedVisibility: normalizedVisibility
                 )
             )
         }
@@ -155,12 +189,14 @@ final class ProfileActivityService: ObservableObject {
         let waitingGeneration = generation
         let waitingKind = selectedKind
         let waitingPostKind = selectedPublishedPostKind
+        let waitingVisibility = selectedPublishedVisibility
 
         guard await waitForInitialLoadSlot(
             owner: waitingOwner,
             generation: waitingGeneration,
             kind: waitingKind,
-            publishedPostKind: waitingPostKind
+            publishedPostKind: waitingPostKind,
+            publishedVisibility: waitingVisibility
         ) else { return }
         if hasResolvedInitialLoad && !force { return }
 
@@ -168,6 +204,7 @@ final class ProfileActivityService: ObservableObject {
         let requestGeneration = generation
         let requestKind = selectedKind
         let requestPostKind = selectedPublishedPostKind
+        let requestVisibility = selectedPublishedVisibility
         isLoading = true
         errorMessage = nil
         defer {
@@ -175,7 +212,8 @@ final class ProfileActivityService: ObservableObject {
                 owner: requestOwner,
                 generation: requestGeneration,
                 kind: requestKind,
-                publishedPostKind: requestPostKind
+                publishedPostKind: requestPostKind,
+                publishedVisibility: requestVisibility
             ) {
                 isLoading = false
             }
@@ -185,10 +223,11 @@ final class ProfileActivityService: ObservableObject {
             let page = try await loadPage(
                 requestKind,
                 requestPostKind,
+                requestVisibility,
                 nil,
                 pageSize
             )
-            let loadedPrivatePostIDs = try await loadPrivatePostIDs(
+            let visibility = try await loadVisibility(
                 requestKind,
                 page.items.map(\.postID)
             )
@@ -196,10 +235,12 @@ final class ProfileActivityService: ObservableObject {
                 owner: requestOwner,
                 generation: requestGeneration,
                 kind: requestKind,
-                publishedPostKind: requestPostKind
+                publishedPostKind: requestPostKind,
+                publishedVisibility: requestVisibility
             ) else { return }
             items = page.items
-            privatePostIDs = loadedPrivatePostIDs
+            privatePostIDs = visibility.privatePostIDs
+            autoHiddenPostIDs = visibility.autoHiddenPostIDs
             cursor = page.nextCursor
             hasMore = page.nextCursor != nil
             hasResolvedInitialLoad = true
@@ -209,7 +250,8 @@ final class ProfileActivityService: ObservableObject {
                 owner: requestOwner,
                 generation: requestGeneration,
                 kind: requestKind,
-                publishedPostKind: requestPostKind
+                publishedPostKind: requestPostKind,
+                publishedVisibility: requestVisibility
             ) else { return }
             if error.isCancellationLike { return }
             errorMessage = error.localizedDescription
@@ -229,13 +271,15 @@ final class ProfileActivityService: ObservableObject {
         let requestGeneration = generation
         let requestKind = selectedKind
         let requestPostKind = selectedPublishedPostKind
+        let requestVisibility = selectedPublishedVisibility
         isLoadingNextPage = true
         defer {
             if isCurrent(
                 owner: requestOwner,
                 generation: requestGeneration,
                 kind: requestKind,
-                publishedPostKind: requestPostKind
+                publishedPostKind: requestPostKind,
+                publishedVisibility: requestVisibility
             ) {
                 isLoadingNextPage = false
             }
@@ -245,10 +289,11 @@ final class ProfileActivityService: ObservableObject {
             let page = try await loadPage(
                 requestKind,
                 requestPostKind,
+                requestVisibility,
                 cursor,
                 pageSize
             )
-            let loadedPrivatePostIDs = try await loadPrivatePostIDs(
+            let visibility = try await loadVisibility(
                 requestKind,
                 page.items.map(\.postID)
             )
@@ -256,13 +301,15 @@ final class ProfileActivityService: ObservableObject {
                 owner: requestOwner,
                 generation: requestGeneration,
                 kind: requestKind,
-                publishedPostKind: requestPostKind
+                publishedPostKind: requestPostKind,
+                publishedVisibility: requestVisibility
             ) else { return }
             let known = Set(items.map(\.id))
             items.append(contentsOf: page.items.filter {
                 !known.contains($0.id)
             })
-            privatePostIDs.formUnion(loadedPrivatePostIDs)
+            privatePostIDs.formUnion(visibility.privatePostIDs)
+            autoHiddenPostIDs.formUnion(visibility.autoHiddenPostIDs)
             self.cursor = page.nextCursor
             hasMore = page.nextCursor != nil
             errorMessage = nil
@@ -272,7 +319,8 @@ final class ProfileActivityService: ObservableObject {
                 owner: requestOwner,
                 generation: requestGeneration,
                 kind: requestKind,
-                publishedPostKind: requestPostKind
+                publishedPostKind: requestPostKind,
+                publishedVisibility: requestVisibility
             ) else { return }
             if error.isCancellationLike { return }
             errorMessage = error.localizedDescription
@@ -309,6 +357,11 @@ final class ProfileActivityService: ObservableObject {
         privatePostIDs.contains(postID)
     }
 
+    func hiddenReason(_ postID: UUID) -> PostHiddenReason? {
+        guard privatePostIDs.contains(postID) else { return nil }
+        return autoHiddenPostIDs.contains(postID) ? .autoExpired : .user
+    }
+
     private func resetPage() {
         items = []
         cursor = nil
@@ -317,6 +370,7 @@ final class ProfileActivityService: ObservableObject {
         hasResolvedInitialLoad = false
         hasMore = true
         privatePostIDs = []
+        autoHiddenPostIDs = []
         errorMessage = nil
     }
 
@@ -325,13 +379,15 @@ final class ProfileActivityService: ObservableObject {
         cachedPages[
             ActivityCacheKey(
                 kind: selectedKind,
-                publishedPostKind: selectedPublishedPostKind
+                publishedPostKind: selectedPublishedPostKind,
+                publishedVisibility: selectedPublishedVisibility
             )
         ] = CachedPage(
             items: items,
             cursor: cursor,
             hasMore: hasMore,
             privatePostIDs: privatePostIDs,
+            autoHiddenPostIDs: autoHiddenPostIDs,
             errorMessage: errorMessage
         )
     }
@@ -351,6 +407,7 @@ final class ProfileActivityService: ObservableObject {
         hasResolvedInitialLoad = true
         hasMore = page.hasMore
         privatePostIDs = page.privatePostIDs
+        autoHiddenPostIDs = page.autoHiddenPostIDs
         errorMessage = page.errorMessage
     }
 
@@ -358,19 +415,22 @@ final class ProfileActivityService: ObservableObject {
         owner: UUID?,
         generation: UInt64,
         kind: ProfileActivityKind,
-        publishedPostKind: PostKind?
+        publishedPostKind: PostKind?,
+        publishedVisibility: PublishedPostVisibility
     ) -> Bool {
         ownerID == owner
             && self.generation == generation
             && selectedKind == kind
             && selectedPublishedPostKind == publishedPostKind
+            && selectedPublishedVisibility == publishedVisibility
     }
 
     private func waitForInitialLoadSlot(
         owner: UUID,
         generation: UInt64,
         kind: ProfileActivityKind,
-        publishedPostKind: PostKind?
+        publishedPostKind: PostKind?,
+        publishedVisibility: PublishedPostVisibility
     ) async -> Bool {
         while isLoading {
             guard !Task.isCancelled,
@@ -378,7 +438,8 @@ final class ProfileActivityService: ObservableObject {
                     owner: owner,
                     generation: generation,
                     kind: kind,
-                    publishedPostKind: publishedPostKind
+                    publishedPostKind: publishedPostKind,
+                    publishedVisibility: publishedVisibility
                   )
             else { return false }
 
@@ -394,13 +455,15 @@ final class ProfileActivityService: ObservableObject {
                 owner: owner,
                 generation: generation,
                 kind: kind,
-                publishedPostKind: publishedPostKind
+                publishedPostKind: publishedPostKind,
+                publishedVisibility: publishedVisibility
             )
     }
 
     private static func remotePage(
         kind: ProfileActivityKind,
         publishedPostKind: PostKind?,
+        publishedVisibility: PublishedPostVisibility,
         cursor: ProfileActivityCursor?,
         limit: Int
     ) async throws -> ProfileActivityPage {
@@ -410,6 +473,7 @@ final class ProfileActivityService: ObservableObject {
                 params: ProfileActivityPageParams(
                     activityKind: kind.rawValue,
                     postType: publishedPostKind?.rawValue,
+                    visibility: publishedVisibility.rawValue,
                     beforeCreatedAt: cursor?.createdAt,
                     beforeID: cursor?.id,
                     limit: limit
@@ -431,20 +495,27 @@ final class ProfileActivityService: ObservableObject {
         )
     }
 
-    private static func remotePrivatePostIDs(
+    private static func remoteVisibility(
         _ kind: ProfileActivityKind,
         _ postIDs: [UUID]
-    ) async throws -> Set<UUID> {
-        guard kind == .published, !postIDs.isEmpty else { return [] }
+    ) async throws -> ProfileActivityVisibilitySnapshot {
+        guard kind == .published, !postIDs.isEmpty else { return .empty }
 
-        let rows: [ProfileActivityPrivacyRow] = try await SupabaseManager.shared
+        let rows: [ProfileActivityVisibilityRow] = try await SupabaseManager.shared
             .database("posts")
-            .select("id,is_private")
+            .select("id,is_private,hidden_reason")
             .in("id", values: Array(Set(postIDs)).map(\.uuidString))
             .execute()
             .value
 
-        return Set(rows.lazy.filter(\.isPrivate).map(\.id))
+        return ProfileActivityVisibilitySnapshot(
+            privatePostIDs: Set(rows.lazy.filter(\.isPrivate).map(\.id)),
+            autoHiddenPostIDs: Set(
+                rows.lazy.filter {
+                    $0.isPrivate && $0.hiddenReason == .autoExpired
+                }.map(\.id)
+            )
+        )
     }
 
     private struct CachedPage {
@@ -452,28 +523,43 @@ final class ProfileActivityService: ObservableObject {
         let cursor: ProfileActivityCursor?
         let hasMore: Bool
         let privatePostIDs: Set<UUID>
+        let autoHiddenPostIDs: Set<UUID>
         let errorMessage: String?
     }
 
     private struct ActivityCacheKey: Hashable {
         let kind: ProfileActivityKind
         let publishedPostKind: PostKind?
+        let publishedVisibility: PublishedPostVisibility
     }
 }
 
-private struct ProfileActivityPrivacyRow: Decodable {
+private struct ProfileActivityVisibilitySnapshot {
+    let privatePostIDs: Set<UUID>
+    let autoHiddenPostIDs: Set<UUID>
+
+    static let empty = ProfileActivityVisibilitySnapshot(
+        privatePostIDs: [],
+        autoHiddenPostIDs: []
+    )
+}
+
+private struct ProfileActivityVisibilityRow: Decodable {
     let id: UUID
     let isPrivate: Bool
+    let hiddenReason: PostHiddenReason?
 
     enum CodingKeys: String, CodingKey {
         case id
         case isPrivate = "is_private"
+        case hiddenReason = "hidden_reason"
     }
 }
 
 private struct ProfileActivityPageParams: Encodable {
     let activityKind: String
     let postType: String?
+    let visibility: String
     let beforeCreatedAt: Date?
     let beforeID: UUID?
     let limit: Int
@@ -481,6 +567,7 @@ private struct ProfileActivityPageParams: Encodable {
     enum CodingKeys: String, CodingKey {
         case activityKind = "p_activity_kind"
         case postType = "p_post_type"
+        case visibility = "p_visibility"
         case beforeCreatedAt = "p_before_created_at"
         case beforeID = "p_before_id"
         case limit = "p_limit"

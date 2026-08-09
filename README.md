@@ -6,7 +6,7 @@ Cheese is a SwiftUI campus community application backed by Supabase. This reposi
 
 - Course discovery, reviews, and professor ratings
 - Community Forum with boards, anonymous posting rules, moderation, comments, and Forum likes
-- Secondhand Marketplace with bookmarks, seller identity, availability/expiration, and owner deletion
+- Secondhand Marketplace with bookmarks, seller identity, recoverable 30-day auto-hide, and owner deletion
 - Search across active domains and profiles
 - Profiles, follow/privacy controls, moderation, and activity
 - Direct and generic group chat with private media

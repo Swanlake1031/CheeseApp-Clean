@@ -13,7 +13,7 @@ test("skips safely without service-role credentials", async () => {
 
   assert.equal(result.skipped, "missing_service_role");
   assert.equal(result.remindersCreated, 0);
-  assert.equal(result.listingsInactivated, 0);
+  assert.equal(result.listingsHidden, 0);
 });
 
 test("calls the bounded lifecycle RPC with service-role auth", async () => {
@@ -29,7 +29,7 @@ test("calls the bounded lifecycle RPC with service-role auth", async () => {
       return new Response(
         JSON.stringify([{
           reminders_created: 4,
-          listings_inactivated: 2
+          listings_hidden: 2
         }]),
         { status: 200 }
       );
@@ -46,7 +46,7 @@ test("calls the bounded lifecycle RPC with service-role auth", async () => {
   assert.deepEqual(result, {
     skipped: null,
     remindersCreated: 4,
-    listingsInactivated: 2
+    listingsHidden: 2
   });
 });
 

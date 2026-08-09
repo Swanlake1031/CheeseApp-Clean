@@ -57,4 +57,14 @@ struct UserPostSummary: Identifiable, Hashable {
             return nil
         }
     }
+
+    var sharePayload: PostSharePayload {
+        PostSharePayload(
+            kind: kind,
+            postId: id,
+            title: title,
+            subtitle: subtitle,
+            summary: description
+        )
+    }
 }

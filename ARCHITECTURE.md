@@ -83,7 +83,9 @@ The current backend rejects likes for Secondhand posts (migration 140). Secondha
 
 ### Secondhand listings
 
-`SecondhandService.shared` owns list snapshots, pagination, item mapping, availability, and external operations. Detail screens may hold a loaded item value; favorite state is reconciled through `PostInteractionStore`. Secondhand intentionally has no comment system. Expiration/inactivation is also processed by the worker/backend contract.
+`SecondhandService.shared` owns list snapshots, pagination, item mapping, availability, and external operations. Detail screens may hold a loaded item value; favorite state is reconciled through `PostInteractionStore`. Secondhand intentionally has no comment system.
+
+Marketplace expiry is a scheduling deadline, not an independent presentation state. The worker calls `process_secondhand_availability_lifecycle`; at 30 days the database changes the canonical post visibility to hidden while preserving the active post row, images, metadata, and interactions. Restoring that same post starts a new availability cycle and sets a fresh `expires_at` deadline.
 
 ### Course ratings
 
@@ -91,7 +93,18 @@ The current backend rejects likes for Secondhand posts (migration 140). Secondha
 
 ### Profile data
 
-`AuthService.currentUser` owns the signed-in profile identity. `ProfileSocialService` is the canonical owner for follow mutations and cached relationship summaries; Search and Chat follow-search keep only result projections and reconcile them from `ProfileSocialEvents`. `ProfileActivityService` and `UserPostsService` own scoped activity/profile-post queries, caching, privacy, and pagination. The legacy Favorite Posts service/screen was removed; profile activity is the active path.
+`AuthService.currentUser` owns the signed-in profile identity. `ProfileSocialService` is the canonical owner for follow mutations and cached relationship summaries; Search and Chat follow-search keep only result projections and reconcile them from `ProfileSocialEvents`. `ProfileActivityService` and `UserPostsService` own scoped activity/profile-post queries, caching, visibility mutations, and pagination. “我的发布” and “私密内容” use the same `ProfileActivityView`/`ProfileActivityService` flow, distinguished only by the server-side `visible` or `hidden` query parameter. The legacy Favorite Posts service/screen was removed; profile activity is the active path.
+
+### Post visibility lifecycle
+
+For Forum and Secondhand posts, durable visibility has one owner: `posts.is_private`.
+
+- `is_private = false`: eligible for public feeds, search, recommendations, following, and public profiles when `status = active`.
+- `is_private = true`: hidden from public surfaces and readable by the author through “私密内容”.
+- `hidden_at` and `hidden_reason` (`user` or `auto_expired`) describe why/when a post was hidden; they are metadata, not additional visibility switches.
+- `status = deleted` remains the non-recoverable deletion path. Hiding never deletes media or creates a replacement post ID.
+
+Visibility changes go through `set_my_post_hidden`. The service emits one `PostFeatureEvents` invalidation after the RPC succeeds so mounted Home, Forum, Secondhand, Search, and Profile query owners refresh from the same database truth. Do not add a ViewModel-only hidden dictionary or reintroduce `expires_at` filtering as a second source of public visibility.
 
 ### Chat and notifications
 

@@ -182,7 +182,7 @@ export default {
         }
         console.log("Secondhand lifecycle worker summary", {
           remindersCreated: result.remindersCreated,
-          listingsInactivated: result.listingsInactivated
+          listingsHidden: result.listingsHidden
         });
       }).catch((error) => {
         console.error(

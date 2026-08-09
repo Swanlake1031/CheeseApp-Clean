@@ -19,6 +19,10 @@ Rentals/Housing is not present in the current client or database contract. Ride-
 - Removed split root/per-tab navigation ownership; each persistent tab now owns one stack at the `MainTabView` boundary.
 - Routed all post links/notifications to Home and all conversation/group/System Message notifications to Chat through an explicit tab policy with unit-test assertions.
 - Excluded historical recovery artifacts, dependencies, build output, Xcode user state, prototypes, and an unrelated nested website repository from this baseline.
+- Replaced the owner-post action-icon strip with one native `编辑` menu and kept destructive deletion confirmation.
+- Added the recoverable “私密内容” surface by reusing the existing Profile activity view, filters, cards, pagination, edit, share, and delete flow.
+- Unified Forum/Secondhand public visibility on `posts.is_private`; `hidden_at` and `hidden_reason` are descriptive metadata rather than competing booleans.
+- Changed the Marketplace 30-day worker transition from `status = inactive` to auto-hide, preserving the original post and resetting a fresh 30-day cycle when restored.
 
 See `ARCHITECTURE_AUDIT.md` for evidence and `ARCHITECTURE.md` for the resulting ownership model.
 
@@ -35,6 +39,7 @@ See `ARCHITECTURE_AUDIT.md` for evidence and `ARCHITECTURE.md` for the resulting
 - Keep full, compact, and search card variants when their information density differs; share narrow semantic components instead of building a flag-heavy mega-card.
 - Keep one `NavigationStack` per persistent tab, owned by `MainTabView`; global route input selects a tab and lets that stack present the destination.
 - Add Supabase changes as new migrations. Do not rewrite history.
+- Change post visibility only through `set_my_post_hidden`. Do not use deletion, a local hidden dictionary, or `expires_at` as a parallel visibility source.
 
 ## Known Remaining Technical Debt
 
@@ -52,6 +57,7 @@ See `ARCHITECTURE_AUDIT.md` for evidence and `ARCHITECTURE.md` for the resulting
 - The one-stack-per-tab boundary, route-to-tab policy, or swipe gesture behavior without device regression tests.
 - Home refresh publication back to per-source progressive assignment.
 - The distinction between System Messages and push routing.
+- Migrations 152–154 hidden-post lifecycle and Search follow-up: public feeds depend on `status` plus `is_private`; `expires_at` is only the worker deadline, and restoring must retain the same post ID.
 - Rentals/Housing and Secondhand likes/comments are explicitly outside the product boundary; do not revive historical implementations.
 
 ## Build the App
@@ -101,6 +107,7 @@ For Cloudflare, configure `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` as deplo
 
 - Supabase Auth, PostgREST, Realtime, Storage, RLS, database functions, and reviewed public views.
 - Ordered migrations through the latest file in `Supabase/migrations`.
+- Migrations 152–154 are required for the private-content UI, 30-day auto-hide contract, and matching Search schema; deploy them before shipping the matching iOS/worker build.
 - Cloudflare Worker routes for `cheeseapp.org`, cron lifecycle jobs, and universal-link/AASA delivery.
 - APNs credentials and queued push database contracts.
 - Course import files and manifests under `docs` / `scripts` where applicable.

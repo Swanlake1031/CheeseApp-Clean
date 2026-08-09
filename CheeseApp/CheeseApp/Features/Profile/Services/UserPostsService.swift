@@ -356,21 +356,32 @@ final class UserPostsService: ObservableObject {
         }
     }
 
-    func setPostHidden(postId: UUID, hidden: Bool) async throws {
+    func setPostHidden(
+        postId: UUID,
+        hidden: Bool,
+        kind knownKind: PostKind? = nil,
+        authorId knownAuthorId: UUID? = nil
+    ) async throws {
         let resolvedHidden: Bool = try await supabase.client.rpc(
             "set_my_post_hidden",
             params: SetPostHiddenParams(postID: postId, hidden: hidden)
         ).execute().value
 
-        guard let index = posts.firstIndex(where: { $0.id == postId }) else { return }
-        posts[index].isPrivate = resolvedHidden
-        if let loadedUserId {
-            syncCache(userId: loadedUserId)
+        let existingPost = posts.first(where: { $0.id == postId })
+        if let index = posts.firstIndex(where: { $0.id == postId }) {
+            posts[index].isPrivate = resolvedHidden
+            if let loadedUserId {
+                syncCache(userId: loadedUserId)
+            }
         }
-        PostFeatureEvents.postDidChange(
-            kind: posts[index].kind,
-            authorId: posts[index].authorId
-        )
+
+        if let kind = existingPost?.kind ?? knownKind {
+            PostFeatureEvents.postDidChange(
+                kind: kind,
+                authorId: existingPost?.authorId ?? knownAuthorId,
+                postId: postId
+            )
+        }
     }
 
     private func deleteBasePost(postId: UUID) async throws {

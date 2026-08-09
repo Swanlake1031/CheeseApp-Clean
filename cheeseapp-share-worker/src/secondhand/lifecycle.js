@@ -7,7 +7,7 @@ export async function processSecondhandLifecycle({
 }) {
   const serviceRoleKey = normalize(config.supabaseServiceRoleKey);
   if (!serviceRoleKey) {
-    return { skipped: "missing_service_role", remindersCreated: 0, listingsInactivated: 0 };
+    return { skipped: "missing_service_role", remindersCreated: 0, listingsHidden: 0 };
   }
 
   const limit = Math.min(
@@ -35,7 +35,7 @@ export async function processSecondhandLifecycle({
   return {
     skipped: null,
     remindersCreated: finiteCount(summary.reminders_created),
-    listingsInactivated: finiteCount(summary.listings_inactivated)
+    listingsHidden: finiteCount(summary.listings_hidden)
   };
 }
 

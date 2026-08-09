@@ -7,7 +7,7 @@ final class ProfileActivityServiceTests: XCTestCase {
         let account = UUID(uuidString: "a9400000-0000-4000-8000-000000000001")!
         var requestedKinds: [ProfileActivityKind] = []
         let service = ProfileActivityService(
-            loadPage: { kind, _, _, _ in
+            loadPage: { kind, _, _, _, _ in
                 requestedKinds.append(kind)
                 return ProfileActivityPage(
                     items: [.fixture(index: 1, kind: kind)],
@@ -29,7 +29,7 @@ final class ProfileActivityServiceTests: XCTestCase {
         let accountB = UUID(uuidString: "b9500000-0000-4000-8000-000000000001")!
         let loader = ControlledProfileActivityLoader()
         let service = ProfileActivityService(
-            loadPage: { kind, _, cursor, limit in
+            loadPage: { kind, _, _, cursor, limit in
                 try await loader.load(
                     kind: kind,
                     cursor: cursor,
@@ -62,7 +62,7 @@ final class ProfileActivityServiceTests: XCTestCase {
         let account = UUID(uuidString: "a9550000-0000-4000-8000-000000000001")!
         let loader = CancellableProfileActivityLoader()
         let service = ProfileActivityService(
-            loadPage: { kind, _, cursor, limit in
+            loadPage: { kind, _, _, cursor, limit in
                 try await loader.load(
                     kind: kind,
                     cursor: cursor,
@@ -108,7 +108,7 @@ final class ProfileActivityServiceTests: XCTestCase {
         let service = ProfileActivityService(
             initialKind: .liked,
             pageSize: 2,
-            loadPage: { _, _, _, _ in pages.removeFirst() }
+            loadPage: { _, _, _, _, _ in pages.removeFirst() }
         )
 
         service.activateAccount(account)
@@ -123,7 +123,7 @@ final class ProfileActivityServiceTests: XCTestCase {
         let account = UUID(uuidString: "a9700000-0000-4000-8000-000000000001")!
         var requestedKinds: [ProfileActivityKind] = []
         let service = ProfileActivityService(
-            loadPage: { kind, _, _, _ in
+            loadPage: { kind, _, _, _, _ in
                 requestedKinds.append(kind)
                 return ProfileActivityPage(
                     items: [.fixture(index: requestedKinds.count, kind: kind)],
@@ -151,7 +151,7 @@ final class ProfileActivityServiceTests: XCTestCase {
         let privateItem = ProfileActivityItem.fixture(index: 8, kind: .published)
         let publicItem = ProfileActivityItem.fixture(index: 9, kind: .published)
         let service = ProfileActivityService(
-            loadPage: { _, _, _, _ in
+            loadPage: { _, _, _, _, _ in
                 ProfileActivityPage(
                     items: [privateItem, publicItem],
                     nextCursor: nil
@@ -178,7 +178,7 @@ final class ProfileActivityServiceTests: XCTestCase {
         let account = UUID(uuidString: "a9900000-0000-4000-8000-000000000001")!
         var requests: [PostKind?] = []
         let service = ProfileActivityService(
-            loadPage: { kind, postKind, _, _ in
+            loadPage: { kind, postKind, _, _, _ in
                 XCTAssertEqual(kind, .published)
                 requests.append(postKind)
                 return ProfileActivityPage(
@@ -203,6 +203,47 @@ final class ProfileActivityServiceTests: XCTestCase {
         XCTAssertEqual(requests, [.forum, .secondhand])
         XCTAssertEqual(service.items.map(\.id), forumIDs)
         XCTAssertEqual(service.selectedPublishedPostKind, .forum)
+    }
+
+    func testVisibleAndHiddenPublishedPagesUseIndependentCaches() async {
+        let account = UUID(uuidString: "a9950000-0000-4000-8000-000000000001")!
+        var requests: [PublishedPostVisibility] = []
+        let service = ProfileActivityService(
+            loadPage: { kind, _, visibility, _, _ in
+                XCTAssertEqual(kind, .published)
+                requests.append(visibility)
+                return ProfileActivityPage(
+                    items: [
+                        .fixture(
+                            index: visibility == .visible ? 31 : 32,
+                            kind: .published
+                        )
+                    ],
+                    nextCursor: nil
+                )
+            }
+        )
+
+        service.activateAccount(account)
+        await service.select(
+            .published,
+            publishedVisibility: .visible
+        )
+        let visibleIDs = service.items.map(\.id)
+        await service.select(
+            .published,
+            publishedVisibility: .hidden
+        )
+        let hiddenIDs = service.items.map(\.id)
+        await service.select(
+            .published,
+            publishedVisibility: .visible
+        )
+
+        XCTAssertEqual(requests, [.visible, .hidden])
+        XCTAssertNotEqual(visibleIDs, hiddenIDs)
+        XCTAssertEqual(service.items.map(\.id), visibleIDs)
+        XCTAssertEqual(service.selectedPublishedVisibility, .visible)
     }
 
 }

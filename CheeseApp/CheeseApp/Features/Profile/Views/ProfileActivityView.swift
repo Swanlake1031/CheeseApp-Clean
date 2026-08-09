@@ -26,10 +26,14 @@ struct ProfileActivityView: View {
     @State private var updatingPrivacyPostID: UUID?
     @State private var deletingPostID: UUID?
     @State private var deletingItem: ProfileActivityItem?
+    @State private var sharingPost: PostSharePayload?
+    @State private var shareFeedbackMessage: String?
     @State private var navigationErrorMessage: String?
     @State private var embeddedPageHeights: [ProfileActivityKind: CGFloat] = [:]
     private let showsKindPicker: Bool
     private let isEmbedded: Bool
+    private let publishedVisibility: PublishedPostVisibility
+    private let pageTitle: String?
     private let externalRefreshGeneration: Int
     private let minimumEmbeddedPagerHeight: CGFloat
 
@@ -37,6 +41,8 @@ struct ProfileActivityView: View {
         initialKind: ProfileActivityKind = .published,
         showsKindPicker: Bool = true,
         isEmbedded: Bool = false,
+        publishedVisibility: PublishedPostVisibility = .visible,
+        pageTitle: String? = nil,
         externalRefreshGeneration: Int = 0,
         minimumEmbeddedPagerHeight: CGFloat = 220
     ) {
@@ -44,6 +50,8 @@ struct ProfileActivityView: View {
         _selectedPublishedKind = State(initialValue: nil)
         self.showsKindPicker = showsKindPicker
         self.isEmbedded = isEmbedded
+        self.publishedVisibility = publishedVisibility
+        self.pageTitle = pageTitle
         self.externalRefreshGeneration = externalRefreshGeneration
         self.minimumEmbeddedPagerHeight = minimumEmbeddedPagerHeight
     }
@@ -62,7 +70,7 @@ struct ProfileActivityView: View {
         }
         .if(!isEmbedded) { content in
             content.cheesePageTopBar(
-                title: showsKindPicker ? "我的活动" : selectedKind.title
+                title: pageTitle ?? (showsKindPicker ? "我的活动" : selectedKind.title)
             )
         }
         .navigationDestination(item: $destination) { target in
@@ -72,6 +80,13 @@ struct ProfileActivityView: View {
             EditPostSheet(post: post) { payload in
                 try await userPostsService.update(payload: payload)
                 refreshGeneration &+= 1
+            }
+        }
+        .sheet(item: $sharingPost) { payload in
+            CheesePostShareBottomSheet(payload: payload) { message in
+                ShareFeedbackPresenter.show(message) {
+                    shareFeedbackMessage = $0
+                }
             }
         }
         .onChange(of: destination) { previous, current in
@@ -112,6 +127,7 @@ struct ProfileActivityView: View {
         } message: {
             Text("删除后无法复原。")
         }
+        .shareFeedbackToast(message: $shareFeedbackMessage)
     }
 
     private var fullPageContent: some View {
@@ -194,6 +210,7 @@ struct ProfileActivityView: View {
             updatingPrivacyPostID: updatingPrivacyPostID,
             deletingPostID: deletingPostID,
             publishedPostKind: selectedPublishedKind,
+            publishedVisibility: publishedVisibility,
             embedsInParentScroll: embedsInParentScroll,
             onOpen: { item in
                 Task { await openPost(item) }
@@ -209,6 +226,7 @@ struct ProfileActivityView: View {
             onSetPrivacy: { item, hidden in
                 Task { await setPostPrivacy(item, hidden: hidden) }
             },
+            onShare: share,
             onDelete: { item in
                 deletingItem = item
             },
@@ -458,20 +476,27 @@ struct ProfileActivityView: View {
         do {
             try await userPostsService.setPostHidden(
                 postId: item.postID,
-                hidden: hidden
+                hidden: hidden,
+                kind: item.kind,
+                authorId: authService.currentUser?.id
             )
-            if let kind = item.kind,
-               let authorID = authService.currentUser?.id {
-                PostFeatureEvents.postDidChange(
-                    kind: kind,
-                    authorId: authorID
-                )
-            }
             refreshGeneration &+= 1
         } catch {
             if error.isCancellationLike { return }
             navigationErrorMessage = error.localizedDescription
         }
+    }
+
+    private func share(_ item: ProfileActivityItem) {
+        guard let kind = item.kind else { return }
+        sharingPost = PostSharePayload(
+            kind: kind,
+            postId: item.postID,
+            title: item.postTitle,
+            subtitle: kind.displayName,
+            summary: item.postSummary,
+            imageURL: item.coverImage.flatMap(URL.init(string:))
+        )
     }
 
     @MainActor
@@ -505,10 +530,12 @@ private struct ProfileActivityPageView: View {
     let updatingPrivacyPostID: UUID?
     let deletingPostID: UUID?
     let publishedPostKind: PostKind?
+    let publishedVisibility: PublishedPostVisibility
     let embedsInParentScroll: Bool
     let onOpen: (ProfileActivityItem) -> Void
     let onEdit: (ProfileActivityItem) -> Void
     let onSetPrivacy: (ProfileActivityItem, Bool) -> Void
+    let onShare: (ProfileActivityItem) -> Void
     let onDelete: (ProfileActivityItem) -> Void
     let onSelectPublishedKind: (PostKind?) -> Void
 
@@ -525,10 +552,12 @@ private struct ProfileActivityPageView: View {
         updatingPrivacyPostID: UUID?,
         deletingPostID: UUID?,
         publishedPostKind: PostKind?,
+        publishedVisibility: PublishedPostVisibility,
         embedsInParentScroll: Bool,
         onOpen: @escaping (ProfileActivityItem) -> Void,
         onEdit: @escaping (ProfileActivityItem) -> Void,
         onSetPrivacy: @escaping (ProfileActivityItem, Bool) -> Void,
+        onShare: @escaping (ProfileActivityItem) -> Void,
         onDelete: @escaping (ProfileActivityItem) -> Void,
         onSelectPublishedKind: @escaping (PostKind?) -> Void
     ) {
@@ -540,20 +569,31 @@ private struct ProfileActivityPageView: View {
         self.updatingPrivacyPostID = updatingPrivacyPostID
         self.deletingPostID = deletingPostID
         self.publishedPostKind = publishedPostKind
+        self.publishedVisibility = publishedVisibility
         self.embedsInParentScroll = embedsInParentScroll
         self.onOpen = onOpen
         self.onEdit = onEdit
         self.onSetPrivacy = onSetPrivacy
+        self.onShare = onShare
         self.onDelete = onDelete
         self.onSelectPublishedKind = onSelectPublishedKind
         _service = StateObject(
-            wrappedValue: ProfileActivityService(initialKind: kind)
+            wrappedValue: ProfileActivityService(
+                initialKind: kind,
+                initialPublishedVisibility: publishedVisibility
+            )
         )
     }
 
     var body: some View {
         VStack(spacing: 0) {
             if kind == .published {
+                if publishedVisibility == .visible {
+                    privateContentEntry
+                        .padding(.horizontal, embedsInParentScroll ? 12 : 16)
+                        .padding(.top, 12)
+                }
+
                 ProfilePostKindFilterBar(
                     availableKinds: PostKind.allCases,
                     selectedKind: publishedPostKind,
@@ -573,7 +613,8 @@ private struct ProfileActivityPageView: View {
                 service.activateAccount(userID)
                 await service.select(
                     kind,
-                    publishedPostKind: publishedPostKind
+                    publishedPostKind: publishedPostKind,
+                    publishedVisibility: publishedVisibility
                 )
             }
             .task(id: refreshGeneration) {
@@ -595,6 +636,38 @@ private struct ProfileActivityPageView: View {
             }
     }
 
+    private var privateContentEntry: some View {
+        NavigationLink(destination: PrivateContentView()) {
+            HStack(spacing: 12) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .frame(width: 34, height: 34)
+                    .background(AppColors.accent.opacity(0.22))
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("私密内容")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppColors.textPrimary)
+                    Text("查看和恢复已隐藏的二手与论坛帖子")
+                        .font(.system(size: 11))
+                        .foregroundStyle(AppColors.textMuted)
+                }
+
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(AppColors.textMuted)
+            }
+            .padding(12)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .cheeseCardChrome(cornerRadius: 14)
+        }
+        .buttonStyle(.plain)
+    }
+
     @ViewBuilder
     private var content: some View {
         switch service.loadState {
@@ -608,7 +681,7 @@ private struct ProfileActivityPageView: View {
                     Image(systemName: emptyIcon)
                         .font(.system(size: 34))
                         .foregroundStyle(kind == .liked ? AppColors.likeActive : AppColors.textMuted)
-                    Text(kind.emptyTitle)
+                    Text(emptyTitle)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(AppColors.textMuted)
                 }
@@ -664,11 +737,13 @@ private struct ProfileActivityPageView: View {
                     isUpdatingPrivacy: updatingPrivacyPostID == item.postID,
                     isDeleting: deletingPostID == item.postID,
                     isPrivate: service.isPostPrivate(item.postID),
+                    hiddenReason: service.hiddenReason(item.postID),
                     onOpen: { onOpen(item) },
                     onEdit: { onEdit(item) },
                     onSetPrivacy: { hidden in
                         onSetPrivacy(item, hidden)
                     },
+                    onShare: { onShare(item) },
                     onDelete: { onDelete(item) },
                     onRemove: {
                         Task { await service.removeReaction(item) }
@@ -697,7 +772,7 @@ private struct ProfileActivityPageView: View {
     }
 
     private var loadTaskID: String {
-        "\(userID?.uuidString ?? "signed-out"):\(kind.rawValue):\(publishedPostKind?.rawValue ?? "all")"
+        "\(userID?.uuidString ?? "signed-out"):\(kind.rawValue):\(publishedPostKind?.rawValue ?? "all"):\(publishedVisibility.rawValue)"
     }
 
     private var relevantActivityRevision: UInt64 {
@@ -712,12 +787,22 @@ private struct ProfileActivityPageView: View {
     }
 
     private var emptyIcon: String {
+        if kind == .published && publishedVisibility == .hidden {
+            return "lock"
+        }
         switch kind {
         case .published: return "square.and.pencil"
         case .liked: return "heart"
         case .commented: return "bubble.left"
         case .favorited: return "bookmark"
         }
+    }
+
+    private var emptyTitle: String {
+        if kind == .published && publishedVisibility == .hidden {
+            return "暂无私密内容"
+        }
+        return kind.emptyTitle
     }
 }
 
@@ -729,9 +814,11 @@ private struct ProfileActivityRow: View {
     let isUpdatingPrivacy: Bool
     let isDeleting: Bool
     let isPrivate: Bool
+    let hiddenReason: PostHiddenReason?
     let onOpen: () -> Void
     let onEdit: () -> Void
     let onSetPrivacy: (Bool) -> Void
+    let onShare: () -> Void
     let onDelete: () -> Void
     let onRemove: () -> Void
 
@@ -768,6 +855,13 @@ private struct ProfileActivityRow: View {
                             .font(.system(size: 12))
                             .foregroundStyle(AppColors.textMuted)
                             .lineLimit(2)
+
+                        if hiddenReason == .autoExpired {
+                            Label("已自动隐藏 · 发布超过 30 天", systemImage: "clock.badge.exclamationmark")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color.orange)
+                                .lineLimit(1)
+                        }
                     }
                 }
 
@@ -786,6 +880,15 @@ private struct ProfileActivityRow: View {
                     .buttonStyle(.plain)
                 }
             }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard !isOpening,
+                      !isEditing,
+                      !isUpdatingPrivacy,
+                      !isDeleting
+                else { return }
+                onOpen()
+            }
 
             if activityKind == .published {
                 HStack(spacing: 10) {
@@ -793,48 +896,52 @@ private struct ProfileActivityRow: View {
 
                     Menu {
                         Button {
-                            onSetPrivacy(false)
+                            onSetPrivacy(!isPrivate)
                         } label: {
-                            Label("公开可见", systemImage: "eye")
+                            Label(
+                                isPrivate ? "恢复公开" : "隐藏",
+                                systemImage: isPrivate ? "eye" : "eye.slash"
+                            )
                         }
 
                         Button {
-                            onSetPrivacy(true)
+                            onEdit()
                         } label: {
-                            Label("仅自己可见", systemImage: "eye.slash")
+                            Label("编辑", systemImage: "square.and.pencil")
+                        }
+
+                        Button {
+                            onShare()
+                        } label: {
+                            Label("分享", systemImage: "square.and.arrow.up")
+                        }
+
+                        Divider()
+
+                        Button(role: .destructive) {
+                            onDelete()
+                        } label: {
+                            Label("删除", systemImage: "trash")
                         }
                     } label: {
-                        activityActionIcon(
-                            systemName: isPrivate ? "eye.slash" : "eye",
-                            color: AppColors.textPrimary,
-                            isLoading: isUpdatingPrivacy
-                        )
+                        HStack(spacing: 5) {
+                            if isUpdatingPrivacy || isEditing || isDeleting {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Text("编辑")
+                                Image(systemName: "ellipsis")
+                            }
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
+                        .background(Color(.systemGray6))
+                        .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
                     .disabled(isPublishedActionDisabled)
-                    .accessibilityLabel("更改帖子可见范围")
-
-                    Button(action: onEdit) {
-                        activityActionIcon(
-                            systemName: "square.and.pencil",
-                            color: AppColors.textPrimary,
-                            isLoading: isEditing
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isPublishedActionDisabled)
-                    .accessibilityLabel(isEditing ? "正在载入编辑内容" : "编辑帖子")
-
-                    Button(role: .destructive, action: onDelete) {
-                        activityActionIcon(
-                            systemName: "trash",
-                            color: .red,
-                            isLoading: isDeleting
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isPublishedActionDisabled)
-                    .accessibilityLabel(isDeleting ? "正在删除帖子" : "删除帖子")
+                    .accessibilityLabel("帖子操作")
                 }
             }
         }
@@ -842,15 +949,6 @@ private struct ProfileActivityRow: View {
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
         .cheeseCardChrome(cornerRadius: 15)
-        .contentShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-        .onTapGesture {
-            guard !isOpening,
-                  !isEditing,
-                  !isUpdatingPrivacy,
-                  !isDeleting
-            else { return }
-            onOpen()
-        }
     }
 
     @ViewBuilder
@@ -887,24 +985,16 @@ private struct ProfileActivityRow: View {
         isOpening || isEditing || isUpdatingPrivacy || isDeleting
     }
 
-    private func activityActionIcon(
-        systemName: String,
-        color: Color,
-        isLoading: Bool
-    ) -> some View {
-        Group {
-            if isLoading {
-                ProgressView()
-                    .controlSize(.small)
-            } else {
-                Image(systemName: systemName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(color)
-            }
-        }
-        .frame(width: 34, height: 30)
-        .background(Color(.systemGray6))
-        .clipShape(Capsule())
+}
+
+struct PrivateContentView: View {
+    var body: some View {
+        ProfileActivityView(
+            initialKind: .published,
+            showsKindPicker: false,
+            publishedVisibility: .hidden,
+            pageTitle: "私密内容"
+        )
     }
 }
 

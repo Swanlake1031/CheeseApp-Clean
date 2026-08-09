@@ -808,17 +808,6 @@ class SecondhandService: ObservableObject {
             .execute()
             .value
 
-        if dbPost.isExpired == true {
-            throw NSError(
-                domain: "SecondhandService",
-                code: 404,
-                userInfo: [NSLocalizedDescriptionKey: L10n.tr(
-                    "This item is unavailable right now.",
-                    "该商品当前不可用，可能已下架或已过期。"
-                )]
-            )
-        }
-
         let favoritePostIds = await PostFavoriteService.shared.fetchFavoritePostIds(postIds: [dbPost.id])
         let item = convertToUIModel(
             dbPost,
@@ -847,14 +836,13 @@ class SecondhandService: ObservableObject {
         from dbPosts: [DBSecondhandPost],
         seedInteractions: Bool = true
     ) async -> [SecondhandItem] {
-        let availablePosts = dbPosts.filter { $0.isExpired != true }
-        prefetchPreviewImages(from: availablePosts)
+        prefetchPreviewImages(from: dbPosts)
 
         let favoritePostIDs = await PostFavoriteService.shared.fetchFavoritePostIds(
-            postIds: availablePosts.map(\.id)
+            postIds: dbPosts.map(\.id)
         )
 
-        let resolvedItems = availablePosts.map {
+        let resolvedItems = dbPosts.map {
             convertToUIModel(
                 $0,
                 isFavorited: favoritePostIDs.contains($0.id)
@@ -1008,7 +996,6 @@ struct DBSecondhandPost: Codable, Identifiable {
     var userMcMasterVerified: Bool? = nil
     let isAnonymous: Bool
     let images: [DBSecondhandImage]?
-    let isExpired: Bool?
     let likeCount: Int?
     let viewCount: Int?
     var saveCount: Int? = nil
@@ -1031,7 +1018,6 @@ struct DBSecondhandPost: Codable, Identifiable {
         case userMcMasterVerified = "user_mcmaster_verified"
         case isAnonymous = "is_anonymous"
         case images
-        case isExpired = "is_expired"
         case likeCount = "like_count"
         case viewCount = "view_count"
         case saveCount = "save_count"

@@ -21,7 +21,7 @@ struct EditPostSheet: View {
     @State private var forumBoardID: UUID?
     @State private var forumAllowComments: Bool
     @State private var forumIsAnonymous: Bool
-    @State private var isPrivate: Bool
+    private let isPrivate: Bool
 
     @State private var isLoadingExtraDetails = false
     @State private var isSaving = false
@@ -49,7 +49,7 @@ struct EditPostSheet: View {
         _forumBoardID = State(initialValue: nil)
         _forumAllowComments = State(initialValue: true)
         _forumIsAnonymous = State(initialValue: false)
-        _isPrivate = State(initialValue: post.isPrivate)
+        isPrivate = post.isPrivate
         _selectedImages = State(initialValue: [])
         _existingImages = State(initialValue: [])
     }
@@ -216,27 +216,6 @@ struct EditPostSheet: View {
                 description: $description,
                 selectedImages: $selectedImages
             )
-
-            privacyFormSection
-        }
-    }
-
-    private var privacyFormSection: some View {
-        PostFormSection(title: "可见范围") {
-            Toggle(isOn: $isPrivate) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("设为私密")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(AppColors.textPrimary)
-                    Text("开启后仅自己可见，其他用户无法看到此帖子。")
-                        .font(.system(size: 12))
-                        .foregroundStyle(AppColors.textMuted)
-                }
-            }
-            .tint(accentColor)
-            .padding()
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
         }
     }
 
