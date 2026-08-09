@@ -189,6 +189,34 @@ final class SearchPaginationViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.profileResults.first?.id, profileID)
     }
 
+    func testFollowEventUpdatesVisibleProfileResultWithoutRefetch() async {
+        let profileID = UUID()
+        let profile = SearchProfileResult(
+            id: profileID,
+            fullName: "Follow target",
+            avatarURL: nil,
+            university: nil,
+            bio: nil,
+            isFollowing: false,
+            isMutualFollow: false
+        )
+        let viewModel = SearchViewModel(
+            loadPostPage: { _, _, _, _ in
+                SearchPostPage(results: [], nextCursor: nil)
+            },
+            loadPostCounts: { [:] },
+            loadProfiles: { _, _ in [profile] },
+            searchDebounceNanoseconds: 0
+        )
+        viewModel.activateAccount(UUID())
+        viewModel.updateSearch(text: "target", category: .all)
+        await waitUntil { viewModel.profileResults == [profile] }
+
+        viewModel.applyFollowChange(targetUserID: profileID, isFollowing: true)
+
+        XCTAssertTrue(viewModel.profileResults.first?.isFollowing == true)
+    }
+
     private func makeResult(
         title: String,
         category: SearchCategory = .forum,

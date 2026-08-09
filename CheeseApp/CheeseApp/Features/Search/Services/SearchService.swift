@@ -162,24 +162,11 @@ final class SearchService {
     }
 
     func followUser(targetUserId: UUID) async throws {
-        let currentUserId = try await AuthService.shared.requireAuthUserId()
-        try await supabase
-            .database("user_follows")
-            .insert([
-                "follower_id": currentUserId.uuidString,
-                "following_id": targetUserId.uuidString
-            ])
-            .execute()
+        try await ProfileSocialService.shared.follow(targetUserId: targetUserId)
     }
 
     func unfollowUser(targetUserId: UUID) async throws {
-        let currentUserId = try await AuthService.shared.requireAuthUserId()
-        try await supabase
-            .database("user_follows")
-            .delete()
-            .eq("follower_id", value: currentUserId.uuidString)
-            .eq("following_id", value: targetUserId.uuidString)
-            .execute()
+        try await ProfileSocialService.shared.unfollow(targetUserId: targetUserId)
     }
 }
 

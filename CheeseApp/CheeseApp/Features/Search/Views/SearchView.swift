@@ -98,6 +98,15 @@ struct SearchView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: ProfileSocialEvents.followingDidChange)) { notification in
+            guard let (targetUserID, isFollowing) = ProfileSocialEvents.change(
+                from: notification
+            ) else { return }
+            viewModel.applyFollowChange(
+                targetUserID: targetUserID,
+                isFollowing: isFollowing
+            )
+        }
         .onAppear {
             isSearchPageVisible = true
             if !showsBackButton {
@@ -391,6 +400,7 @@ struct SearchView: View {
                         SearchProfileCard(
                             profile: profile,
                             isCurrentUser: authService.currentUser?.id == profile.id,
+                            isFollowBusy: viewModel.isTogglingFollow(profile.id),
                             onOpenProfile: {
                                 selectedProfile = profile
                             },
@@ -637,6 +647,7 @@ final class SearchViewModel: ObservableObject {
     @Published private(set) var searchPageErrorMessage: String?
     @Published private(set) var hasResolvedInitialLandingLoad = false
     @Published private(set) var accountGeneration: UInt64 = 0
+    @Published private(set) var togglingProfileIDs: Set<UUID> = []
 
     private var postSearchTask: Task<Void, Never>?
     private var currentPostSearchQuery: String = ""
@@ -705,6 +716,7 @@ final class SearchViewModel: ObservableObject {
         hasMoreSearchResults = false
         searchPageErrorMessage = nil
         hasResolvedInitialLandingLoad = false
+        togglingProfileIDs = []
         loadRecentSearches()
     }
 
@@ -968,13 +980,29 @@ final class SearchViewModel: ObservableObject {
     }
 
     func toggleFollow(profile: SearchProfileResult) async throws {
-        if profile.isFollowing {
-            try await searchService.unfollowUser(targetUserId: profile.id)
+        guard togglingProfileIDs.insert(profile.id).inserted else { return }
+        defer { togglingProfileIDs.remove(profile.id) }
+
+        let currentProfile = profileResults.first(where: { $0.id == profile.id })
+            ?? profile
+        if currentProfile.isFollowing {
+            try await searchService.unfollowUser(targetUserId: currentProfile.id)
         } else {
-            try await searchService.followUser(targetUserId: profile.id)
+            try await searchService.followUser(targetUserId: currentProfile.id)
         }
 
         await reloadProfileResults(query: lastProfileQuery)
+    }
+
+    func isTogglingFollow(_ userID: UUID) -> Bool {
+        togglingProfileIDs.contains(userID)
+    }
+
+    func applyFollowChange(targetUserID: UUID, isFollowing: Bool) {
+        profileResults = profileResults.map { profile in
+            guard profile.id == targetUserID else { return profile }
+            return profile.applyingFollowState(isFollowing)
+        }
     }
 
     private func searchProfiles(with query: String) {
@@ -1165,29 +1193,33 @@ struct SearchResultCard: View {
 struct SearchProfileCard: View {
     let profile: SearchProfileResult
     let isCurrentUser: Bool
+    let isFollowBusy: Bool
     let onOpenProfile: () -> Void
     let onFollowTap: () -> Void
     let onMessageTap: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                avatarView
+            Button(action: onOpenProfile) {
+                HStack(spacing: 12) {
+                    avatarView
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(profile.fullName)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(AppColors.textPrimary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(profile.fullName)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(AppColors.textPrimary)
 
-                    if let university = profile.university, !university.isEmpty {
-                        Text(university)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(AppColors.textMuted)
+                        if let university = profile.university, !university.isEmpty {
+                            Text(university)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(AppColors.textMuted)
+                        }
                     }
-
+                    Spacer()
                 }
-                Spacer()
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
 
             if let bio = profile.bio, !bio.isEmpty {
                 Text(bio)
@@ -1210,15 +1242,22 @@ struct SearchProfileCard: View {
 
                 if !isCurrentUser {
                     Button(action: onFollowTap) {
-                        Text(profile.isFollowing ? "已关注" : "关注")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(AppColors.accent)
-                            .clipShape(Capsule())
+                        HStack(spacing: 6) {
+                            if isFollowBusy {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                            Text(profile.isFollowing ? "已关注" : "关注")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(AppColors.accent)
+                        .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
+                    .disabled(isFollowBusy)
 
                     Button(action: onMessageTap) {
                         Text("私信")
@@ -1249,10 +1288,6 @@ struct SearchProfileCard: View {
         .background(AppColors.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .cheeseCardChrome(cornerRadius: 14)
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .onTapGesture {
-            onOpenProfile()
-        }
     }
 
     private var avatarView: some View {

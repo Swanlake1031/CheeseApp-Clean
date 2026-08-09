@@ -50,6 +50,19 @@ struct ProfileSocialSummary: Decodable, Equatable {
         case followsMe = "follows_me"
         case isMutualFollow = "is_mutual_follow"
     }
+
+    func applyingViewerFollowState(_ isFollowing: Bool) -> ProfileSocialSummary {
+        guard amFollowing != isFollowing else { return self }
+        return ProfileSocialSummary(
+            // Aggregate counts remain server-owned because an idempotent
+            // upsert may either insert a row or confirm one already exists.
+            followerCount: followerCount,
+            followingCount: followingCount,
+            amFollowing: isFollowing,
+            followsMe: followsMe,
+            isMutualFollow: isFollowing && followsMe
+        )
+    }
 }
 
 enum ProfileFollowListMode {
@@ -154,6 +167,10 @@ final class ProfileSocialService: ObservableObject {
         return summaries[userId] ?? .empty
     }
 
+    func hasSummary(for userId: UUID) -> Bool {
+        summaries[userId] != nil
+    }
+
     @discardableResult
     func loadSummary(userId: UUID, forceRefresh: Bool = false) async -> ProfileSocialSummary {
         if !forceRefresh, let cached = summaries[userId] {
@@ -172,8 +189,9 @@ final class ProfileSocialService: ObservableObject {
             guard isCurrentAccountRequest(generation: requestGeneration) else {
                 return .empty
             }
-            summaries[userId] = .empty
-            return .empty
+            // A transient request failure must not become a permanent cached
+            // "not following" result for the remainder of the account session.
+            return summaries[userId] ?? .empty
         }
     }
 
@@ -183,11 +201,20 @@ final class ProfileSocialService: ObservableObject {
 
         try await supabase
             .database("user_follows")
-            .insert([
-                "follower_id": currentUserId.uuidString,
-                "following_id": targetUserId.uuidString
-            ])
+            .upsert(
+                [
+                    "follower_id": currentUserId.uuidString,
+                    "following_id": targetUserId.uuidString
+                ],
+                onConflict: "follower_id,following_id",
+                ignoreDuplicates: true
+            )
             .execute()
+
+        applyCachedFollowChange(
+            targetUserId: targetUserId,
+            isFollowing: true
+        )
 
         ProfileSocialEvents.followingDidChange(
             targetUserID: targetUserId,
@@ -210,6 +237,11 @@ final class ProfileSocialService: ObservableObject {
             .eq("follower_id", value: currentUserId.uuidString)
             .eq("following_id", value: targetUserId.uuidString)
             .execute()
+
+        applyCachedFollowChange(
+            targetUserId: targetUserId,
+            isFollowing: false
+        )
 
         ProfileSocialEvents.followingDidChange(
             targetUserID: targetUserId,
@@ -381,6 +413,16 @@ final class ProfileSocialService: ObservableObject {
         async let currentSummary = loadSummary(userId: currentUserId, forceRefresh: true)
         async let targetSummary = loadSummary(userId: targetUserId, forceRefresh: true)
         _ = await (currentSummary, targetSummary)
+    }
+
+    private func applyCachedFollowChange(
+        targetUserId: UUID,
+        isFollowing: Bool
+    ) {
+        if let targetSummary = summaries[targetUserId] {
+            summaries[targetUserId] = targetSummary
+                .applyingViewerFollowState(isFollowing)
+        }
     }
 
     private func fetchFollowRows(

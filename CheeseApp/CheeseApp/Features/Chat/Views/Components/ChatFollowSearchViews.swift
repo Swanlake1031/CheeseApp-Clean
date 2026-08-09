@@ -38,6 +38,15 @@ struct ChatFollowSearchSheet: View {
             .navigationDestination(item: $profileRoute) { route in
                 UserPostsView(userId: route.id)
             }
+            .onReceive(NotificationCenter.default.publisher(for: ProfileSocialEvents.followingDidChange)) { notification in
+                guard let (targetUserID, isFollowing) = ProfileSocialEvents.change(
+                    from: notification
+                ) else { return }
+                viewModel.applyFollowChange(
+                    targetUserID: targetUserID,
+                    isFollowing: isFollowing
+                )
+            }
         }
     }
 

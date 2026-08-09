@@ -91,7 +91,7 @@ The current backend rejects likes for Secondhand posts (migration 140). Secondha
 
 ### Profile data
 
-`AuthService.currentUser` owns the signed-in profile identity. `ProfileSocialService`, `ProfileActivityService`, and `UserPostsService` own scoped query results, caching, privacy, pagination, or follower state. The legacy Favorite Posts service/screen was removed; profile activity is the active path.
+`AuthService.currentUser` owns the signed-in profile identity. `ProfileSocialService` is the canonical owner for follow mutations and cached relationship summaries; Search and Chat follow-search keep only result projections and reconcile them from `ProfileSocialEvents`. `ProfileActivityService` and `UserPostsService` own scoped activity/profile-post queries, caching, privacy, and pagination. The legacy Favorite Posts service/screen was removed; profile activity is the active path.
 
 ### Chat and notifications
 

@@ -67,6 +67,7 @@ struct UserPostsView: View {
     @State private var selectedKindFilter: PostKind?
 
     @State private var isLoadingSocialSummary = false
+    @State private var hasResolvedSocialSummary = false
     @State private var isTogglingFollow = false
     @State private var actionErrorMessage: String?
     @State private var isBlockedProfile = false
@@ -141,6 +142,7 @@ struct UserPostsView: View {
     private var initialSurfaceState: CollectionLoadState {
         guard hasCheckedBlockState else { return .initialLoading }
         if !isCurrentUser && isBlockedProfile { return .loaded }
+        guard hasResolvedSocialSummary else { return .initialLoading }
 
         switch service.surfaceLoadState {
         case .unresolved, .initialLoading:
@@ -699,6 +701,12 @@ struct UserPostsView: View {
         }
 
         hasCheckedBlockState = false
+        if forceRefresh {
+            hasResolvedSocialSummary = false
+        }
+        async let socialSummaryLoad: Void = loadSocialSummary(
+            forceRefresh: forceRefresh
+        )
 
         if !isCurrentUser {
             let relation = await chatService.fetchBlockRelation(with: userId)
@@ -711,7 +719,10 @@ struct UserPostsView: View {
                 viewerID: requestViewerID,
                 targetUserID: userId
             )
-            guard !isBlockedProfile else { return }
+            guard !isBlockedProfile else {
+                _ = await socialSummaryLoad
+                return
+            }
         } else {
             blockRelation = .none
             isBlockedProfile = false
@@ -722,11 +733,11 @@ struct UserPostsView: View {
         }
 
         await service.load(userId: userId, forceRefresh: forceRefresh)
+        _ = await socialSummaryLoad
         guard authService.currentUser?.id == requestViewerID else { return }
         guard case .loaded = service.surfaceLoadState else {
             return
         }
-        await loadSocialSummary(forceRefresh: forceRefresh)
     }
 
     @MainActor
@@ -737,6 +748,7 @@ struct UserPostsView: View {
         blockRelation = .none
         isBlockedProfile = false
         hasCheckedBlockState = false
+        hasResolvedSocialSummary = false
         editingPost = nil
         reportingPost = nil
         deletingPost = nil
@@ -756,7 +768,10 @@ struct UserPostsView: View {
     private func loadSocialSummary(forceRefresh: Bool = false) async {
         guard !isLoadingSocialSummary else { return }
         isLoadingSocialSummary = true
-        defer { isLoadingSocialSummary = false }
+        defer {
+            isLoadingSocialSummary = false
+            hasResolvedSocialSummary = true
+        }
 
         await profileSocialService.loadSummary(userId: userId, forceRefresh: forceRefresh)
     }

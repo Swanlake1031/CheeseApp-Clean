@@ -43,10 +43,12 @@ final class ChatFollowSearchViewModel: ObservableObject {
         defer { togglingUserIDs.remove(profile.id) }
 
         do {
-            if profile.isFollowing {
-                try await searchService.unfollowUser(targetUserId: profile.id)
+            let currentProfile = results.first(where: { $0.id == profile.id })
+                ?? profile
+            if currentProfile.isFollowing {
+                try await searchService.unfollowUser(targetUserId: currentProfile.id)
             } else {
-                try await searchService.followUser(targetUserId: profile.id)
+                try await searchService.followUser(targetUserId: currentProfile.id)
             }
 
             await reloadResults(query: normalizedQuery)
@@ -57,6 +59,13 @@ final class ChatFollowSearchViewModel: ObservableObject {
 
     func isToggling(_ userID: UUID) -> Bool {
         togglingUserIDs.contains(userID)
+    }
+
+    func applyFollowChange(targetUserID: UUID, isFollowing: Bool) {
+        results = results.map { profile in
+            guard profile.id == targetUserID else { return profile }
+            return profile.applyingFollowState(isFollowing)
+        }
     }
 
     private var normalizedQuery: String {
@@ -74,14 +83,14 @@ final class ChatFollowSearchViewModel: ObservableObject {
 
         do {
             let rows = try await searchService.searchProfiles(query: normalized, limit: 20)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, normalized == normalizedQuery else { return }
 
             let currentUserID = AuthService.shared.currentUser?.id
             results = rows.filter { $0.id != currentUserID }
             errorMessage = nil
             isLoading = false
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, normalized == normalizedQuery else { return }
             results = []
             errorMessage = error.localizedDescription
             isLoading = false

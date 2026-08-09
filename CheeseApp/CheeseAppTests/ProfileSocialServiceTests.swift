@@ -115,6 +115,61 @@ final class ProfileSocialServiceTests: XCTestCase {
         XCTAssertTrue(service.isAccountScopeReady)
     }
 
+    func testFollowSummaryPatchIsIdempotentAndPreservesMutualState() {
+        let initial = ProfileSocialSummary(
+            followerCount: 2,
+            followingCount: 4,
+            amFollowing: false,
+            followsMe: true,
+            isMutualFollow: false
+        )
+
+        let followed = initial.applyingViewerFollowState(true)
+        let followedAgain = followed.applyingViewerFollowState(true)
+        let unfollowed = followedAgain.applyingViewerFollowState(false)
+
+        XCTAssertEqual(followed.followerCount, 2)
+        XCTAssertTrue(followed.amFollowing)
+        XCTAssertTrue(followed.isMutualFollow)
+        XCTAssertEqual(followedAgain, followed)
+        XCTAssertEqual(unfollowed.followerCount, 2)
+        XCTAssertFalse(unfollowed.amFollowing)
+        XCTAssertFalse(unfollowed.isMutualFollow)
+    }
+
+    func testTransientSummaryFailureDoesNotCacheFalseRelationship() async {
+        let account = UUID()
+        let target = UUID()
+        let expected = ProfileSocialSummary(
+            followerCount: 7,
+            followingCount: 2,
+            amFollowing: true,
+            followsMe: false,
+            isMutualFollow: false
+        )
+        var attempts = 0
+        let service = ProfileSocialService(summaryLoader: { _ in
+            attempts += 1
+            if attempts == 1 {
+                throw ProfileSocialServiceTestError.transient
+            }
+            return expected
+        })
+        service.activateAccount(account)
+
+        let failed = await service.loadSummary(userId: target)
+        let retried = await service.loadSummary(userId: target)
+
+        XCTAssertEqual(failed, .empty)
+        XCTAssertEqual(retried, expected)
+        XCTAssertEqual(attempts, 2)
+        XCTAssertTrue(service.hasSummary(for: target))
+    }
+
+}
+
+private enum ProfileSocialServiceTestError: Error {
+    case transient
 }
 
 @MainActor

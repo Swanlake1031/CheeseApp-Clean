@@ -18,4 +18,16 @@ struct SearchProfileResult: Codable, Identifiable, Hashable {
         case isFollowing = "is_following"
         case isMutualFollow = "is_mutual_follow"
     }
+
+    func applyingFollowState(_ isFollowing: Bool) -> SearchProfileResult {
+        SearchProfileResult(
+            id: id,
+            fullName: fullName,
+            avatarURL: avatarURL,
+            university: university,
+            bio: bio,
+            isFollowing: isFollowing,
+            isMutualFollow: isFollowing ? isMutualFollow : false
+        )
+    }
 }
