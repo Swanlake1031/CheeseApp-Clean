@@ -48,8 +48,8 @@ struct ProfileView: View {
                         // 用户信息卡片
                         userInfoCard
 
-                        // 分页至少铺满一个完整可视区，让帖子下方的所有空白
-                        // 也可以拖动切换发布／喜欢／评论／收藏。
+                        // 分页至少铺满一个完整可视区，避免内容较少时
+                        // Profile 外层滚动区高度突然收缩。
                         ProfileActivityView(
                             isEmbedded: true,
                             externalRefreshGeneration: activityRefreshGeneration,

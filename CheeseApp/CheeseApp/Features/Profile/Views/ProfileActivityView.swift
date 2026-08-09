@@ -185,6 +185,11 @@ struct ProfileActivityView: View {
             }
             .scrollTargetBehavior(.paging)
             .scrollPosition(id: embeddedSelectedKindBinding)
+            // The fixed activity picker is the navigation control for the
+            // embedded profile section. Disabling direct pager dragging keeps
+            // a drag that follows native Menu dismissal from rubber-banding
+            // the entire activity page sideways under the fixed picker.
+            .scrollDisabled(true)
             .frame(height: embeddedPagerHeight, alignment: .top)
             .background(AppColors.pageBackground)
             .clipped()
