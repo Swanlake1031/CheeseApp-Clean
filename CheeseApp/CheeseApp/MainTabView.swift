@@ -110,31 +110,35 @@ struct MainTabView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             
-            // 自定义底部导航栏
-            if !tabBarVisibilityController.isHidden && !isKeyboardVisible {
-                CustomTabBar(
-                    selectedTab: $selectedTab,
-                    chatUnreadBadgeCount: chatUnreadBadgeCount,
-                    showProfileRedDot: profileSocialService.hasUnreadFollowers,
-                    onHomeReselect: {
-                        homeRootResetID = UUID()
-                    },
-                    onSearchReselect: {
-                        searchRootResetID = UUID()
-                    },
-                    onChatReselect: {
-                        chatRootResetID = UUID()
-                    },
-                    onCreateTap: {
-                        showCreatePost = true
-                    }
-                )
-                .ignoresSafeArea(.keyboard, edges: .bottom)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+            // 自定义底部导航栏。动画必须限定在这个子树：如果动画整个
+            // MainTabView，键盘安全区收起时会再次插值 Search 页的 ScrollView
+            // 布局，导致水平筛选栏短暂跳位、重叠。
+            Group {
+                if !tabBarVisibilityController.isHidden && !isKeyboardVisible {
+                    CustomTabBar(
+                        selectedTab: $selectedTab,
+                        chatUnreadBadgeCount: chatUnreadBadgeCount,
+                        showProfileRedDot: profileSocialService.hasUnreadFollowers,
+                        onHomeReselect: {
+                            homeRootResetID = UUID()
+                        },
+                        onSearchReselect: {
+                            searchRootResetID = UUID()
+                        },
+                        onChatReselect: {
+                            chatRootResetID = UUID()
+                        },
+                        onCreateTap: {
+                            showCreatePost = true
+                        }
+                    )
+                    .ignoresSafeArea(.keyboard, edges: .bottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
+            .animation(.easeInOut(duration: 0.2), value: tabBarVisibilityController.isHidden)
+            .animation(.easeInOut(duration: 0.2), value: isKeyboardVisible)
         }
-        .animation(.easeInOut(duration: 0.2), value: tabBarVisibilityController.isHidden)
-        .animation(.easeInOut(duration: 0.2), value: isKeyboardVisible)
         .fullScreenCover(isPresented: $showCreatePost) {
             CreatePostView()
         }
