@@ -24,6 +24,7 @@ struct ForumPostEditorSurface: View {
     let isSubmitting: Bool
     let errorMessage: String?
     let hasDraft: Bool
+    let installsSwipeBackGesture: Bool
     let onClose: () -> Void
     let onSubmit: () -> Void
     let onSaveDraft: () -> Void
@@ -85,7 +86,9 @@ struct ForumPostEditorSurface: View {
             let limited = ForumComposerRules.limitedTitle(value)
             if limited != value { title = limited }
         }
-        .enableSwipeBackGesture()
+        .if(installsSwipeBackGesture) { content in
+            content.enableSwipeBackGesture()
+        }
     }
 
     private var header: some View {

@@ -499,11 +499,12 @@ private struct CheesePageTopBarModifier<Trailing: View>: ViewModifier {
     @Environment(\.dismiss) private var dismiss
 
     let title: String
-    let swipeBackEnabled: Bool
+    let installsSwipeBackGesture: Bool
     @ViewBuilder let trailing: () -> Trailing
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content
+        let presentedContent = content
             .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .top) {
@@ -511,18 +512,23 @@ private struct CheesePageTopBarModifier<Trailing: View>: ViewModifier {
                     trailing()
                 }
             }
-            .enableSwipeBackGesture(swipeBackEnabled)
+
+        if installsSwipeBackGesture {
+            presentedContent.enableSwipeBackGesture()
+        } else {
+            presentedContent
+        }
     }
 }
 
 extension View {
     func cheesePageTopBar(
         title: String,
-        swipeBackEnabled: Bool = true
+        installsSwipeBackGesture: Bool = true
     ) -> some View {
         modifier(CheesePageTopBarModifier(
             title: title,
-            swipeBackEnabled: swipeBackEnabled
+            installsSwipeBackGesture: installsSwipeBackGesture
         ) {
             EmptyView()
         })
@@ -530,12 +536,12 @@ extension View {
 
     func cheesePageTopBar<Trailing: View>(
         title: String,
-        swipeBackEnabled: Bool = true,
+        installsSwipeBackGesture: Bool = true,
         @ViewBuilder trailing: @escaping () -> Trailing
     ) -> some View {
         modifier(CheesePageTopBarModifier(
             title: title,
-            swipeBackEnabled: swipeBackEnabled,
+            installsSwipeBackGesture: installsSwipeBackGesture,
             trailing: trailing
         ))
     }

@@ -75,6 +75,7 @@ struct CreateForumView: View {
             isSubmitting: isLoading,
             errorMessage: errorMessage,
             hasDraft: CreateDraftStore.hasDraft(.forum),
+            installsSwipeBackGesture: true,
             onClose: attemptClose,
             onSubmit: {
                 dismissKeyboard()

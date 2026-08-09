@@ -133,16 +133,14 @@ struct EditPostSheet: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
         }
-        .navigationTitle(L10n.tr("Edit Post", "编辑帖子"))
-        .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
-        .enableSwipeBackGesture()
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(action: { dismiss() }) {
-                    PostToolbarIconCircle(icon: "chevron.left")
-                }
-                .buttonStyle(.plain)
+        .toolbar(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .top) {
+            PostDetailTopBar(
+                title: L10n.tr("Edit Post", "编辑帖子"),
+                onBack: { dismiss() }
+            ) {
+                EmptyView()
             }
         }
         .task {
@@ -165,6 +163,7 @@ struct EditPostSheet: View {
             isSubmitting: isSaving,
             errorMessage: errorMessage,
             hasDraft: false,
+            installsSwipeBackGesture: false,
             onClose: { dismiss() },
             onSubmit: { Task { await save() } },
             onSaveDraft: {},
