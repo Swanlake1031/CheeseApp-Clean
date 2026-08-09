@@ -127,12 +127,7 @@ struct ProfileActivityView: View {
         }
         .if(!isEmbedded) { content in
             content.cheesePageTopBar(
-                title: pageTitle ?? (showsKindPicker ? "我的活动" : selectedKind.title),
-                // Full-page activity is already inside MainTabView's Profile
-                // NavigationStack. Reinstalling the UIKit gesture host here
-                // makes the private-content -> editor stack compete for the
-                // same interactive-pop delegate during a swipe.
-                installsSwipeBackGesture: false
+                title: pageTitle ?? (showsKindPicker ? "我的活动" : selectedKind.title)
             )
         }
         .navigationDestination(item: $destination) { target in
@@ -781,6 +776,7 @@ private struct ProfileActivityPageView: View {
             ScrollView(showsIndicators: false) {
                 activityRows
                     .padding(.horizontal, 16)
+                    .padding(.top, 12)
                     .padding(.bottom, 90)
             }
             .refreshable {
