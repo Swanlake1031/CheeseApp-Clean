@@ -309,17 +309,6 @@ struct CheesePostShareBottomSheet: View {
                     .frame(maxWidth: .infinity, minHeight: selectedTargets.isEmpty ? 108 : 208, alignment: .topLeading)
                     .padding(.horizontal, 18)
                     .padding(.bottom, max(10, bottomSafeAreaInset))
-
-                    if let statusMessage, !statusMessage.isEmpty {
-                        Text(statusMessage)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background((statusIsError ? Color.red : Color.black).opacity(0.82))
-                            .clipShape(Capsule())
-                            .padding(.bottom, 6)
-                    }
                 }
                 .frame(width: geometry.size.width)
                 .frame(height: panelHeight, alignment: .top)
@@ -333,6 +322,20 @@ struct CheesePostShareBottomSheet: View {
                         style: .continuous
                     )
                 )
+                .overlay(alignment: .bottom) {
+                    if let statusMessage, !statusMessage.isEmpty {
+                        Text(statusMessage)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background((statusIsError ? Color.red : Color.black).opacity(0.82))
+                            .clipShape(Capsule())
+                            .padding(.bottom, max(84, bottomSafeAreaInset + 56))
+                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                            .allowsHitTesting(false)
+                    }
+                }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
