@@ -39,7 +39,8 @@ struct ProfileFollowListView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var actionErrorMessage: String?
-    @State private var removingEntryIDs: Set<UUID> = []
+    @State private var pendingEntryIDs: Set<UUID> = []
+    @State private var unfollowedEntryIDs: Set<UUID> = []
 
     private var canManageFollowers: Bool {
         mode == .followers && AuthService.shared.currentUser?.id == userId
@@ -109,7 +110,7 @@ struct ProfileFollowListView: View {
                                     removeFollowerButton(entry)
                                         .padding(.trailing, 16)
                                 } else if canManageFollowing {
-                                    unfollowButton(entry)
+                                    followingManagementButton(entry)
                                         .padding(.trailing, 16)
                                 }
                             }
@@ -135,6 +136,20 @@ struct ProfileFollowListView: View {
         .toolbarBackground(AppColors.pageBackground, for: .navigationBar)
         .task {
             await loadEntries()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: ProfileSocialEvents.followingDidChange)
+        ) { notification in
+            guard canManageFollowing,
+                  let (targetUserID, isFollowing) = ProfileSocialEvents.change(from: notification),
+                  entries.contains(where: { $0.id == targetUserID })
+            else { return }
+
+            if isFollowing {
+                unfollowedEntryIDs.remove(targetUserID)
+            } else {
+                unfollowedEntryIDs.insert(targetUserID)
+            }
         }
         .alert(
             "操作失败",
@@ -208,7 +223,7 @@ struct ProfileFollowListView: View {
             Task { await removeFollower(entry) }
         } label: {
             Group {
-                if removingEntryIDs.contains(entry.id) {
+                if pendingEntryIDs.contains(entry.id) {
                     ProgressView().controlSize(.small)
                 } else {
                     Text("移除")
@@ -223,35 +238,40 @@ struct ProfileFollowListView: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-        .disabled(removingEntryIDs.contains(entry.id))
+        .disabled(pendingEntryIDs.contains(entry.id))
     }
 
-    private func unfollowButton(_ entry: ProfileFollowListEntry) -> some View {
-        Button {
-            Task { await unfollow(entry) }
+    private func followingManagementButton(_ entry: ProfileFollowListEntry) -> some View {
+        let isFollowing = !unfollowedEntryIDs.contains(entry.id)
+
+        return Button {
+            Task { await setFollowing(isFollowing: !isFollowing, entry: entry) }
         } label: {
             Group {
-                if removingEntryIDs.contains(entry.id) {
+                if pendingEntryIDs.contains(entry.id) {
                     ProgressView().controlSize(.small)
                 } else {
-                    Text("取消关注")
+                    Text(isFollowing ? "取消关注" : "关注")
                         .font(.system(size: 12, weight: .semibold))
                 }
             }
-            .foregroundStyle(AppColors.textPrimary)
+            .foregroundStyle(isFollowing ? AppColors.textPrimary : Color.black)
             .frame(minWidth: 60)
             .padding(.horizontal, 8)
             .padding(.vertical, 7)
-            .background(AppColors.pageBackground)
+            .background(isFollowing ? AppColors.pageBackground : AppColors.accent)
             .clipShape(Capsule())
             .overlay {
                 Capsule()
-                    .stroke(AppColors.textMuted.opacity(0.25), lineWidth: 1)
+                    .stroke(
+                        isFollowing ? AppColors.textMuted.opacity(0.25) : Color.clear,
+                        lineWidth: 1
+                    )
             }
         }
         .buttonStyle(.plain)
-        .disabled(removingEntryIDs.contains(entry.id))
-        .accessibilityLabel("取消关注\(entry.displayName)")
+        .disabled(pendingEntryIDs.contains(entry.id))
+        .accessibilityLabel("\(isFollowing ? "取消关注" : "关注")\(entry.displayName)")
     }
 
     private func avatarFallback(name: String) -> some View {
@@ -273,6 +293,7 @@ struct ProfileFollowListView: View {
         do {
             let snapshot = try await profileSocialService.loadFollowList(userId: userId, mode: mode)
             entries = snapshot.entries
+            unfollowedEntryIDs.removeAll()
             newFollowerCount = snapshot.newFollowerCount
         } catch {
             entries = []
@@ -283,9 +304,9 @@ struct ProfileFollowListView: View {
 
     @MainActor
     private func removeFollower(_ entry: ProfileFollowListEntry) async {
-        guard !removingEntryIDs.contains(entry.id) else { return }
-        removingEntryIDs.insert(entry.id)
-        defer { removingEntryIDs.remove(entry.id) }
+        guard !pendingEntryIDs.contains(entry.id) else { return }
+        pendingEntryIDs.insert(entry.id)
+        defer { pendingEntryIDs.remove(entry.id) }
 
         do {
             try await profileSocialService.removeFollower(followerUserId: entry.id)
@@ -299,16 +320,21 @@ struct ProfileFollowListView: View {
     }
 
     @MainActor
-    private func unfollow(_ entry: ProfileFollowListEntry) async {
+    private func setFollowing(isFollowing: Bool, entry: ProfileFollowListEntry) async {
         guard canManageFollowing,
-              !removingEntryIDs.contains(entry.id)
+              !pendingEntryIDs.contains(entry.id)
         else { return }
-        removingEntryIDs.insert(entry.id)
-        defer { removingEntryIDs.remove(entry.id) }
+        pendingEntryIDs.insert(entry.id)
+        defer { pendingEntryIDs.remove(entry.id) }
 
         do {
-            try await profileSocialService.unfollow(targetUserId: entry.id)
-            entries.removeAll { $0.id == entry.id }
+            if isFollowing {
+                try await profileSocialService.follow(targetUserId: entry.id)
+                unfollowedEntryIDs.remove(entry.id)
+            } else {
+                try await profileSocialService.unfollow(targetUserId: entry.id)
+                unfollowedEntryIDs.insert(entry.id)
+            }
         } catch {
             actionErrorMessage = error.localizedDescription
         }
