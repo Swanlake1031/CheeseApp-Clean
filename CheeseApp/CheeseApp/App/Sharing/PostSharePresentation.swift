@@ -161,6 +161,7 @@ private struct CheesePostSharePanelPresenter: ViewModifier {
                 }
             }
             .animation(.easeOut(duration: 0.18), value: item?.id)
+            .cheeseTabBarHidden(item != nil)
     }
 }
 
