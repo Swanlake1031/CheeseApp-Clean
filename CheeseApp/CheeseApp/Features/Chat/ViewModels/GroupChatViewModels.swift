@@ -6,6 +6,7 @@ import UIKit
 enum GroupChatRoomDestination: Identifiable, Hashable {
     case details
     case userProfile(UUID)
+    case sharedForumPost(UUID)
 
     var id: String {
         switch self {
@@ -13,6 +14,8 @@ enum GroupChatRoomDestination: Identifiable, Hashable {
             return "details"
         case .userProfile(let userID):
             return "profile:\(userID.uuidString)"
+        case .sharedForumPost(let postID):
+            return "forum:\(postID.uuidString)"
         }
     }
 }
@@ -103,6 +106,21 @@ final class GroupChatRoomViewModel: ObservableObject {
     func openProfile(_ userID: UUID?) {
         guard let userID else { return }
         destination = .userProfile(userID)
+    }
+
+    func openSharedPost(_ card: SharedPostCardMetadata) {
+        guard let postID = card.postId else {
+            roomState.setError(L10n.tr("Shared post is unavailable", "分享帖子已不可用"))
+            return
+        }
+        guard PostKind(remoteValue: card.postKind) == .forum else {
+            roomState.setError(L10n.tr(
+                "This shared content type is not supported yet",
+                "暂不支持打开该类型分享内容"
+            ))
+            return
+        }
+        destination = .sharedForumPost(postID)
     }
 
     func submitText() {

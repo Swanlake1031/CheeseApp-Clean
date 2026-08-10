@@ -27,7 +27,7 @@ struct ChatMessageContentView: View {
             if let card = message.metadata?.postContactCard {
                 postContactCardView(card: card, isMine: isMine)
             } else if let card = message.metadata?.sharedPostCard {
-                sharedPostCardView(card: card, isMine: isMine)
+                ChatSharedPostCardView(card: card, onOpen: onOpenSharedPost)
             } else if message.messageType == "image",
                       let reference = message.metadata?.chatMediaReference,
                       reference.belongs(to: .direct, id: message.conversationId) {
@@ -312,97 +312,162 @@ struct ChatMessageContentView: View {
         }
     }
 
-    private func sharedPostCardView(card: SharedPostCardMetadata, isMine: Bool) -> some View {
+}
+
+/// Canonical timeline presentation for a post shared into direct or group chat.
+/// Shared content is a card in its own right, so it deliberately does not inherit
+/// the sender's yellow text-bubble background.
+struct ChatSharedPostCardView: View {
+    let card: SharedPostCardMetadata
+    let onOpen: (SharedPostCardMetadata) -> Void
+
+    private var presentation: (kindText: String, icon: String, tint: Color) {
+        switch PostKind(remoteValue: card.postKind) {
+        case .forum:
+            return (
+                L10n.tr("Forum", "论坛"),
+                "bubble.left.and.bubble.right.fill",
+                AppColors.categoryColor(for: "forum")
+            )
+        case .secondhand:
+            return (
+                L10n.tr("Secondhand", "二手"),
+                "bag.fill",
+                AppColors.categoryColor(for: "secondhand")
+            )
+        default:
+            return (card.postKind.capitalized, "doc.text.image.fill", AppColors.link)
+        }
+    }
+
+    private var imageURL: URL? {
+        guard let value = card.imageURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else {
+            return nil
+        }
+        return URL(string: value)
+    }
+
+    var body: some View {
+        let presentation = presentation
+
         Button {
-            onOpenSharedPost(card)
+            onOpen(card)
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    Image(systemName: "square.and.arrow.up.fill")
-                        .font(.system(size: 11, weight: .bold))
-                    Text(L10n.tr("Shared Post", "分享帖子"))
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(presentation.tint.opacity(0.14))
+
+                        Image(systemName: presentation.icon)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(presentation.tint)
+                    }
+                    .frame(width: 30, height: 30)
+
+                    Text(L10n.tr("Shared Post Card", "帖子分享卡"))
                         .font(.system(size: 12, weight: .bold))
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                }
-
-                HStack(alignment: .top, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(card.title)
-                            .font(.system(size: 14, weight: .semibold))
-                            .lineLimit(2)
-
-                        if let summary = card.summary?.trimmingCharacters(in: .whitespacesAndNewlines),
-                           !summary.isEmpty {
-                            Text(summary)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(AppColors.textMuted)
-                                .lineLimit(2)
-                        }
-
-                        HStack(spacing: 8) {
-                            Text(card.postKind == PostKind.forum.rawValue
-                                ? L10n.tr("Forum", "论坛")
-                                : card.postKind.capitalized)
-                                .font(.system(size: 11, weight: .semibold))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.black.opacity(0.08))
-                                .clipShape(Capsule())
-
-                            if let subtitle = card.subtitle?.trimmingCharacters(in: .whitespacesAndNewlines),
-                               !subtitle.isEmpty {
-                                Text(subtitle)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(AppColors.textMuted)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-
-                    if let imageURL = card.imageURL,
-                       let url = URL(string: imageURL),
-                       !imageURL.isEmpty {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                            default:
-                                Color.black.opacity(0.08)
-                            }
-                        }
-                        .frame(width: 56, height: 56)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                }
-
-                if let authorName = card.authorName?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !authorName.isEmpty {
-                    Text(authorName)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(AppColors.textMuted)
                         .lineLimit(1)
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(presentation.tint.opacity(0.9))
+
+                    Text(presentation.kindText)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(presentation.tint)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(presentation.tint.opacity(0.12))
+                        )
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .stroke(presentation.tint.opacity(0.14), lineWidth: 1)
+                        )
+                }
+
+                if let imageURL {
+                    CachedRemoteImage(url: imageURL, targetPixelWidth: 720) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        LinearGradient(
+                            colors: [
+                                presentation.tint.opacity(0.22),
+                                presentation.tint.opacity(0.08)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 132)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(L10n.tr(
+                        "Post preview attached. Tap to view details.",
+                        "已附上帖子卡片，点击查看详情"
+                    ))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(AppColors.textMuted)
+
+                    Text(card.title)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .lineLimit(3)
+
+                    if let subtitle = card.subtitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+                       !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(presentation.tint)
+                            .lineLimit(2)
+                    }
+
+                    if let summary = card.summary?.trimmingCharacters(in: .whitespacesAndNewlines),
+                       !summary.isEmpty {
+                        Text(summary)
+                            .font(.system(size: 13))
+                            .foregroundStyle(AppColors.textMuted)
+                            .lineSpacing(3)
+                            .lineLimit(4)
+                    }
+
+                    if let authorName = card.authorName?.trimmingCharacters(in: .whitespacesAndNewlines),
+                       !authorName.isEmpty {
+                        Text(authorName)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(AppColors.textMuted)
+                            .lineLimit(1)
+                    }
                 }
             }
-            .foregroundStyle(isMine ? .black : AppColors.textPrimary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .foregroundStyle(AppColors.textPrimary)
+            .padding(12)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isMine ? AppColors.chatOutgoingBubble : Color.white)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(
-                        isMine ? Color.clear : Color.black.opacity(0.08),
-                        lineWidth: 1
-                    )
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(presentation.tint.opacity(0.14), lineWidth: 1)
             )
+            .shadow(color: Color.black.opacity(0.04), radius: 10, x: 0, y: 4)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Text("\(L10n.tr("Shared Post", "分享帖子"))：\(card.title)"))
     }
 }
 

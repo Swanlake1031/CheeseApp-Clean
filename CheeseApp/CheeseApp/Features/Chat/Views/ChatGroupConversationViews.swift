@@ -385,7 +385,9 @@ struct GroupChatRoomView: View {
             }
 
             Group {
-                if message.messageType == "image",
+                if let card = message.metadata?.sharedPostCard {
+                    ChatSharedPostCardView(card: card, onOpen: viewModel.openSharedPost)
+                } else if message.messageType == "image",
                    let reference = message.metadata?.chatMediaReference,
                    reference.belongs(to: .group, id: message.groupId) {
                     ChatPrivateMediaImageView(reference: reference)
@@ -502,6 +504,8 @@ struct GroupChatRoomView: View {
             }
         case .userProfile(let userID):
             UserPostsView(userId: userID)
+        case .sharedForumPost(let postID):
+            ChatSharedForumDetailLoaderView(postId: postID)
         }
     }
 
