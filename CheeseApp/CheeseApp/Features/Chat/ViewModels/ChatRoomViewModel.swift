@@ -30,11 +30,13 @@ enum ChatRoomNavigationDestination: Identifiable, Hashable {
 enum ChatRoomSheetDestination: Identifiable {
     case reportUser
     case reportMessage(ChatMessageReportTarget)
+    case secondhandBuyerSelection
 
     var id: String {
         switch self {
         case .reportUser: return "report-user"
         case .reportMessage(let target): return "report-message:\(target.id)"
+        case .secondhandBuyerSelection: return "secondhand-buyer-selection"
         }
     }
 }
@@ -46,6 +48,9 @@ enum ChatRoomAlertDestination: Identifiable, Equatable {
     case blockConfirmation
     case unblockConfirmation
     case deleteMessage(UUID, forEveryone: Bool)
+    case cancelSecondhandPurchaseIntent
+    case completeSecondhandSale(UUID)
+    case stopSellingSecondhandListing
 
     var id: String {
         switch self {
@@ -56,6 +61,12 @@ enum ChatRoomAlertDestination: Identifiable, Equatable {
         case .unblockConfirmation: return "unblock-confirmation"
         case .deleteMessage(let messageID, let forEveryone):
             return "delete-message:\(messageID.uuidString):\(forEveryone)"
+        case .cancelSecondhandPurchaseIntent:
+            return "cancel-secondhand-purchase-intent"
+        case .completeSecondhandSale(let buyerID):
+            return "complete-secondhand-sale:\(buyerID.uuidString)"
+        case .stopSellingSecondhandListing:
+            return "stop-selling-secondhand-listing"
         }
     }
 }
@@ -106,6 +117,9 @@ final class ChatRoomViewModel: ObservableObject {
     @Published private(set) var hasAcknowledgedStrangerSafety = false
     @Published private(set) var conversationDisplayName: String
     @Published private(set) var conversationRemark: String?
+    @Published private(set) var secondhandPurchaseIntent: SecondhandChatPurchaseIntent?
+    @Published private(set) var secondhandActiveBuyers: [SecondhandActiveBuyer] = []
+    @Published private(set) var isApplyingSecondhandTransactionAction = false
     @Published var navigationDestination: ChatRoomNavigationDestination?
     @Published var sheetDestination: ChatRoomSheetDestination?
     @Published var alertDestination: ChatRoomAlertDestination?
@@ -113,6 +127,7 @@ final class ChatRoomViewModel: ObservableObject {
     private let chatService: any ChatRoomServicing
     private let mediaService: any ChatRoomMediaServicing
     private let strangerSafetyStore: any ChatStrangerSafetyStoring
+    private let secondhandTransactionService: (any SecondhandChatTransactionServicing)?
     private var currentUserID: UUID?
     private var pendingSendConfirmation: ChatRoomPendingSend?
     private var failedSend: ChatRoomPendingSend?
@@ -120,6 +135,7 @@ final class ChatRoomViewModel: ObservableObject {
     private var mediaPreparationTask: Task<Void, Never>?
     private var sendTask: Task<Void, Never>?
     private var presentationTask: Task<Void, Never>?
+    private var secondhandTransactionRefreshTask: Task<Void, Never>?
     private var mediaPreparationID: UUID?
     private var mediaCancellationRequested = false
     private var discardMediaAfterCancellation = false
@@ -128,6 +144,7 @@ final class ChatRoomViewModel: ObservableObject {
         conversation: ChatConversationPreview,
         roomState: ChatRoomMessageState<Message>? = nil,
         chatService: (any ChatRoomServicing)? = nil,
+        secondhandTransactionService: (any SecondhandChatTransactionServicing)? = nil,
         mediaService: (any ChatRoomMediaServicing)? = nil,
         strangerSafetyStore: (any ChatStrangerSafetyStoring)? = nil,
         currentUserID: UUID? = nil,
@@ -139,12 +156,14 @@ final class ChatRoomViewModel: ObservableObject {
         self.conversation = conversation
         self.roomState = roomState ?? .direct(conversationID: conversation.id)
         self.chatService = resolvedChatService
+        self.secondhandTransactionService = secondhandTransactionService
         self.mediaService = mediaService ?? LiveChatRoomMediaService()
         self.strangerSafetyStore = resolvedSafetyStore
         self.currentUserID = currentUserID
         self.stagedMedia = stagedImages.map { ChatRoomPendingImage(image: $0) }
         self.conversationDisplayName = resolvedChatService.displayName(for: conversation)
         self.conversationRemark = resolvedChatService.conversationRemark(for: conversation.id)
+        self.secondhandPurchaseIntent = nil
         if let currentUserID {
             hasAcknowledgedStrangerSafety = resolvedSafetyStore.hasAcknowledged(
                 userID: currentUserID,
@@ -161,6 +180,7 @@ final class ChatRoomViewModel: ObservableObject {
         mediaPreparationTask?.cancel()
         sendTask?.cancel()
         presentationTask?.cancel()
+        secondhandTransactionRefreshTask?.cancel()
     }
 
     var messages: [Message] { roomState.messages }
@@ -209,6 +229,14 @@ final class ChatRoomViewModel: ObservableObject {
             : "你已拉黑对方，当前会话仅可查看历史消息。"
     }
     var hasNestedDestinationPresented: Bool { navigationDestination != nil }
+    var latestSecondhandTransactionSignalMessageID: UUID? {
+        messages.last(where: { message in
+            message.metadata?.secondhandTransactionEvent != nil
+                || message.metadata?.postContactCard.map {
+                    PostKind(remoteValue: $0.postKind) == .secondhand
+                } == true
+        })?.id
+    }
 
     private var hasEverSentMessage: Bool {
         guard let currentUserID else { return false }
@@ -240,6 +268,7 @@ final class ChatRoomViewModel: ObservableObject {
         await roomState.bootstrap { [weak self] in
             guard let self else { return }
             await self.loadPrivacyState()
+            await self.refreshSecondhandPurchaseIntent()
             self.roomState.updateMinimumVisibleDate(self.clearBeforeAt)
         }
         if strangerSafetyPolicy.shouldShowEntryNotice {
@@ -256,6 +285,119 @@ final class ChatRoomViewModel: ObservableObject {
             cleanupUploadedAssets(in: stagedMedia)
         }
         roomState.stopOnDisappear(hasNestedDestinationPresented: false)
+        secondhandTransactionRefreshTask?.cancel()
+        secondhandTransactionRefreshTask = nil
+    }
+
+    func refreshSecondhandPurchaseIntentAfterTimelineSignal() {
+        guard secondhandTransactionService != nil else { return }
+        secondhandTransactionRefreshTask?.cancel()
+        secondhandTransactionRefreshTask = Task { [weak self] in
+            guard let self else { return }
+            await self.refreshSecondhandPurchaseIntent()
+            self.secondhandTransactionRefreshTask = nil
+        }
+    }
+
+    func requestCancelSecondhandPurchaseIntent() {
+        guard secondhandPurchaseIntent?.status == .active,
+              secondhandPurchaseIntent?.viewerRole == .buyer,
+              !isApplyingSecondhandTransactionAction
+        else { return }
+        alertDestination = .cancelSecondhandPurchaseIntent
+    }
+
+    func requestCompleteSecondhandSale() {
+        guard let intent = secondhandPurchaseIntent,
+              intent.status == .active,
+              intent.viewerRole == .seller,
+              !isApplyingSecondhandTransactionAction,
+              let secondhandTransactionService
+        else { return }
+
+        isApplyingSecondhandTransactionAction = true
+        roomState.clearError()
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.isApplyingSecondhandTransactionAction = false }
+            do {
+                let buyers = try await secondhandTransactionService
+                    .fetchSecondhandActiveBuyers(listingId: intent.listingId)
+                guard !buyers.isEmpty else {
+                    self.roomState.setError("当前没有可确认成交的买家。")
+                    return
+                }
+                self.secondhandActiveBuyers = buyers
+                if buyers.count == 1, let buyerID = buyers.first?.buyerId {
+                    self.alertDestination = .completeSecondhandSale(buyerID)
+                } else {
+                    self.sheetDestination = .secondhandBuyerSelection
+                }
+            } catch {
+                self.roomState.setError(error.localizedDescription)
+            }
+        }
+    }
+
+    func selectSecondhandBuyerForCompletion(_ buyerID: UUID) {
+        guard secondhandActiveBuyers.contains(where: { $0.buyerId == buyerID }) else { return }
+        sheetDestination = nil
+        presentationTask?.cancel()
+        presentationTask = Task { [weak self] in
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            self?.alertDestination = .completeSecondhandSale(buyerID)
+        }
+    }
+
+    func requestStopSellingSecondhandListing() {
+        guard secondhandPurchaseIntent?.status == .active,
+              secondhandPurchaseIntent?.viewerRole == .seller,
+              !isApplyingSecondhandTransactionAction
+        else { return }
+        alertDestination = .stopSellingSecondhandListing
+    }
+
+    func confirmCancelSecondhandPurchaseIntent() {
+        guard let intent = secondhandPurchaseIntent,
+              intent.status == .active,
+              intent.viewerRole == .buyer,
+              let secondhandTransactionService
+        else { return }
+        alertDestination = nil
+        performSecondhandTransactionAction {
+            try await secondhandTransactionService
+                .cancelSecondhandPurchaseIntent(intentId: intent.id)
+        }
+    }
+
+    func confirmCompleteSecondhandSale(buyerID: UUID) {
+        guard let intent = secondhandPurchaseIntent,
+              intent.status == .active,
+              intent.viewerRole == .seller,
+              secondhandActiveBuyers.contains(where: { $0.buyerId == buyerID }),
+              let secondhandTransactionService
+        else { return }
+        alertDestination = nil
+        performSecondhandTransactionAction {
+            try await secondhandTransactionService.completeSecondhandSale(
+                listingId: intent.listingId,
+                buyerId: buyerID
+            )
+        }
+    }
+
+    func confirmStopSellingSecondhandListing() {
+        guard let intent = secondhandPurchaseIntent,
+              intent.status == .active,
+              intent.viewerRole == .seller,
+              let secondhandTransactionService
+        else { return }
+        alertDestination = nil
+        performSecondhandTransactionAction {
+            try await secondhandTransactionService
+                .stopSellingSecondhandListing(listingId: intent.listingId)
+        }
     }
 
     func requestScrollToLatest() {
@@ -667,6 +809,44 @@ final class ChatRoomViewModel: ObservableObject {
         isMuted = settings.isMuted
         clearBeforeAt = settings.clearBeforeAt
         blockRelation = await chatService.fetchBlockRelation(with: conversation.otherUserId)
+    }
+
+    private func refreshSecondhandPurchaseIntent() async {
+        guard let secondhandTransactionService else {
+            secondhandPurchaseIntent = nil
+            return
+        }
+
+        do {
+            secondhandPurchaseIntent = try await secondhandTransactionService
+                .fetchSecondhandPurchaseIntent(conversationId: conversation.id)
+        } catch is CancellationError {
+            return
+        } catch {
+            // Transaction state is supplemental to the room. A temporarily
+            // unavailable status RPC must not replace an otherwise usable chat
+            // with a full-room loading failure or erase the last valid status.
+            return
+        }
+    }
+
+    private func performSecondhandTransactionAction(
+        _ action: @escaping () async throws -> Void
+    ) {
+        guard !isApplyingSecondhandTransactionAction else { return }
+        isApplyingSecondhandTransactionAction = true
+        roomState.clearError()
+
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.isApplyingSecondhandTransactionAction = false }
+            do {
+                try await action()
+                await self.refreshSecondhandPurchaseIntent()
+            } catch {
+                self.roomState.setError(error.localizedDescription)
+            }
+        }
     }
 
     private func runPrivacyAction(_ action: @escaping () async throws -> Void) {

@@ -145,6 +145,61 @@ struct ChatServiceRepository {
             .value
     }
 
+    func fetchSecondhandPurchaseIntent(
+        conversationId: UUID
+    ) async throws -> SecondhandChatPurchaseIntent? {
+        let rows: [SecondhandChatPurchaseIntent] = try await supabase.client
+            .rpc(
+                "get_secondhand_chat_purchase_intent",
+                params: SecondhandChatIntentParams(conversationID: conversationId)
+            )
+            .execute()
+            .value
+        return rows.first
+    }
+
+    func fetchSecondhandActiveBuyers(
+        listingId: UUID
+    ) async throws -> [SecondhandActiveBuyer] {
+        try await supabase.client
+            .rpc(
+                "get_secondhand_active_buyers",
+                params: SecondhandListingParams(listingID: listingId)
+            )
+            .execute()
+            .value
+    }
+
+    func cancelSecondhandPurchaseIntent(intentId: UUID) async throws {
+        try await supabase.client
+            .rpc(
+                "cancel_my_secondhand_purchase_intent",
+                params: SecondhandIntentActionParams(intentID: intentId)
+            )
+            .execute()
+    }
+
+    func completeSecondhandSale(listingId: UUID, buyerId: UUID) async throws {
+        try await supabase.client
+            .rpc(
+                "complete_secondhand_sale",
+                params: CompleteSecondhandSaleParams(
+                    listingID: listingId,
+                    buyerID: buyerId
+                )
+            )
+            .execute()
+    }
+
+    func stopSellingSecondhandListing(listingId: UUID) async throws {
+        try await supabase.client
+            .rpc(
+                "stop_selling_secondhand_listing",
+                params: SecondhandListingParams(listingID: listingId)
+            )
+            .execute()
+    }
+
     func fetchGroupMessages(groupId: UUID) async throws -> [GroupMessage] {
         try await fetchGroupMessagesPage(groupId: groupId).messages
     }
@@ -645,6 +700,40 @@ private struct LinkedPostCardLookupParams: Encodable {
         case conversationID = "p_conversation_id"
         case postKind = "p_post_kind"
         case postID = "p_post_id"
+    }
+}
+
+private struct SecondhandChatIntentParams: Encodable {
+    let conversationID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case conversationID = "p_conversation_id"
+    }
+}
+
+private struct SecondhandListingParams: Encodable {
+    let listingID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case listingID = "p_listing_id"
+    }
+}
+
+private struct SecondhandIntentActionParams: Encodable {
+    let intentID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case intentID = "p_intent_id"
+    }
+}
+
+private struct CompleteSecondhandSaleParams: Encodable {
+    let listingID: UUID
+    let buyerID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case listingID = "p_listing_id"
+        case buyerID = "p_buyer_id"
     }
 }
 

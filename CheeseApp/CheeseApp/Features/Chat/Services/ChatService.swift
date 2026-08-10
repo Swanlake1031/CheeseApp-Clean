@@ -525,6 +525,35 @@ class ChatService: ObservableObject {
         )
     }
 
+    func fetchSecondhandPurchaseIntent(
+        conversationId: UUID
+    ) async throws -> SecondhandChatPurchaseIntent? {
+        try await repository.fetchSecondhandPurchaseIntent(
+            conversationId: conversationId
+        )
+    }
+
+    func fetchSecondhandActiveBuyers(
+        listingId: UUID
+    ) async throws -> [SecondhandActiveBuyer] {
+        try await repository.fetchSecondhandActiveBuyers(listingId: listingId)
+    }
+
+    func cancelSecondhandPurchaseIntent(intentId: UUID) async throws {
+        try await repository.cancelSecondhandPurchaseIntent(intentId: intentId)
+    }
+
+    func completeSecondhandSale(listingId: UUID, buyerId: UUID) async throws {
+        try await repository.completeSecondhandSale(
+            listingId: listingId,
+            buyerId: buyerId
+        )
+    }
+
+    func stopSellingSecondhandListing(listingId: UUID) async throws {
+        try await repository.stopSellingSecondhandListing(listingId: listingId)
+    }
+
     func sendSharedPostCardMessage(
         conversationId: UUID,
         card: SharedPostCardMetadata

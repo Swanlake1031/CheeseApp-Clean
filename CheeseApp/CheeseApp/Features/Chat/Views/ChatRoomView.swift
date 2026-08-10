@@ -25,6 +25,103 @@ enum ChatComposerLayout {
     }
 }
 
+private struct SecondhandTransactionActionButtonStyle: ButtonStyle {
+    enum Role {
+        case primary
+        case secondary
+    }
+
+    let role: Role
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(role == .primary ? Color.black : AppColors.textPrimary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(
+                role == .primary
+                    ? AppColors.accent.opacity(configuration.isPressed ? 0.72 : 1)
+                    : Color(uiColor: .secondarySystemBackground)
+                        .opacity(configuration.isPressed ? 0.7 : 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+private struct SecondhandBuyerSelectionSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let buyers: [SecondhandActiveBuyer]
+    let onSelect: (UUID) -> Void
+
+    var body: some View {
+        NavigationStack {
+            List(buyers) { buyer in
+                Button {
+                    onSelect(buyer.buyerId)
+                } label: {
+                    HStack(spacing: 12) {
+                        buyerAvatar(buyer)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(buyer.buyerName)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(AppColors.textPrimary)
+                            Text(L10n.tr("Active purchase intent", "购买意向进行中"))
+                                .font(.system(size: 12))
+                                .foregroundStyle(AppColors.textMuted)
+                        }
+
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(AppColors.textMuted)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .listStyle(.plain)
+            .navigationTitle(L10n.tr("Select the actual buyer", "选择实际买家"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.tr("Cancel", "取消")) { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func buyerAvatar(_ buyer: SecondhandActiveBuyer) -> some View {
+        Group {
+            if let avatar = buyer.buyerAvatar,
+               let url = URL(string: avatar),
+               !avatar.isEmpty {
+                CachedRemoteImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    avatarFallback(buyer.buyerName)
+                }
+            } else {
+                avatarFallback(buyer.buyerName)
+            }
+        }
+        .frame(width: 42, height: 42)
+        .clipShape(Circle())
+    }
+
+    private func avatarFallback(_ name: String) -> some View {
+        Circle()
+            .fill(Color.gray.opacity(0.14))
+            .overlay {
+                Text(String(name.prefix(1)).uppercased())
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(AppColors.textMuted)
+            }
+    }
+}
+
 private struct ChatComposerContainerModifier: ViewModifier {
     let topGap: CGFloat
     let keyboardHeight: CGFloat
@@ -79,7 +176,10 @@ struct ChatRoomView: View {
     init(conversation: ChatConversationPreview) {
         self.conversation = conversation
         _viewModel = StateObject(
-            wrappedValue: ChatRoomViewModel(conversation: conversation)
+            wrappedValue: ChatRoomViewModel(
+                conversation: conversation,
+                secondhandTransactionService: ChatService.shared
+            )
         )
     }
 
@@ -124,6 +224,10 @@ struct ChatRoomView: View {
                 selectedImageItems = []
                 viewModel.stageMediaSelections(newItems)
             }
+            .onChange(of: viewModel.latestSecondhandTransactionSignalMessageID) { _, newID in
+                guard newID != nil else { return }
+                viewModel.refreshSecondhandPurchaseIntentAfterTimelineSignal()
+            }
             .navigationDestination(item: $viewModel.navigationDestination) { destination in
                 navigationView(for: destination)
             }
@@ -153,7 +257,74 @@ struct ChatRoomView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            messageTimeline
+            VStack(spacing: 0) {
+                if let intent = viewModel.secondhandPurchaseIntent {
+                    secondhandTransactionCard(intent)
+                    Divider()
+                }
+                messageTimeline
+            }
+        }
+    }
+
+    private func secondhandTransactionCard(
+        _ intent: SecondhandChatPurchaseIntent
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Label {
+                    Text(intent.status.displayTitle)
+                } icon: {
+                    Image(systemName: intent.status.isActive ? "arrow.triangle.2.circlepath" : "checkmark.circle")
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(AppColors.textPrimary)
+
+                Spacer(minLength: 8)
+
+                Text(L10n.tr("Secondhand", "二手"))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(AppColors.categoryColor(for: "secondhand"))
+            }
+
+            Text(intent.listingTitle)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(AppColors.textMuted)
+                .lineLimit(1)
+
+            if intent.status == .active {
+                secondhandTransactionActions(intent)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(uiColor: .systemBackground))
+    }
+
+    @ViewBuilder
+    private func secondhandTransactionActions(
+        _ intent: SecondhandChatPurchaseIntent
+    ) -> some View {
+        if intent.viewerRole == .buyer {
+            Button(L10n.tr("No longer interested", "不想要了")) {
+                viewModel.requestCancelSecondhandPurchaseIntent()
+            }
+            .buttonStyle(SecondhandTransactionActionButtonStyle(role: .secondary))
+            .disabled(viewModel.isApplyingSecondhandTransactionAction)
+        } else {
+            HStack(spacing: 10) {
+                Button(L10n.tr("Complete transaction", "交易完成")) {
+                    viewModel.requestCompleteSecondhandSale()
+                }
+                .buttonStyle(SecondhandTransactionActionButtonStyle(role: .primary))
+
+                Button(L10n.tr("Stop selling", "不想卖了")) {
+                    viewModel.requestStopSellingSecondhandListing()
+                }
+                .buttonStyle(SecondhandTransactionActionButtonStyle(role: .secondary))
+            }
+            .disabled(viewModel.isApplyingSecondhandTransactionAction)
         }
     }
 
@@ -552,9 +723,22 @@ struct ChatRoomView: View {
     }
 
     private func messageBubble(_ message: Message) -> some View {
+        if message.metadata?.secondhandTransactionEvent != nil {
+            return AnyView(
+                Text(message.content)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(AppColors.textMuted)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 5)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel(message.content)
+            )
+        }
+
         let isMine = currentUserID != nil && message.senderId == currentUserID
 
-        return HStack(alignment: .center, spacing: 8) {
+        return AnyView(HStack(alignment: .center, spacing: 8) {
             if isMine { Spacer(minLength: 40) }
             if !isMine {
                 Button {
@@ -579,7 +763,7 @@ struct ChatRoomView: View {
                 directMessageAvatar(isMine: true, size: 30)
             }
             if !isMine { Spacer(minLength: 40) }
-        }
+        })
     }
 
     @ViewBuilder
@@ -691,6 +875,12 @@ struct ChatRoomView: View {
             }
         case .reportMessage(let target):
             ReportMessageSheet(target: target)
+        case .secondhandBuyerSelection:
+            SecondhandBuyerSelectionSheet(
+                buyers: viewModel.secondhandActiveBuyers,
+                onSelect: viewModel.selectSecondhandBuyerForCompletion
+            )
+            .presentationDetents([.medium, .large])
         }
     }
 
@@ -759,6 +949,33 @@ struct ChatRoomView: View {
                 primaryButton: .cancel(Text(L10n.tr("Cancel", "取消"))),
                 secondaryButton: .destructive(Text(L10n.tr("Delete", "删除"))) {
                     viewModel.deleteMessage(messageID, forEveryone: forEveryone)
+                }
+            )
+        case .cancelSecondhandPurchaseIntent:
+            return Alert(
+                title: Text("确定取消购买意向？"),
+                message: Text("聊天记录会保留，商品仍可由其他买家购买。"),
+                primaryButton: .cancel(Text("返回")),
+                secondaryButton: .destructive(Text("不想要了")) {
+                    viewModel.confirmCancelSecondhandPurchaseIntent()
+                }
+            )
+        case .completeSecondhandSale(let buyerID):
+            return Alert(
+                title: Text("确认该商品已完成交易？"),
+                message: Text("请在商品已经完成线下交付后再确认。"),
+                primaryButton: .cancel(Text("返回")),
+                secondaryButton: .default(Text("确认完成")) {
+                    viewModel.confirmCompleteSecondhandSale(buyerID: buyerID)
+                }
+            )
+        case .stopSellingSecondhandListing:
+            return Alert(
+                title: Text("确定不再出售该商品？"),
+                message: Text("商品不会被标记为已售出，所有买家的购买意向将结束。"),
+                primaryButton: .cancel(Text("返回")),
+                secondaryButton: .destructive(Text("停止出售")) {
+                    viewModel.confirmStopSellingSecondhandListing()
                 }
             )
         }

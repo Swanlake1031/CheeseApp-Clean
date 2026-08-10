@@ -33,6 +33,7 @@ struct MessageMetadata: Codable, Hashable {
     let imageURL: String?
     let sharedPostCard: SharedPostCardMetadata?
     let postContactCard: PostContactCardMetadata?
+    let secondhandTransactionEvent: SecondhandTransactionEventMetadata?
     let quotedMessage: QuotedMessageMetadata?
     let imageBucket: String?
     let imageObjectPath: String?
@@ -43,6 +44,7 @@ struct MessageMetadata: Codable, Hashable {
         imageURL: String?,
         sharedPostCard: SharedPostCardMetadata?,
         postContactCard: PostContactCardMetadata?,
+        secondhandTransactionEvent: SecondhandTransactionEventMetadata? = nil,
         quotedMessage: QuotedMessageMetadata? = nil,
         imageBucket: String? = nil,
         imageObjectPath: String? = nil,
@@ -52,6 +54,7 @@ struct MessageMetadata: Codable, Hashable {
         self.imageURL = imageURL
         self.sharedPostCard = sharedPostCard
         self.postContactCard = postContactCard
+        self.secondhandTransactionEvent = secondhandTransactionEvent
         self.quotedMessage = quotedMessage
         self.imageBucket = imageBucket
         self.imageObjectPath = imageObjectPath
@@ -80,6 +83,7 @@ struct MessageMetadata: Codable, Hashable {
         case imageURL = "image_url"
         case sharedPostCard = "shared_post_card"
         case postContactCard = "post_contact_card"
+        case secondhandTransactionEvent = "secondhand_transaction_event"
         case quotedMessage = "quoted_message"
         case imageBucket = "image_bucket"
         case imageObjectPath = "image_object_path"
@@ -92,6 +96,10 @@ struct MessageMetadata: Codable, Hashable {
         try container.encodeIfPresent(imageURL, forKey: .imageURL)
         try container.encodeIfPresent(sharedPostCard, forKey: .sharedPostCard)
         try container.encodeIfPresent(postContactCard, forKey: .postContactCard)
+        try container.encodeIfPresent(
+            secondhandTransactionEvent,
+            forKey: .secondhandTransactionEvent
+        )
         try container.encodeIfPresent(quotedMessage, forKey: .quotedMessage)
         try container.encodeIfPresent(imageBucket, forKey: .imageBucket)
         try container.encodeIfPresent(imageObjectPath, forKey: .imageObjectPath)
@@ -106,6 +114,91 @@ struct MessageMetadata: Codable, Hashable {
                 forKey: .imageScopeID
             )
         }
+    }
+}
+
+struct SecondhandTransactionEventMetadata: Codable, Hashable {
+    let kind: SecondhandPurchaseIntentStatus
+    let listingId: UUID
+    let intentId: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case kind
+        case listingId = "listing_id"
+        case intentId = "intent_id"
+    }
+}
+
+enum SecondhandPurchaseIntentStatus: String, Codable, Hashable {
+    case active
+    case buyerCancelled = "buyer_cancelled"
+    case completed
+    case listingSold = "listing_sold"
+    case sellerStopped = "seller_stopped"
+
+    var displayTitle: String {
+        switch self {
+        case .active: return L10n.tr("Transaction in progress", "交易进行中")
+        case .buyerCancelled: return L10n.tr("Purchase intent cancelled", "购买意向已取消")
+        case .completed: return L10n.tr("Transaction completed", "交易已完成")
+        case .listingSold: return L10n.tr("This item has been sold", "该商品已售出")
+        case .sellerStopped: return L10n.tr("Seller stopped selling", "卖家已停止出售")
+        }
+    }
+
+    var isActive: Bool { self == .active }
+}
+
+enum SecondhandTransactionViewerRole: String, Codable, Hashable {
+    case buyer
+    case seller
+}
+
+struct SecondhandChatPurchaseIntent: Codable, Identifiable, Hashable {
+    let id: UUID
+    let listingId: UUID
+    let conversationId: UUID
+    let sellerId: UUID
+    let buyerId: UUID
+    let status: SecondhandPurchaseIntentStatus
+    let startedAt: Date
+    let updatedAt: Date
+    let listingTitle: String
+    let listingStatus: String
+    let listingIsPrivate: Bool
+    let viewerRole: SecondhandTransactionViewerRole
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case listingId = "listing_id"
+        case conversationId = "conversation_id"
+        case sellerId = "seller_id"
+        case buyerId = "buyer_id"
+        case status
+        case startedAt = "started_at"
+        case updatedAt = "updated_at"
+        case listingTitle = "listing_title"
+        case listingStatus = "listing_status"
+        case listingIsPrivate = "listing_is_private"
+        case viewerRole = "viewer_role"
+    }
+}
+
+struct SecondhandActiveBuyer: Codable, Identifiable, Hashable {
+    let buyerId: UUID
+    let buyerName: String
+    let buyerAvatar: String?
+    let conversationId: UUID
+    let startedAt: Date
+
+    var id: UUID { buyerId }
+
+    enum CodingKeys: String, CodingKey {
+        case buyerId = "buyer_id"
+        case buyerName = "buyer_name"
+        case buyerAvatar = "buyer_avatar"
+        case conversationId = "conversation_id"
+        case startedAt = "started_at"
     }
 }
 

@@ -110,6 +110,8 @@ Visibility changes go through `set_my_post_hidden`. The service emits one `PostF
 
 `ChatService.shared` owns conversation/group previews and account-scoped unread state. Room controllers own message timelines and cancellation. Private chat media uses authenticated/signed loading rather than the public image cache. `SystemMessageService` is the only current notification inbox; the unreachable Forum-specific bell architecture was removed.
 
+Secondhand chat transaction state is server-owned in `secondhand_purchase_intents`. A normal direct message never creates a purchase intent; the existing `post_contact_card` insert is the sole trigger. `ChatRoomViewModel` reads the matching intent through `ChatService` and presents it above, not inside, the scrollable message timeline. Buyer cancellation, seller completion, and seller stop-selling actions use protected RPCs that atomically update the intent/listing and append an immutable-looking system event to the existing conversation. Do not infer transaction state from local buttons or duplicate it in message metadata.
+
 ## Loading Model
 
 Use these meanings consistently:

@@ -33,6 +33,21 @@ protocol ChatRoomServicing: AnyObject {
 extension ChatService: ChatRoomServicing {}
 
 @MainActor
+protocol SecondhandChatTransactionServicing: AnyObject {
+    func fetchSecondhandPurchaseIntent(
+        conversationId: UUID
+    ) async throws -> SecondhandChatPurchaseIntent?
+    func fetchSecondhandActiveBuyers(
+        listingId: UUID
+    ) async throws -> [SecondhandActiveBuyer]
+    func cancelSecondhandPurchaseIntent(intentId: UUID) async throws
+    func completeSecondhandSale(listingId: UUID, buyerId: UUID) async throws
+    func stopSellingSecondhandListing(listingId: UUID) async throws
+}
+
+extension ChatService: SecondhandChatTransactionServicing {}
+
+@MainActor
 protocol ChatRoomMediaServicing {
     func loadImages(from items: [PhotosPickerItem]) async throws -> [UIImage]
     func uploadImage(

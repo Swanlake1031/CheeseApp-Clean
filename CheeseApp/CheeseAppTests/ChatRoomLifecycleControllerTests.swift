@@ -561,6 +561,112 @@ final class ChatRoomViewModelTests: XCTestCase {
         XCTAssertNil(object["image_url"])
     }
 
+    func testSecondhandTransactionEventMetadataDecodesAuthoritativeStatus() throws {
+        let listingID = UUID()
+        let intentID = UUID()
+        let data = try JSONSerialization.data(withJSONObject: [
+            "secondhand_transaction_event": [
+                "kind": "listing_sold",
+                "listing_id": listingID.uuidString.lowercased(),
+                "intent_id": intentID.uuidString.lowercased()
+            ]
+        ])
+
+        let metadata = try JSONDecoder().decode(MessageMetadata.self, from: data)
+
+        XCTAssertEqual(metadata.secondhandTransactionEvent?.kind, .listingSold)
+        XCTAssertEqual(metadata.secondhandTransactionEvent?.listingId, listingID)
+        XCTAssertEqual(metadata.secondhandTransactionEvent?.intentId, intentID)
+        XCTAssertEqual(
+            metadata.secondhandTransactionEvent?.kind.displayTitle,
+            "该商品已售出"
+        )
+    }
+
+    func testBuyerCancellationUsesTransactionServiceAndKeepsEndedState() async {
+        let buyerID = UUID()
+        let conversation = ChatConversationPreview.fixture()
+        let intent = SecondhandChatPurchaseIntent.fixture(
+            conversationID: conversation.id,
+            sellerID: conversation.otherUserId,
+            buyerID: buyerID,
+            role: .buyer
+        )
+        let transactionService = SecondhandTransactionServiceStub(intent: intent)
+        let recorder = ChatRoomSendRecorder(
+            conversationID: conversation.id,
+            senderID: buyerID
+        )
+        let viewModel = makeViewModel(
+            conversation,
+            senderID: buyerID,
+            recorder: recorder,
+            chatService: ChatRoomServiceStub(),
+            transactionService: transactionService
+        )
+
+        await viewModel.bootstrap(currentUserID: buyerID)
+        XCTAssertEqual(viewModel.secondhandPurchaseIntent?.status, .active)
+
+        viewModel.requestCancelSecondhandPurchaseIntent()
+        XCTAssertEqual(viewModel.alertDestination, .cancelSecondhandPurchaseIntent)
+        viewModel.confirmCancelSecondhandPurchaseIntent()
+
+        await waitUntil {
+            viewModel.secondhandPurchaseIntent?.status == .buyerCancelled
+        }
+        XCTAssertEqual(transactionService.cancelAttempts, 1)
+        XCTAssertFalse(viewModel.secondhandPurchaseIntent?.status.isActive ?? true)
+    }
+
+    func testSellerWithMultipleActiveBuyersMustSelectBeforeCompletion() async {
+        let sellerID = UUID()
+        let conversation = ChatConversationPreview.fixture()
+        let currentBuyerID = conversation.otherUserId
+        let otherBuyerID = UUID()
+        let intent = SecondhandChatPurchaseIntent.fixture(
+            conversationID: conversation.id,
+            sellerID: sellerID,
+            buyerID: currentBuyerID,
+            role: .seller
+        )
+        let transactionService = SecondhandTransactionServiceStub(
+            intent: intent,
+            buyers: [
+                .fixture(buyerID: currentBuyerID, conversationID: conversation.id),
+                .fixture(buyerID: otherBuyerID, conversationID: UUID())
+            ]
+        )
+        let recorder = ChatRoomSendRecorder(
+            conversationID: conversation.id,
+            senderID: sellerID
+        )
+        let viewModel = makeViewModel(
+            conversation,
+            senderID: sellerID,
+            recorder: recorder,
+            chatService: ChatRoomServiceStub(),
+            transactionService: transactionService
+        )
+
+        await viewModel.bootstrap(currentUserID: sellerID)
+        viewModel.requestCompleteSecondhandSale()
+        await waitUntil {
+            viewModel.sheetDestination?.id == "secondhand-buyer-selection"
+        }
+
+        viewModel.selectSecondhandBuyerForCompletion(otherBuyerID)
+        await waitUntil {
+            viewModel.alertDestination == .completeSecondhandSale(otherBuyerID)
+        }
+        viewModel.confirmCompleteSecondhandSale(buyerID: otherBuyerID)
+
+        await waitUntil {
+            viewModel.secondhandPurchaseIntent?.status == .listingSold
+        }
+        XCTAssertEqual(transactionService.completedBuyerIDs, [otherBuyerID])
+    }
+
     func testUserDefaultsSafetyAcknowledgementIsScopedToUserAndConversation() {
         let suiteName = "ChatRoomViewModelTests.\(UUID().uuidString)"
         let defaults = try! XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -581,6 +687,7 @@ final class ChatRoomViewModelTests: XCTestCase {
         senderID: UUID,
         recorder: ChatRoomSendRecorder,
         chatService: (any ChatRoomServicing)? = nil,
+        transactionService: (any SecondhandChatTransactionServicing)? = nil,
         mediaService: ChatRoomMediaServiceStub? = nil,
         safetyStore: ChatStrangerSafetyStoreStub = ChatStrangerSafetyStoreStub(),
         stagedImages: [UIImage] = []
@@ -606,6 +713,7 @@ final class ChatRoomViewModelTests: XCTestCase {
             conversation: conversation,
             roomState: state,
             chatService: chatService,
+            secondhandTransactionService: transactionService,
             mediaService: mediaService ?? ChatRoomMediaServiceStub(),
             strangerSafetyStore: safetyStore,
             currentUserID: senderID,
@@ -719,6 +827,53 @@ private final class ChatRoomServiceStub: ChatRoomServicing {
 }
 
 @MainActor
+private final class SecondhandTransactionServiceStub: SecondhandChatTransactionServicing {
+    private(set) var intent: SecondhandChatPurchaseIntent?
+    private let buyers: [SecondhandActiveBuyer]
+    private(set) var cancelAttempts = 0
+    private(set) var completedBuyerIDs: [UUID] = []
+
+    init(
+        intent: SecondhandChatPurchaseIntent?,
+        buyers: [SecondhandActiveBuyer] = []
+    ) {
+        self.intent = intent
+        self.buyers = buyers
+    }
+
+    func fetchSecondhandPurchaseIntent(
+        conversationId: UUID
+    ) async throws -> SecondhandChatPurchaseIntent? {
+        intent
+    }
+
+    func fetchSecondhandActiveBuyers(
+        listingId: UUID
+    ) async throws -> [SecondhandActiveBuyer] {
+        buyers
+    }
+
+    func cancelSecondhandPurchaseIntent(intentId: UUID) async throws {
+        cancelAttempts += 1
+        guard let current = intent else { return }
+        intent = current.replacing(status: .buyerCancelled)
+    }
+
+    func completeSecondhandSale(listingId: UUID, buyerId: UUID) async throws {
+        completedBuyerIDs.append(buyerId)
+        guard let current = intent else { return }
+        intent = current.replacing(
+            status: current.buyerId == buyerId ? .completed : .listingSold
+        )
+    }
+
+    func stopSellingSecondhandListing(listingId: UUID) async throws {
+        guard let current = intent else { return }
+        intent = current.replacing(status: .sellerStopped)
+    }
+}
+
+@MainActor
 private final class ChatRoomMediaServiceStub: ChatRoomMediaServicing {
     private let uploadDelayNanoseconds: UInt64
     private(set) var uploadCount = 0
@@ -814,6 +969,66 @@ private extension ChatConversationPreview {
             unreadCount: 0,
             canChatFreely: canChatFreely,
             isMutualFollow: isMutualFollow
+        )
+    }
+}
+
+private extension SecondhandChatPurchaseIntent {
+    static func fixture(
+        conversationID: UUID,
+        sellerID: UUID,
+        buyerID: UUID,
+        role: SecondhandTransactionViewerRole
+    ) -> SecondhandChatPurchaseIntent {
+        SecondhandChatPurchaseIntent(
+            id: UUID(),
+            listingId: UUID(),
+            conversationId: conversationID,
+            sellerId: sellerID,
+            buyerId: buyerID,
+            status: .active,
+            startedAt: Date(),
+            updatedAt: Date(),
+            listingTitle: "Test listing",
+            listingStatus: "active",
+            listingIsPrivate: false,
+            viewerRole: role
+        )
+    }
+
+    func replacing(
+        status: SecondhandPurchaseIntentStatus
+    ) -> SecondhandChatPurchaseIntent {
+        SecondhandChatPurchaseIntent(
+            id: id,
+            listingId: listingId,
+            conversationId: conversationId,
+            sellerId: sellerId,
+            buyerId: buyerId,
+            status: status,
+            startedAt: startedAt,
+            updatedAt: Date(),
+            listingTitle: listingTitle,
+            listingStatus: status == .completed || status == .listingSold
+                ? "completed"
+                : listingStatus,
+            listingIsPrivate: listingIsPrivate,
+            viewerRole: viewerRole
+        )
+    }
+}
+
+private extension SecondhandActiveBuyer {
+    static func fixture(
+        buyerID: UUID,
+        conversationID: UUID
+    ) -> SecondhandActiveBuyer {
+        SecondhandActiveBuyer(
+            buyerId: buyerID,
+            buyerName: "Buyer",
+            buyerAvatar: nil,
+            conversationId: conversationID,
+            startedAt: Date()
         )
     }
 }

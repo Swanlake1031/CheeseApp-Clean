@@ -58,6 +58,7 @@ See `ARCHITECTURE_AUDIT.md` for evidence and `ARCHITECTURE.md` for the resulting
 - Home refresh publication back to per-source progressive assignment.
 - The distinction between System Messages and push routing.
 - Migrations 152–154 hidden-post lifecycle and Search follow-up: public feeds depend on `status` plus `is_private`; `expires_at` is only the worker deadline, and restoring must retain the same post ID.
+- Migration 156 Secondhand purchase-intent contract: only a successfully inserted contact card starts a transaction; normal chat must never create one, and transaction actions must remain protected RPCs.
 - Rentals/Housing and Secondhand likes/comments are explicitly outside the product boundary; do not revive historical implementations.
 
 ## Build the App
@@ -107,7 +108,7 @@ For Cloudflare, configure `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` as deplo
 
 - Supabase Auth, PostgREST, Realtime, Storage, RLS, database functions, and reviewed public views.
 - Ordered migrations through the latest file in `Supabase/migrations`.
-- Migrations 152–154 are required for the private-content UI, 30-day auto-hide contract, and matching Search schema; deploy them before shipping the matching iOS/worker build.
+- Migrations 152–155 are required for the private-content UI, 30-day auto-hide contract, Search schema, and optional activity parameters. Migration 156 adds the contact-card-triggered Secondhand transaction contract and must be deployed before shipping its pinned chat card.
 - Cloudflare Worker routes for `cheeseapp.org`, cron lifecycle jobs, and universal-link/AASA delivery.
 - APNs credentials and queued push database contracts.
 - Course import files and manifests under `docs` / `scripts` where applicable.
