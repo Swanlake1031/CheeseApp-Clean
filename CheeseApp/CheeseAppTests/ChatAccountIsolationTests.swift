@@ -106,6 +106,55 @@ final class ChatAccountIsolationTests: XCTestCase {
         XCTAssertEqual(loadCount, 2)
     }
 
+    func testCancelledViewTaskDoesNotBecomeAnInboxError() async {
+        let account = UUID(uuidString: "a4000000-0000-4000-8000-000000000001")!
+        let service = ChatService(
+            currentUserIDProvider: { account },
+            conversationStateLoader: { _ in
+                try await Task.sleep(for: .seconds(30))
+                return .fixture(ownerName: "Too late")
+            }
+        )
+
+        service.activateAccount(account)
+        let task = Task { @MainActor in
+            await service.refreshConversations()
+        }
+        await waitUntil { service.isLoadingConversations }
+        task.cancel()
+        await task.value
+
+        XCTAssertNil(service.conversationErrorMessage)
+        XCTAssertFalse(service.hasResolvedInitialConversationLoad)
+        XCTAssertFalse(service.isLoadingConversations)
+        XCTAssertEqual(service.conversationListState, .unresolved)
+    }
+
+    func testWrappedNetworkCancellationUsesActionableInboxError() async {
+        let account = UUID(uuidString: "a5000000-0000-4000-8000-000000000001")!
+        let service = ChatService(
+            currentUserIDProvider: { account },
+            conversationStateLoader: { _ in
+                throw NSError(
+                    domain: "PostgREST",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "cancelled"]
+                )
+            }
+        )
+
+        service.activateAccount(account)
+        await service.refreshConversations()
+
+        XCTAssertEqual(service.conversationErrorMessage, "连接中断，请重试。")
+        XCTAssertTrue(service.hasResolvedInitialConversationLoad)
+        XCTAssertFalse(service.isLoadingConversations)
+        XCTAssertEqual(
+            service.conversationListState,
+            .error(message: "连接中断，请重试。")
+        )
+    }
+
     func testRemoteImageCacheEvictsDiskAndAdvancesGeneration() throws {
         let responseCache = URLCache(
             memoryCapacity: 1_024_000,

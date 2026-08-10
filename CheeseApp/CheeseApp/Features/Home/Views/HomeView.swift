@@ -12,17 +12,6 @@
 import SwiftUI
 import UIKit
 
-private struct HomeFeaturedPageHeightPreferenceKey: PreferenceKey {
-    static var defaultValue: [HomeFeedTab: CGFloat] = [:]
-
-    static func reduce(
-        value: inout [HomeFeedTab: CGFloat],
-        nextValue: () -> [HomeFeedTab: CGFloat]
-    ) {
-        value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
-    }
-}
-
 private struct HomeProfileRoute: Identifiable, Hashable {
     let id: UUID
 }
@@ -263,15 +252,14 @@ struct HomeView: View {
                         featuredCategoryPage(category)
                             .fixedSize(horizontal: false, vertical: true)
                             .containerRelativeFrame(.horizontal)
-                            .background {
-                                // Measure the intrinsic content before the page
-                                // is expanded to the current pager height.
-                                GeometryReader { proxy in
-                                    Color.clear.preference(
-                                        key: HomeFeaturedPageHeightPreferenceKey.self,
-                                        value: [category: proxy.size.height]
-                                    )
-                                }
+                            // Read each page's intrinsic height before it is expanded to the
+                            // current pager height. `onGeometryChange` only invokes the action
+                            // when the transformed value changes, avoiding the old bound-
+                            // preference feedback loop during layout.
+                            .onGeometryChange(for: CGFloat.self) { proxy in
+                                proxy.size.height
+                            } action: { height in
+                                updateFeaturedPageHeight(height, for: category)
                             }
                             .frame(
                                 minHeight: pagerHeight,
@@ -294,14 +282,6 @@ struct HomeView: View {
             .background(AppColors.pageBackground)
             .clipped()
             .contentShape(Rectangle())
-            .onPreferenceChange(HomeFeaturedPageHeightPreferenceKey.self) { heights in
-                for (category, height) in heights where height > 0 {
-                    guard abs((featuredPageHeights[category] ?? 0) - height) > 0.5 else {
-                        continue
-                    }
-                    featuredPageHeights[category] = height
-                }
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -710,6 +690,13 @@ struct HomeView: View {
             featuredPageHeights[selectedFeaturedCategory] ?? minimum,
             minimum
         )
+    }
+
+    private func updateFeaturedPageHeight(_ height: CGFloat, for category: HomeFeedTab) {
+        guard height > 0,
+              abs((featuredPageHeights[category] ?? 0) - height) > 0.5
+        else { return }
+        featuredPageHeights[category] = height
     }
 
     private func selectFeaturedCategory(_ category: HomeFeedTab) {

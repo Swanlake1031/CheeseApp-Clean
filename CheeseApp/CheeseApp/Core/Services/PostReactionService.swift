@@ -6,7 +6,20 @@ extension Error {
     var isCancellationLike: Bool {
         if self is CancellationError { return true }
         let nsError = self as NSError
-        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
+        if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+            return true
+        }
+
+        // Some networking libraries wrap URLSession cancellation and only retain its
+        // localized message. Keep this deliberately narrow so real transport failures
+        // still surface to the user.
+        let message = localizedDescription
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return message == "cancelled"
+            || message == "canceled"
+            || message == "the operation was cancelled."
+            || message == "the operation was canceled."
     }
 }
 

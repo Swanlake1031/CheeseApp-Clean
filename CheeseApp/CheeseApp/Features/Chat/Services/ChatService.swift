@@ -27,6 +27,13 @@ struct GroupConversationSettings: Hashable {
     static let `default` = GroupConversationSettings(isMuted: false)
 }
 
+struct ChatConversationListSettingsSnapshot {
+    let mutedConversationIDs: Set<UUID>
+    let manualUnreadConversationIDs: Set<UUID>
+    let hiddenConversationUntilMap: [UUID: Date]
+    let clearBeforeMap: [UUID: Date]
+}
+
 struct ChatGroupMemberSummary: Identifiable, Hashable {
     let id: UUID
     let displayName: String
@@ -256,7 +263,16 @@ class ChatService: ObservableObject {
             guard accountGeneration == requestGeneration,
                   !isAccountTransitionInProgress
             else { return }
-            conversationErrorMessage = error.localizedDescription
+
+            // SwiftUI cancels view-scoped tasks during navigation and account-boundary
+            // reconstruction. Cancellation is lifecycle control, not a failed inbox load;
+            // publishing it as an error replaced otherwise valid/empty content with the
+            // user-facing "cancelled" retry screen.
+            guard !Task.isCancelled else { return }
+
+            conversationErrorMessage = error.isCancellationLike
+                ? "连接中断，请重试。"
+                : error.localizedDescription
             hasResolvedInitialConversationLoad = true
         }
     }
@@ -268,37 +284,47 @@ class ChatService: ObservableObject {
             return try await injectedConversationStateLoader(userID)
         }
 
-        async let snapshotTask = repository.fetchConversationSnapshot(userId: userID)
-        async let mutedConversationTask = privacyActions.fetchMutedConversationIDs(userId: userID)
-        async let mutedGroupTask = privacyActions.fetchMutedGroupIDs(userId: userID)
-        async let manualUnreadTask = privacyActions.fetchManualUnreadConversationIDs(userId: userID)
-        async let hiddenConversationTask = privacyActions.fetchHiddenConversationUntilMap(userId: userID)
+        // Resolve the three list endpoints as one atomic snapshot first. The previous
+        // implementation also launched five settings requests at the same time (including
+        // duplicate reads of user_conversation_settings), which could overload the mobile
+        // connection and cancel part of the refresh.
+        let snapshot = try await repository.fetchConversationSnapshot(userId: userID)
 
-        let mutedConversationIDs = await mutedConversationTask
-        let mutedGroupIDs = await mutedGroupTask
-        let manualUnreadConversationIDs = await manualUnreadTask
-        let hiddenConversationUntilMap = await hiddenConversationTask
-        let snapshot = try await snapshotTask
+        async let conversationSettingsTask = privacyActions.fetchConversationListSettings(
+            userId: userID
+        )
+        async let mutedGroupTask = privacyActions.fetchMutedGroupIDs(userId: userID)
+
+        let conversationSettings = try await conversationSettingsTask
+        let mutedGroupIDs = try await mutedGroupTask
+        let directConversations = stateUpdater.applyClearHistoryToPreviews(
+            snapshot.directConversations,
+            clearMap: conversationSettings.clearBeforeMap
+        )
+        let messageRequests = stateUpdater.applyClearHistoryToPreviews(
+            snapshot.messageRequests,
+            clearMap: conversationSettings.clearBeforeMap
+        )
         let requests = stateUpdater.applyConversationListState(
             to: stateUpdater.applyMuteState(
-                to: snapshot.messageRequests,
-                mutedConversationIDs: mutedConversationIDs
+                to: messageRequests,
+                mutedConversationIDs: conversationSettings.mutedConversationIDs
             ),
-            manualUnreadConversationIDs: manualUnreadConversationIDs,
-            hiddenConversationUntilMap: hiddenConversationUntilMap
+            manualUnreadConversationIDs: conversationSettings.manualUnreadConversationIDs,
+            hiddenConversationUntilMap: conversationSettings.hiddenConversationUntilMap
         )
         let requestIDs = Set(requests.map(\.id))
 
         return ChatConversationRepositorySnapshot(
             directConversations: stateUpdater.applyConversationListState(
                 to: stateUpdater.applyMuteState(
-                    to: snapshot.directConversations.filter {
+                    to: directConversations.filter {
                         !requestIDs.contains($0.id)
                     },
-                    mutedConversationIDs: mutedConversationIDs
+                    mutedConversationIDs: conversationSettings.mutedConversationIDs
                 ),
-                manualUnreadConversationIDs: manualUnreadConversationIDs,
-                hiddenConversationUntilMap: hiddenConversationUntilMap
+                manualUnreadConversationIDs: conversationSettings.manualUnreadConversationIDs,
+                hiddenConversationUntilMap: conversationSettings.hiddenConversationUntilMap
             ),
             messageRequests: requests,
             groupConversations: stateUpdater.applyGroupMuteState(
@@ -1459,21 +1485,19 @@ struct GroupConversationReadMarkerUpdate: Encodable {
     }
 }
 
-struct ConversationClearMarkerRow: Decodable {
+struct ConversationListSettingsRow: Decodable {
     let conversationId: UUID
+    let isMuted: Bool
+    let manualUnread: Bool
+    let hideUntilAt: Date?
     let clearBeforeAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case conversationId = "conversation_id"
+        case isMuted = "is_muted"
+        case manualUnread = "manual_unread"
+        case hideUntilAt = "hide_until_at"
         case clearBeforeAt = "clear_before_at"
-    }
-}
-
-struct ConversationIDRow: Decodable {
-    let conversationId: UUID
-
-    enum CodingKeys: String, CodingKey {
-        case conversationId = "conversation_id"
     }
 }
 

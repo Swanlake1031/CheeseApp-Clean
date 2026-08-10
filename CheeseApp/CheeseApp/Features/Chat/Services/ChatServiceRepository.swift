@@ -480,57 +480,29 @@ struct ChatServiceRepository {
             .execute()
             .value
 
-        let clearMap = await conversationClearBeforeMap(userId: userId)
-        return stateUpdater.applyClearHistoryToPreviews(rows, clearMap: clearMap).sorted { lhs, rhs in
+        return rows.sorted { lhs, rhs in
             lhs.lastMessageAt > rhs.lastMessageAt
         }
     }
 
-    private func conversationClearBeforeMap(userId: UUID) async -> [UUID: Date] {
-        do {
-            let rows: [ConversationClearMarkerRow] = try await supabase
-                .database("user_conversation_settings")
-                .select("conversation_id,clear_before_at")
-                .eq("user_id", value: userId.uuidString)
-                .execute()
-                .value
-
-            return Dictionary(uniqueKeysWithValues: rows.compactMap { row in
-                guard let clearBeforeAt = row.clearBeforeAt else { return nil }
-                return (row.conversationId, clearBeforeAt)
-            })
-        } catch {
-            return [:]
-        }
-    }
-
     private func fetchMessageRequests(userId: UUID) async throws -> [ChatConversationPreview] {
-        do {
-            let rows: [ChatConversationPreview] = try await supabase.client
-                .rpc("get_user_message_requests", params: ChatGetUserMessageRequestsParams(pUserId: userId))
-                .execute()
-                .value
+        let rows: [ChatConversationPreview] = try await supabase.client
+            .rpc("get_user_message_requests", params: ChatGetUserMessageRequestsParams(pUserId: userId))
+            .execute()
+            .value
 
-            let clearMap = await conversationClearBeforeMap(userId: userId)
-            return stateUpdater.applyClearHistoryToPreviews(rows, clearMap: clearMap).sorted { lhs, rhs in
-                lhs.lastMessageAt > rhs.lastMessageAt
-            }
-        } catch {
-            return []
+        return rows.sorted { lhs, rhs in
+            lhs.lastMessageAt > rhs.lastMessageAt
         }
     }
 
     private func fetchUserChatGroups(userId: UUID) async throws -> [ChatGroupPreview] {
-        do {
-            let rows: [ChatGroupPreview] = try await supabase.client
-                .rpc("get_user_chat_groups", params: ChatGetUserChatGroupsParams(pUserId: userId))
-                .execute()
-                .value
+        let rows: [ChatGroupPreview] = try await supabase.client
+            .rpc("get_user_chat_groups", params: ChatGetUserChatGroupsParams(pUserId: userId))
+            .execute()
+            .value
 
-            return stateUpdater.sortGroupConversations(rows)
-        } catch {
-            return []
-        }
+        return stateUpdater.sortGroupConversations(rows)
     }
 
     private func groupPreviewContent(from message: GroupMessagePreviewRow?) -> String? {

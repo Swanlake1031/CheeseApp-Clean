@@ -11,40 +11,38 @@ import Supabase
 struct ChatPrivacyActions {
     private let supabase = SupabaseManager.shared
 
-    func fetchMutedConversationIDs(userId: UUID) async -> Set<UUID> {
-        await fetchConversationSettingsIDSet(
-            userId: userId,
-            flagColumn: "is_muted"
+    func fetchConversationListSettings(
+        userId: UUID
+    ) async throws -> ChatConversationListSettingsSnapshot {
+        let rows: [ConversationListSettingsRow] = try await supabase
+            .database("user_conversation_settings")
+            .select("conversation_id,is_muted,manual_unread,hide_until_at,clear_before_at")
+            .eq("user_id", value: userId.uuidString)
+            .execute()
+            .value
+
+        return ChatConversationListSettingsSnapshot(
+            mutedConversationIDs: Set(
+                rows.lazy.filter(\.isMuted).map(\.conversationId)
+            ),
+            manualUnreadConversationIDs: Set(
+                rows.lazy.filter(\.manualUnread).map(\.conversationId)
+            ),
+            hiddenConversationUntilMap: Dictionary(
+                uniqueKeysWithValues: rows.compactMap { row in
+                    row.hideUntilAt.map { (row.conversationId, $0) }
+                }
+            ),
+            clearBeforeMap: Dictionary(
+                uniqueKeysWithValues: rows.compactMap { row in
+                    row.clearBeforeAt.map { (row.conversationId, $0) }
+                }
+            )
         )
     }
 
-    func fetchManualUnreadConversationIDs(userId: UUID) async -> Set<UUID> {
-        await fetchConversationSettingsIDSet(
-            userId: userId,
-            flagColumn: "manual_unread"
-        )
-    }
-
-    func fetchHiddenConversationUntilMap(userId: UUID) async -> [UUID: Date] {
-        do {
-            let rows: [HiddenConversationUntilRow] = try await supabase
-                .database("user_conversation_settings")
-                .select("conversation_id,hide_until_at")
-                .eq("user_id", value: userId.uuidString)
-                .execute()
-                .value
-
-            return Dictionary(uniqueKeysWithValues: rows.compactMap { row in
-                guard let hideUntilAt = row.hideUntilAt else { return nil }
-                return (row.conversationId, hideUntilAt)
-            })
-        } catch {
-            return [:]
-        }
-    }
-
-    func fetchMutedGroupIDs(userId: UUID) async -> Set<UUID> {
-        await fetchGroupSettingsIDSet(
+    func fetchMutedGroupIDs(userId: UUID) async throws -> Set<UUID> {
+        try await fetchGroupSettingsIDSet(
             userId: userId,
             flagColumn: "is_muted"
         )
@@ -364,40 +362,18 @@ struct ChatPrivacyActions {
         }
     }
 
-    private func fetchConversationSettingsIDSet(
-        userId: UUID,
-        flagColumn: String
-    ) async -> Set<UUID> {
-        do {
-            let rows: [ConversationIDRow] = try await supabase
-                .database("user_conversation_settings")
-                .select("conversation_id")
-                .eq("user_id", value: userId.uuidString)
-                .eq(flagColumn, value: true)
-                .execute()
-                .value
-            return Set(rows.map(\.conversationId))
-        } catch {
-            return []
-        }
-    }
-
     private func fetchGroupSettingsIDSet(
         userId: UUID,
         flagColumn: String
-    ) async -> Set<UUID> {
-        do {
-            let rows: [GroupIDRow] = try await supabase
-                .database("user_chat_group_settings")
-                .select("group_id")
-                .eq("user_id", value: userId.uuidString)
-                .eq(flagColumn, value: true)
-                .execute()
-                .value
-            return Set(rows.map(\.groupId))
-        } catch {
-            return []
-        }
+    ) async throws -> Set<UUID> {
+        let rows: [GroupIDRow] = try await supabase
+            .database("user_chat_group_settings")
+            .select("group_id")
+            .eq("user_id", value: userId.uuidString)
+            .eq(flagColumn, value: true)
+            .execute()
+            .value
+        return Set(rows.map(\.groupId))
     }
 
     private func saveConversationSettings(
