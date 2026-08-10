@@ -38,10 +38,19 @@ struct ProfileFollowListView: View {
     @State private var newFollowerCount = 0
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var actionErrorMessage: String?
     @State private var removingEntryIDs: Set<UUID> = []
 
     private var canManageFollowers: Bool {
         mode == .followers && AuthService.shared.currentUser?.id == userId
+    }
+
+    private var canManageFollowing: Bool {
+        mode == .following && AuthService.shared.currentUser?.id == userId
+    }
+
+    private var showsRowManagementAction: Bool {
+        canManageFollowers || canManageFollowing
     }
 
     var body: some View {
@@ -99,6 +108,9 @@ struct ProfileFollowListView: View {
                                 if canManageFollowers {
                                     removeFollowerButton(entry)
                                         .padding(.trailing, 16)
+                                } else if canManageFollowing {
+                                    unfollowButton(entry)
+                                        .padding(.trailing, 16)
                                 }
                             }
 
@@ -123,6 +135,17 @@ struct ProfileFollowListView: View {
         .toolbarBackground(AppColors.pageBackground, for: .navigationBar)
         .task {
             await loadEntries()
+        }
+        .alert(
+            "操作失败",
+            isPresented: Binding(
+                get: { actionErrorMessage != nil },
+                set: { if !$0 { actionErrorMessage = nil } }
+            )
+        ) {
+            Button("确定", role: .cancel) {}
+        } message: {
+            Text(actionErrorMessage ?? "")
         }
     }
 
@@ -169,7 +192,7 @@ struct ProfileFollowListView: View {
                     .clipShape(Capsule())
             }
 
-            if !canManageFollowers {
+            if !showsRowManagementAction {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(AppColors.textMuted.opacity(0.6))
@@ -201,6 +224,34 @@ struct ProfileFollowListView: View {
         }
         .buttonStyle(.plain)
         .disabled(removingEntryIDs.contains(entry.id))
+    }
+
+    private func unfollowButton(_ entry: ProfileFollowListEntry) -> some View {
+        Button {
+            Task { await unfollow(entry) }
+        } label: {
+            Group {
+                if removingEntryIDs.contains(entry.id) {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Text("取消关注")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .foregroundStyle(AppColors.textPrimary)
+            .frame(minWidth: 60)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .background(AppColors.pageBackground)
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(AppColors.textMuted.opacity(0.25), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(removingEntryIDs.contains(entry.id))
+        .accessibilityLabel("取消关注\(entry.displayName)")
     }
 
     private func avatarFallback(name: String) -> some View {
@@ -243,7 +294,23 @@ struct ProfileFollowListView: View {
                 newFollowerCount = max(0, newFollowerCount - 1)
             }
         } catch {
-            errorMessage = error.localizedDescription
+            actionErrorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func unfollow(_ entry: ProfileFollowListEntry) async {
+        guard canManageFollowing,
+              !removingEntryIDs.contains(entry.id)
+        else { return }
+        removingEntryIDs.insert(entry.id)
+        defer { removingEntryIDs.remove(entry.id) }
+
+        do {
+            try await profileSocialService.unfollow(targetUserId: entry.id)
+            entries.removeAll { $0.id == entry.id }
+        } catch {
+            actionErrorMessage = error.localizedDescription
         }
     }
 }
