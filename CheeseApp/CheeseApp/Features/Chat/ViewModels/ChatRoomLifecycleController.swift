@@ -69,6 +69,13 @@ protocol ChatRoomTimelineMessage: Identifiable where ID == UUID {
 extension Message: ChatRoomTimelineMessage {}
 extension GroupMessage: ChatRoomTimelineMessage {}
 
+struct ChatRoomTimelineEntry<MessageType: ChatRoomTimelineMessage>: Identifiable {
+    let message: MessageType
+    let showsTimeSeparator: Bool
+
+    var id: UUID { message.id }
+}
+
 enum ChatRoomMessageTimeline {
     static func merge<MessageType: ChatRoomTimelineMessage>(
         _ incoming: [MessageType],
@@ -88,6 +95,24 @@ enum ChatRoomMessageTimeline {
             return lhs.id.uuidString < rhs.id.uuidString
         }
         return merged
+    }
+
+    static func entries<MessageType: ChatRoomTimelineMessage>(
+        for messages: [MessageType],
+        calendar: Calendar = .autoupdatingCurrent
+    ) -> [ChatRoomTimelineEntry<MessageType>] {
+        let ordered = merge(messages, into: [])
+        return ordered.enumerated().map { index, message in
+            let previousDate = index > 0 ? ordered[index - 1].createdAt : nil
+            return ChatRoomTimelineEntry(
+                message: message,
+                showsTimeSeparator: ChatTimeFormatter.shouldShowTimelineSeparator(
+                    before: message.createdAt,
+                    previousDate: previousDate,
+                    calendar: calendar
+                )
+            )
+        }
     }
 }
 

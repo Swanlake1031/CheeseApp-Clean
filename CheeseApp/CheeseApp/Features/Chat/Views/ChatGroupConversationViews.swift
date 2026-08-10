@@ -146,9 +146,12 @@ struct GroupChatRoomView: View {
                         InlineErrorBanner(text: error)
                     }
 
-                    ForEach(viewModel.messages) { message in
-                        messageBubble(message)
-                            .id(message.id)
+                    ForEach(ChatRoomMessageTimeline.entries(for: viewModel.messages)) { entry in
+                        if entry.showsTimeSeparator {
+                            ChatTimelineTimeSeparator(date: entry.message.createdAt)
+                        }
+                        messageBubble(entry.message)
+                            .id(entry.message.id)
                     }
 
                     Spacer(minLength: 10)
@@ -339,46 +342,39 @@ struct GroupChatRoomView: View {
     private func messageBubble(_ message: GroupMessage) -> some View {
         let isMine = currentUserID != nil && message.senderId == currentUserID
 
-        return VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
-            HStack(alignment: .center, spacing: 8) {
-                if isMine { Spacer(minLength: 40) }
-                if !isMine {
-                    Button {
-                        viewModel.openProfile(message.senderId)
-                    } label: {
-                        groupMessageAvatar(message: message, isMine: false, size: 30)
-                    }
-                    .buttonStyle(.plain)
+        return HStack(alignment: .center, spacing: 8) {
+            if isMine { Spacer(minLength: 40) }
+            if !isMine {
+                Button {
+                    viewModel.openProfile(message.senderId)
+                } label: {
+                    groupMessageAvatar(message: message, isMine: false, size: 30)
                 }
-
-                VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
-                    if !isMine {
-                        Text(message.senderName)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(AppColors.textMuted)
-                    }
-
-                    messageContentView(message, isMine: isMine)
-                        .contextMenu {
-                            groupMessageContextMenu(message, isMine: isMine)
-                        }
-                }
-
-                if isMine {
-                    Button {
-                        viewModel.openProfile(currentUserID)
-                    } label: {
-                        groupMessageAvatar(message: message, isMine: true, size: 30)
-                    }
-                    .buttonStyle(.plain)
-                }
-                if !isMine { Spacer(minLength: 40) }
+                .buttonStyle(.plain)
             }
 
-            Text(relativeTime(message.createdAt))
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 38)
+            VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
+                if !isMine {
+                    Text(message.senderName)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(AppColors.textMuted)
+                }
+
+                messageContentView(message, isMine: isMine)
+                    .contextMenu {
+                        groupMessageContextMenu(message, isMine: isMine)
+                    }
+            }
+
+            if isMine {
+                Button {
+                    viewModel.openProfile(currentUserID)
+                } label: {
+                    groupMessageAvatar(message: message, isMine: true, size: 30)
+                }
+                .buttonStyle(.plain)
+            }
+            if !isMine { Spacer(minLength: 40) }
         }
     }
 
@@ -507,10 +503,6 @@ struct GroupChatRoomView: View {
         case .userProfile(let userID):
             UserPostsView(userId: userID)
         }
-    }
-
-    private func relativeTime(_ date: Date) -> String {
-        ChatTimeFormatter.relativeString(from: date)
     }
 
     private func dismissDraftKeyboard() {

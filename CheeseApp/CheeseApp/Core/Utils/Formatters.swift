@@ -8,41 +8,88 @@
 import Foundation
 
 enum ChatTimeFormatter {
-    private static let clockFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        formatter.dateFormat = "HH:mm"
-        return formatter
-    }()
+    static let timelineSeparatorInterval: TimeInterval = 5 * 60
 
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        formatter.dateFormat = "MM/dd"
-        return formatter
-    }()
+    static func shouldShowTimelineSeparator(
+        before date: Date,
+        previousDate: Date?,
+        calendar: Calendar = .autoupdatingCurrent
+    ) -> Bool {
+        guard let previousDate else { return true }
+        if !calendar.isDate(date, inSameDayAs: previousDate) {
+            return true
+        }
+        return date.timeIntervalSince(previousDate) >= timelineSeparatorInterval
+    }
 
-    static func relativeString(from date: Date, relativeTo now: Date = Date()) -> String {
-        let interval = max(0, now.timeIntervalSince(date))
-        if interval < 60 {
-            return L10n.tr("Just now", "刚刚")
+    static func timelineString(
+        from date: Date,
+        relativeTo now: Date = Date(),
+        calendar: Calendar = .autoupdatingCurrent,
+        locale: Locale? = nil
+    ) -> String {
+        let resolvedLocale = locale ?? Locale(
+            identifier: AppLanguageStore.shared.current == .chinese ? "zh_CN" : "en_US"
+        )
+        let usesChineseLabels = resolvedLocale.identifier
+            .lowercased()
+            .hasPrefix("zh")
+        let clock = formatted(
+            date,
+            format: "HH:mm",
+            calendar: calendar,
+            locale: resolvedLocale
+        )
+
+        if calendar.isDate(date, inSameDayAs: now) {
+            return "\(usesChineseLabels ? "今天" : "Today") \(clock)"
         }
-        if interval < 3_600 {
-            return L10n.tr(
-                "\(Int(interval / 60))m ago",
-                "\(Int(interval / 60))分钟前"
+
+        if let yesterday = calendar.date(
+            byAdding: .day,
+            value: -1,
+            to: calendar.startOfDay(for: now)
+        ), calendar.isDate(date, inSameDayAs: yesterday) {
+            return "\(usesChineseLabels ? "昨天" : "Yesterday") \(clock)"
+        }
+
+        let isInCurrentWeek = calendar.component(.weekOfYear, from: date)
+            == calendar.component(.weekOfYear, from: now)
+            && calendar.component(.yearForWeekOfYear, from: date)
+            == calendar.component(.yearForWeekOfYear, from: now)
+        if isInCurrentWeek {
+            let weekday = formatted(
+                date,
+                format: "EEE",
+                calendar: calendar,
+                locale: resolvedLocale
             )
+            return "\(weekday) \(clock)"
         }
-        if Calendar.current.isDateInToday(date) {
-            return clockFormatter.string(from: date)
-        }
-        if interval < 7 * 86_400 {
-            return L10n.tr(
-                "\(Int(interval / 86_400))d ago",
-                "\(Int(interval / 86_400))天前"
-            )
-        }
-        return dateFormatter.string(from: date)
+
+        let isInCurrentYear = calendar.component(.year, from: date)
+            == calendar.component(.year, from: now)
+        let dateFormat = isInCurrentYear ? "MM-dd HH:mm" : "yyyy-MM-dd HH:mm"
+        return formatted(
+            date,
+            format: dateFormat,
+            calendar: calendar,
+            locale: resolvedLocale
+        )
+    }
+
+    private static func formatted(
+        _ date: Date,
+        format: String,
+        calendar: Calendar,
+        locale: Locale
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = locale
+        formatter.dateFormat = format
+        return formatter.string(from: date)
     }
 }
 

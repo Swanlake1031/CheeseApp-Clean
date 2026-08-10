@@ -103,6 +103,136 @@ final class ChatRoomLifecycleControllerTests: XCTestCase {
         XCTAssertEqual(merged.map(\.id), [first.id, second.id, third.id])
         XCTAssertEqual(merged.first?.content, "first")
     }
+
+    func testTimelineSeparatorsUseFiveMinuteThreshold() {
+        let baseDate = Date(timeIntervalSince1970: 1_710_000_000)
+        let messages = [
+            Message.fixture(id: UUID(), createdAt: baseDate, content: "first"),
+            Message.fixture(
+                id: UUID(),
+                createdAt: baseDate.addingTimeInterval(4 * 60),
+                content: "grouped"
+            ),
+            Message.fixture(
+                id: UUID(),
+                createdAt: baseDate.addingTimeInterval(9 * 60),
+                content: "new group"
+            )
+        ]
+
+        let entries = ChatRoomMessageTimeline.entries(for: messages)
+
+        XCTAssertEqual(entries.map(\.showsTimeSeparator), [true, false, true])
+    }
+
+    func testTimelineDateBoundaryAlwaysCreatesSeparator() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Toronto"))
+        let first = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 8, day: 9, hour: 23, minute: 59))
+        )
+        let second = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: 0))
+        )
+        let messages = [
+            Message.fixture(id: UUID(), createdAt: first, content: "before midnight"),
+            Message.fixture(id: UUID(), createdAt: second, content: "after midnight")
+        ]
+
+        let entries = ChatRoomMessageTimeline.entries(for: messages, calendar: calendar)
+
+        XCTAssertEqual(entries.map(\.showsTimeSeparator), [true, true])
+    }
+
+    func testPrependingHistoryRecomputesBoundaryWithoutDuplicateSeparator() {
+        let baseDate = Date(timeIntervalSince1970: 1_710_000_000)
+        let older = Message.fixture(id: UUID(), createdAt: baseDate, content: "older")
+        let formerFirst = Message.fixture(
+            id: UUID(),
+            createdAt: baseDate.addingTimeInterval(3 * 60),
+            content: "former first"
+        )
+        let newest = Message.fixture(
+            id: UUID(),
+            createdAt: baseDate.addingTimeInterval(4 * 60),
+            content: "newest"
+        )
+
+        let entries = ChatRoomMessageTimeline.entries(
+            for: [newest, older, formerFirst, formerFirst]
+        )
+
+        XCTAssertEqual(entries.map(\.message.id), [older.id, formerFirst.id, newest.id])
+        XCTAssertEqual(entries.map(\.showsTimeSeparator), [true, false, false])
+    }
+
+    func testTimelineTimeLabelsUseLocalCalendarBuckets() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Toronto"))
+        let locale = Locale(identifier: "zh_CN")
+        let now = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 15))
+        )
+        func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int) throws -> Date {
+            try XCTUnwrap(
+                calendar.date(
+                    from: DateComponents(
+                        year: year,
+                        month: month,
+                        day: day,
+                        hour: hour,
+                        minute: minute
+                    )
+                )
+            )
+        }
+
+        XCTAssertEqual(
+            ChatTimeFormatter.timelineString(
+                from: try date(2026, 8, 12, 11, 32),
+                relativeTo: now,
+                calendar: calendar,
+                locale: locale
+            ),
+            "今天 11:32"
+        )
+        XCTAssertEqual(
+            ChatTimeFormatter.timelineString(
+                from: try date(2026, 8, 11, 23, 18),
+                relativeTo: now,
+                calendar: calendar,
+                locale: locale
+            ),
+            "昨天 23:18"
+        )
+        XCTAssertEqual(
+            ChatTimeFormatter.timelineString(
+                from: try date(2026, 8, 10, 18, 20),
+                relativeTo: now,
+                calendar: calendar,
+                locale: locale
+            ),
+            "周一 18:20"
+        )
+        XCTAssertEqual(
+            ChatTimeFormatter.timelineString(
+                from: try date(2026, 8, 5, 14, 32),
+                relativeTo: now,
+                calendar: calendar,
+                locale: locale
+            ),
+            "08-05 14:32"
+        )
+        XCTAssertEqual(
+            ChatTimeFormatter.timelineString(
+                from: try date(2025, 12, 28, 20, 15),
+                relativeTo: now,
+                calendar: calendar,
+                locale: locale
+            ),
+            "2025-12-28 20:15"
+        )
+    }
 }
 
 private extension Message {

@@ -192,9 +192,12 @@ struct ChatRoomView: View {
                             .padding(.horizontal, 12)
                     }
 
-                    ForEach(viewModel.messages) { message in
-                        messageBubble(message)
-                            .id(message.id)
+                    ForEach(ChatRoomMessageTimeline.entries(for: viewModel.messages)) { entry in
+                        if entry.showsTimeSeparator {
+                            ChatTimelineTimeSeparator(date: entry.message.createdAt)
+                        }
+                        messageBubble(entry.message)
+                            .id(entry.message.id)
                     }
 
                     Spacer(minLength: 10)
@@ -551,38 +554,31 @@ struct ChatRoomView: View {
     private func messageBubble(_ message: Message) -> some View {
         let isMine = currentUserID != nil && message.senderId == currentUserID
 
-        return VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
-            HStack(alignment: .center, spacing: 8) {
-                if isMine { Spacer(minLength: 40) }
-                if !isMine {
-                    Button {
-                        viewModel.openOtherUserProfile()
-                    } label: {
-                        directMessageAvatar(isMine: false, size: 30)
-                    }
-                    .buttonStyle(.plain)
+        return HStack(alignment: .center, spacing: 8) {
+            if isMine { Spacer(minLength: 40) }
+            if !isMine {
+                Button {
+                    viewModel.openOtherUserProfile()
+                } label: {
+                    directMessageAvatar(isMine: false, size: 30)
                 }
-
-                ChatMessageContentView(
-                    message: message,
-                    isMine: isMine,
-                    onOpenPostRoute: viewModel.openLinkedPost,
-                    onOpenSharedPost: viewModel.openSharedPost
-                )
-                .contextMenu {
-                    messageContextMenu(message, isMine: isMine)
-                }
-
-                if isMine {
-                    directMessageAvatar(isMine: true, size: 30)
-                }
-                if !isMine { Spacer(minLength: 40) }
+                .buttonStyle(.plain)
             }
 
-            Text(relativeTime(message.createdAt))
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 38)
+            ChatMessageContentView(
+                message: message,
+                isMine: isMine,
+                onOpenPostRoute: viewModel.openLinkedPost,
+                onOpenSharedPost: viewModel.openSharedPost
+            )
+            .contextMenu {
+                messageContextMenu(message, isMine: isMine)
+            }
+
+            if isMine {
+                directMessageAvatar(isMine: true, size: 30)
+            }
+            if !isMine { Spacer(minLength: 40) }
         }
     }
 
@@ -817,10 +813,6 @@ struct ChatRoomView: View {
                     .font(.system(size: size * 0.46, weight: .bold))
                     .foregroundStyle(.gray)
             }
-    }
-
-    private func relativeTime(_ date: Date) -> String {
-        ChatTimeFormatter.relativeString(from: date)
     }
 
     private func dismissDraftKeyboard() {

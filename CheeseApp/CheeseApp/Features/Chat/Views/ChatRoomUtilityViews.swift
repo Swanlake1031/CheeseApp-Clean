@@ -7,6 +7,21 @@
 
 import SwiftUI
 
+struct ChatTimelineTimeSeparator: View {
+    let date: Date
+
+    var body: some View {
+        let label = ChatTimeFormatter.timelineString(from: date)
+
+        Text(label)
+            .font(.system(size: 11, weight: .regular))
+            .foregroundStyle(AppColors.textMuted.opacity(0.82))
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 4)
+            .accessibilityLabel(label)
+    }
+}
+
 struct ChatRoomHistoryView: View {
     let conversation: ChatConversationPreview
 
