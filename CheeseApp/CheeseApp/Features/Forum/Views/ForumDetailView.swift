@@ -161,11 +161,9 @@ struct ForumDetailView: View {
                 await reloadData()
             }
         }
-        .fullScreenCover(item: $sharingPost) { payload in
-            CheesePostShareBottomSheet(payload: payload) { targetName in
-                ShareFeedbackPresenter.show("已分享到 \(targetName)") {
-                    shareActionToastMessage = $0
-                }
+        .cheesePostSharePanel(item: $sharingPost) { targetName in
+            ShareFeedbackPresenter.show("已分享到 \(targetName)") {
+                shareActionToastMessage = $0
             }
         }
         .sheet(isPresented: $showingCommentComposer, onDismiss: {

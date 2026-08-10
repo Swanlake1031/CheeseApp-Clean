@@ -139,11 +139,9 @@ struct ProfileActivityView: View {
                 refreshGeneration &+= 1
             }
         }
-        .fullScreenCover(item: $sharingPost) { payload in
-            CheesePostShareBottomSheet(payload: payload) { message in
-                ShareFeedbackPresenter.show(message) {
-                    shareFeedbackMessage = $0
-                }
+        .cheesePostSharePanel(item: $sharingPost) { message in
+            ShareFeedbackPresenter.show(message) {
+                shareFeedbackMessage = $0
             }
         }
         .onChange(of: destination) { previous, current in

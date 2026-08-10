@@ -605,11 +605,9 @@ struct SecondhandDetailView: View {
                 try await secondhandService.updatePost(payload: payload)
             }
         }
-        .fullScreenCover(item: $sharingPost) { payload in
-            CheesePostShareBottomSheet(payload: payload) { targetName in
-                ShareFeedbackPresenter.show("已分享到 \(targetName)") { message in
-                    shareFeedbackMessage = message
-                }
+        .cheesePostSharePanel(item: $sharingPost) { targetName in
+            ShareFeedbackPresenter.show("已分享到 \(targetName)") { message in
+                shareFeedbackMessage = message
             }
         }
         .navigationDestination(item: $activeConversation) { conversation in

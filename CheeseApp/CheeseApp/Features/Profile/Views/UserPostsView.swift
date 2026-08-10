@@ -210,11 +210,9 @@ struct UserPostsView: View {
                     postKind: post.kind
                 )
             }
-            .fullScreenCover(item: $sharingPost) { payload in
-                CheesePostShareBottomSheet(payload: payload) { message in
-                    ShareFeedbackPresenter.show(message) {
-                        uidCopyFeedbackMessage = $0
-                    }
+            .cheesePostSharePanel(item: $sharingPost) { message in
+                ShareFeedbackPresenter.show(message) {
+                    uidCopyFeedbackMessage = $0
                 }
             }
     }

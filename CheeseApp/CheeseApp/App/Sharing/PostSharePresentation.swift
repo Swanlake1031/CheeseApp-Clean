@@ -134,13 +134,41 @@ extension View {
     func shareFeedbackToast(message: Binding<String?>) -> some View {
         modifier(ShareFeedbackToastModifier(message: message))
     }
+
+    func cheesePostSharePanel(
+        item: Binding<PostSharePayload?>,
+        onSent: @escaping (String) -> Void
+    ) -> some View {
+        modifier(CheesePostSharePanelPresenter(item: item, onSent: onSent))
+    }
+}
+
+private struct CheesePostSharePanelPresenter: ViewModifier {
+    @Binding var item: PostSharePayload?
+    let onSent: (String) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if let payload = item {
+                    CheesePostShareBottomSheet(
+                        payload: payload,
+                        onDismiss: { item = nil },
+                        onSent: onSent
+                    )
+                    .transition(.opacity)
+                    .zIndex(1_000)
+                }
+            }
+            .animation(.easeOut(duration: 0.18), value: item?.id)
+    }
 }
 
 struct CheesePostShareBottomSheet: View {
     let payload: PostSharePayload
+    let onDismiss: () -> Void
     let onSent: (String) -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @StateObject private var chatService = ChatService.shared
 
     @State private var sendingTargetId: String?
@@ -232,82 +260,83 @@ struct CheesePostShareBottomSheet: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Color.black.opacity(0.2)
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture { dismiss() }
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.2)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onDismiss() }
 
-            VStack(spacing: 0) {
-                ZStack {
-                    Text(L10n.tr("Share to", "分享给"))
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(AppColors.textPrimary)
+                VStack(spacing: 0) {
+                    ZStack {
+                        Text(L10n.tr("Share to", "分享给"))
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(AppColors.textPrimary)
 
-                    HStack {
-                        Spacer()
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(AppColors.textMuted)
-                                .frame(width: 34, height: 34)
-                                .background(Color.black.opacity(0.06))
-                                .clipShape(Circle())
+                        HStack {
+                            Spacer()
+                            Button {
+                                onDismiss()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(AppColors.textMuted)
+                                    .frame(width: 34, height: 34)
+                                    .background(Color.black.opacity(0.06))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 18)
-                .padding(.bottom, 12)
-
-                shareTargetsSection
-
-                Divider()
                     .padding(.horizontal, 18)
-                    .padding(.top, 6)
+                    .padding(.top, 18)
                     .padding(.bottom, 12)
 
-                ZStack(alignment: .top) {
-                    if selectedTargets.isEmpty {
-                        quickActionsSection
-                    } else {
-                        composeSection
+                    shareTargetsSection
+
+                    Divider()
+                        .padding(.horizontal, 18)
+                        .padding(.top, 6)
+                        .padding(.bottom, 12)
+
+                    ZStack(alignment: .top) {
+                        if selectedTargets.isEmpty {
+                            quickActionsSection
+                        } else {
+                            composeSection
+                        }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: selectedTargets.isEmpty ? 108 : 208, alignment: .topLeading)
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, max(10, bottomSafeAreaInset))
+
+                    if let statusMessage, !statusMessage.isEmpty {
+                        Text(statusMessage)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background((statusIsError ? Color.red : Color.black).opacity(0.82))
+                            .clipShape(Capsule())
+                            .padding(.bottom, 6)
                     }
                 }
-                .frame(maxWidth: .infinity, minHeight: selectedTargets.isEmpty ? 108 : 208, alignment: .topLeading)
-                .padding(.horizontal, 18)
-                .padding(.bottom, max(10, bottomSafeAreaInset))
-
-                if let statusMessage, !statusMessage.isEmpty {
-                    Text(statusMessage)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background((statusIsError ? Color.red : Color.black).opacity(0.82))
-                        .clipShape(Capsule())
-                        .padding(.bottom, 6)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: panelHeight, alignment: .top)
-            .background(AppColors.pageBackground)
-            .clipShape(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 28,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: 28,
-                    style: .continuous
+                .frame(width: geometry.size.width)
+                .frame(height: panelHeight, alignment: .top)
+                .background(AppColors.pageBackground)
+                .clipShape(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 28,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 28,
+                        style: .continuous
+                    )
                 )
-            )
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
-        .ignoresSafeArea(.container, edges: [.horizontal, .bottom])
-        .presentationBackground(.clear)
-        .interactiveDismissDisabled()
+        .ignoresSafeArea()
         .task {
             await loadShareTargets()
         }
@@ -559,7 +588,7 @@ struct CheesePostShareBottomSheet: View {
             } else {
                 onSent(L10n.tr("\(targets.count) chats", "\(targets.count)个聊天"))
             }
-            dismiss()
+            onDismiss()
         } catch {
             sendingTargetId = nil
             showStatus(error.localizedDescription, isError: true)
