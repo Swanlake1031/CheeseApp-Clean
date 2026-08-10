@@ -161,7 +161,7 @@ struct ForumDetailView: View {
                 await reloadData()
             }
         }
-        .sheet(item: $sharingPost) { payload in
+        .fullScreenCover(item: $sharingPost) { payload in
             CheesePostShareBottomSheet(payload: payload) { targetName in
                 ShareFeedbackPresenter.show("已分享到 \(targetName)") {
                     shareActionToastMessage = $0

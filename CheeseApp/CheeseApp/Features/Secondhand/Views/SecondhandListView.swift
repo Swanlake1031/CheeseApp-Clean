@@ -605,7 +605,7 @@ struct SecondhandDetailView: View {
                 try await secondhandService.updatePost(payload: payload)
             }
         }
-        .sheet(item: $sharingPost) { payload in
+        .fullScreenCover(item: $sharingPost) { payload in
             CheesePostShareBottomSheet(payload: payload) { targetName in
                 ShareFeedbackPresenter.show("已分享到 \(targetName)") { message in
                     shareFeedbackMessage = message

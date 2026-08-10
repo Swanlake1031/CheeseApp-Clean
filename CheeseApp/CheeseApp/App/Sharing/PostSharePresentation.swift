@@ -149,7 +149,6 @@ struct CheesePostShareBottomSheet: View {
     @State private var statusIsError = false
     @State private var selectedTargetIDs: Set<String> = []
     @State private var shareNote = ""
-    @State private var targetQuery = ""
     @State private var friendProfiles: [MutualFollowProfile] = []
     @State private var isLoadingFriends = false
     @State private var friendsErrorMessage: String?
@@ -215,18 +214,6 @@ struct CheesePostShareBottomSheet: View {
         return recent + friendTargets
     }
 
-    private var visibleTargets: [PostChatShareTarget] {
-        let normalized = targetQuery
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-        guard !normalized.isEmpty else { return allTargets }
-
-        return allTargets.filter {
-            $0.title.lowercased().contains(normalized)
-                || $0.subtitle.lowercased().contains(normalized)
-        }
-    }
-
     private var selectedTargets: [PostChatShareTarget] {
         allTargets.filter { selectedTargetIDs.contains($0.id) }
     }
@@ -239,40 +226,42 @@ struct CheesePostShareBottomSheet: View {
             .safeAreaInsets.bottom ?? 0
     }
 
-    private var preferredSheetHeight: CGFloat {
-        let minHeight: CGFloat = selectedTargets.isEmpty ? 338 : 446
-        let maxHeight = UIScreen.main.bounds.height * 0.78
-        return min(minHeight, maxHeight)
+    private var panelHeight: CGFloat {
+        let contentHeight: CGFloat = selectedTargets.isEmpty ? 322 : 430
+        return min(contentHeight + bottomSafeAreaInset, UIScreen.main.bounds.height * 0.72)
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
-                Capsule()
-                    .fill(Color.black.opacity(0.12))
-                    .frame(width: 38, height: 5)
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(0.2)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { dismiss() }
 
-                HStack {
+            VStack(spacing: 0) {
+                ZStack {
                     Text(L10n.tr("Share to", "分享给"))
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(AppColors.textPrimary)
-                    Spacer()
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(AppColors.textMuted)
-                            .frame(width: 32, height: 32)
-                            .background(Color.black.opacity(0.06))
-                            .clipShape(Circle())
+
+                    HStack {
+                        Spacer()
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(AppColors.textMuted)
+                                .frame(width: 34, height: 34)
+                                .background(Color.black.opacity(0.06))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 18)
-                .padding(.bottom, 14)
+                .padding(.top, 18)
+                .padding(.bottom, 12)
 
                 shareTargetsSection
 
@@ -290,7 +279,7 @@ struct CheesePostShareBottomSheet: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: selectedTargets.isEmpty ? 108 : 208, alignment: .topLeading)
                 .padding(.horizontal, 18)
-                .padding(.bottom, max(10, min(18, bottomSafeAreaInset * 0.45)))
+                .padding(.bottom, max(10, bottomSafeAreaInset))
 
                 if let statusMessage, !statusMessage.isEmpty {
                     Text(statusMessage)
@@ -303,19 +292,22 @@ struct CheesePostShareBottomSheet: View {
                         .padding(.bottom, 6)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .top)
+            .frame(maxWidth: .infinity)
+            .frame(height: panelHeight, alignment: .top)
+            .background(AppColors.pageBackground)
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 28,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 28,
+                    style: .continuous
+                )
+            )
         }
-        .frame(maxWidth: .infinity, alignment: .top)
-        .scrollBounceBehavior(.basedOnSize)
-        .background(
-            AppColors.pageBackground
-                .ignoresSafeArea()
-        )
-        .presentationDetents([.height(preferredSheetHeight)])
-        .presentationDragIndicator(.visible)
-        .presentationContentInteraction(.scrolls)
-        .presentationBackground(AppColors.pageBackground)
-        .presentationCornerRadius(28)
+        .ignoresSafeArea(.container, edges: [.horizontal, .bottom])
+        .presentationBackground(.clear)
+        .interactiveDismissDisabled()
         .task {
             await loadShareTargets()
         }
@@ -337,7 +329,7 @@ struct CheesePostShareBottomSheet: View {
                     .font(.system(size: 13))
                     .foregroundStyle(AppColors.textMuted)
             }
-            .frame(maxWidth: .infinity, minHeight: 158, maxHeight: 158)
+            .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112)
         } else if allTargets.isEmpty {
             VStack(spacing: 10) {
                 Image(systemName: "bubble.left.and.bubble.right")
@@ -357,66 +349,29 @@ struct CheesePostShareBottomSheet: View {
                     .foregroundStyle(AppColors.textMuted)
                     .multilineTextAlignment(.center)
             }
-            .frame(maxWidth: .infinity, minHeight: 158, maxHeight: 158)
+            .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112)
             .padding(.horizontal, 18)
         } else {
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(AppColors.textMuted)
-                    TextField(
-                        L10n.tr("Search friends or chats", "搜索好友或聊天"),
-                        text: $targetQuery
-                    )
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .font(.system(size: 13))
-
-                    if !targetQuery.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 14) {
+                    ForEach(allTargets) { target in
                         Button {
-                            targetQuery = ""
+                            toggleTargetSelection(target)
                         } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(AppColors.textMuted)
+                            PostChatShareTargetAvatar(
+                                target: target,
+                                isSending: sendingTargetId == target.id,
+                                isSelected: selectedTargetIDs.contains(target.id)
+                            )
                         }
                         .buttonStyle(.plain)
+                        .disabled(sendingTargetId != nil)
                     }
                 }
-                .padding(.horizontal, 12)
-                .frame(height: 36)
-                .background(Color.black.opacity(0.05))
-                .clipShape(Capsule())
                 .padding(.horizontal, 18)
-
-                if visibleTargets.isEmpty {
-                    Text(L10n.tr("No matching friend or chat", "没有匹配的好友或聊天"))
-                        .font(.system(size: 12))
-                        .foregroundStyle(AppColors.textMuted)
-                        .frame(maxWidth: .infinity, minHeight: 104)
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(alignment: .top, spacing: 14) {
-                            ForEach(visibleTargets) { target in
-                                Button {
-                                    toggleTargetSelection(target)
-                                } label: {
-                                    PostChatShareTargetAvatar(
-                                        target: target,
-                                        isSending: sendingTargetId == target.id,
-                                        isSelected: selectedTargetIDs.contains(target.id)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(sendingTargetId != nil)
-                            }
-                        }
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 4)
-                    }
-                    .frame(height: 104)
-                }
+                .padding(.vertical, 4)
             }
-            .frame(height: 148)
+            .frame(height: 112)
         }
     }
 

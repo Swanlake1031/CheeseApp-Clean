@@ -53,7 +53,7 @@ struct ForumListView: View {
                 feedReloadGeneration &+= 1
             }
         }
-        .sheet(item: $sharingPost) { payload in
+        .fullScreenCover(item: $sharingPost) { payload in
             CheesePostShareBottomSheet(payload: payload) { targetName in
                 ShareFeedbackPresenter.show("已分享到 \(targetName)") {
                     shareActionToastMessage = $0

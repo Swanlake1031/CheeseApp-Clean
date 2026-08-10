@@ -154,7 +154,7 @@ struct HomeView: View {
         .navigationDestination(item: $selectedProfileRoute) { route in
             UserPostsView(userId: route.id)
         }
-        .sheet(item: $sharingPost) { payload in
+        .fullScreenCover(item: $sharingPost) { payload in
             CheesePostShareBottomSheet(payload: payload) { targetName in
                 ShareFeedbackPresenter.show("已分享到 \(targetName)") {
                     shareActionToastMessage = $0
