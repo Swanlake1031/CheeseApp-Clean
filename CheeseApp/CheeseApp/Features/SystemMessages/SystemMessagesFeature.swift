@@ -10,6 +10,48 @@ enum SystemMessageKind: String, Decodable, Hashable {
     case commentReply = "comment_reply"
     case follow
     case secondhandAvailability = "secondhand_availability"
+
+    var category: SystemMessageCategory {
+        switch self {
+        case .automatic, .secondhandAvailability:
+            return .system
+        case .mention, .postLike, .commentLike, .postComment, .commentReply, .follow:
+            return .interaction
+        }
+    }
+}
+
+enum SystemMessageCategory: String, Codable, CaseIterable, Hashable {
+    case system
+    case interaction
+
+    var title: String {
+        switch self {
+        case .system: return "系统消息"
+        case .interaction: return "互动消息"
+        }
+    }
+
+    var emptyTitle: String {
+        switch self {
+        case .system: return "还没有系统消息"
+        case .interaction: return "还没有互动消息"
+        }
+    }
+
+    var emptyDescription: String {
+        switch self {
+        case .system: return "应用通知和商品状态提醒会显示在这里。"
+        case .interaction: return "评论、回复、提及、点赞和关注会显示在这里。"
+        }
+    }
+
+    var fallbackPreview: String {
+        switch self {
+        case .system: return "应用通知与商品状态提醒"
+        case .interaction: return "评论、回复、提及、点赞与关注"
+        }
+    }
 }
 
 enum SystemMessageCTA: String, Decodable, Hashable {
@@ -71,11 +113,28 @@ struct SystemMessagePage {
     let nextCursor: SystemMessageCursor?
 }
 
+struct SystemMessageInboxSummary: Decodable, Hashable {
+    let category: SystemMessageCategory
+    let latestTitle: String?
+    let latestBody: String?
+    let latestCreatedAt: Date?
+    let unreadCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case category
+        case latestTitle = "latest_title"
+        case latestBody = "latest_body"
+        case latestCreatedAt = "latest_created_at"
+        case unreadCount = "unread_count"
+    }
+}
+
 @MainActor
 final class SystemMessageService: ObservableObject {
     static let shared = SystemMessageService()
 
     @Published private(set) var unreadCount = 0
+    @Published private(set) var inboxSummaries: [SystemMessageCategory: SystemMessageInboxSummary] = [:]
     @Published private(set) var accountGeneration: UInt64 = 0
 
     private let supabase = SupabaseManager.shared
@@ -103,14 +162,16 @@ final class SystemMessageService: ObservableObject {
     }
 
     func loadPage(
+        category: SystemMessageCategory,
         after cursor: SystemMessageCursor? = nil,
         limit: Int = 30
     ) async throws -> SystemMessagePage {
         let requestGeneration = try requestGeneration()
         let rows: [SystemMessageItem] = try await supabase.client
             .rpc(
-                "get_system_messages_page",
+                "get_system_messages_page_by_category",
                 params: SystemMessagesPageParams(
+                    category: category.rawValue,
                     beforeCreatedAt: cursor?.createdAt,
                     beforeID: cursor?.id,
                     limit: limit
@@ -158,19 +219,39 @@ final class SystemMessageService: ObservableObject {
 
     private func performUnreadCountRefresh(generation requestGeneration: UInt64) async {
         do {
-            let count: Int = try await supabase.client
-                .rpc("get_system_message_unread_count")
+            let summaries: [SystemMessageInboxSummary] = try await supabase.client
+                .rpc("get_system_message_inbox_summaries")
                 .execute()
                 .value
             try ensureCurrent(generation: requestGeneration)
-            unreadCount = max(count, 0)
+            inboxSummaries = Dictionary(
+                uniqueKeysWithValues: summaries.map { ($0.category, $0) }
+            )
+            unreadCount = summaries.reduce(0) { partial, summary in
+                partial + max(summary.unreadCount, 0)
+            }
         } catch {
             guard isCurrent(generation: requestGeneration) else { return }
-            unreadCount = 0
+            do {
+                let count: Int = try await supabase.client
+                    .rpc("get_system_message_unread_count")
+                    .execute()
+                    .value
+                try ensureCurrent(generation: requestGeneration)
+                unreadCount = max(count, 0)
+                inboxSummaries = [:]
+            } catch {
+                guard isCurrent(generation: requestGeneration) else { return }
+                unreadCount = 0
+                inboxSummaries = [:]
+            }
         }
     }
 
-    func markRead(messageID: UUID) async throws {
+    func markRead(
+        messageID: UUID,
+        category: SystemMessageCategory
+    ) async throws {
         let requestGeneration = try requestGeneration()
         let _: Bool = try await supabase.client
             .rpc(
@@ -181,16 +262,21 @@ final class SystemMessageService: ObservableObject {
             .value
         try ensureCurrent(generation: requestGeneration)
         unreadCount = max(unreadCount - 1, 0)
+        updateUnreadSummary(category: category) { max($0 - 1, 0) }
     }
 
-    func markAllRead() async throws {
+    func markAllRead(category: SystemMessageCategory) async throws {
         let requestGeneration = try requestGeneration()
-        let _: Int = try await supabase.client
-            .rpc("mark_all_system_messages_read")
+        let markedCount: Int = try await supabase.client
+            .rpc(
+                "mark_all_system_messages_read_by_category",
+                params: SystemMessageCategoryParams(category: category.rawValue)
+            )
             .execute()
             .value
         try ensureCurrent(generation: requestGeneration)
-        unreadCount = 0
+        unreadCount = max(unreadCount - max(markedCount, 0), 0)
+        updateUnreadSummary(category: category) { _ in 0 }
     }
 
     func respondToSecondhand(
@@ -222,6 +308,21 @@ final class SystemMessageService: ObservableObject {
         accountGeneration &+= 1
         stateOwnerID = ownerID
         unreadCount = 0
+        inboxSummaries = [:]
+    }
+
+    private func updateUnreadSummary(
+        category: SystemMessageCategory,
+        transform: (Int) -> Int
+    ) {
+        guard let summary = inboxSummaries[category] else { return }
+        inboxSummaries[category] = SystemMessageInboxSummary(
+            category: summary.category,
+            latestTitle: summary.latestTitle,
+            latestBody: summary.latestBody,
+            latestCreatedAt: summary.latestCreatedAt,
+            unreadCount: transform(summary.unreadCount)
+        )
     }
 
     private func requestGeneration() throws -> UInt64 {
@@ -266,6 +367,7 @@ final class SystemMessageViewModel: ObservableObject {
     @Published var actionMessage: String?
 
     private let pageSize: Int
+    let category: SystemMessageCategory
     private let loadPage: PageLoader
     private let markReadAction: MessageAction
     private let markAllReadAction: () async throws -> Void
@@ -274,19 +376,11 @@ final class SystemMessageViewModel: ObservableObject {
     private var ownerID: UUID?
 
     init(
+        category: SystemMessageCategory = .system,
         pageSize: Int = 30,
-        loadPage: @escaping PageLoader = {
-            try await SystemMessageService.shared.loadPage(
-                after: $0,
-                limit: $1
-            )
-        },
-        markRead: @escaping MessageAction = {
-            try await SystemMessageService.shared.markRead(messageID: $0)
-        },
-        markAllRead: @escaping () async throws -> Void = {
-            try await SystemMessageService.shared.markAllRead()
-        },
+        loadPage: PageLoader? = nil,
+        markRead: MessageAction? = nil,
+        markAllRead: (() async throws -> Void)? = nil,
         respondToSecondhand: @escaping AvailabilityAction = {
             try await SystemMessageService.shared.respondToSecondhand(
                 postID: $0,
@@ -294,10 +388,24 @@ final class SystemMessageViewModel: ObservableObject {
             )
         }
     ) {
+        self.category = category
         self.pageSize = pageSize
-        self.loadPage = loadPage
-        self.markReadAction = markRead
-        self.markAllReadAction = markAllRead
+        self.loadPage = loadPage ?? { cursor, limit in
+            try await SystemMessageService.shared.loadPage(
+                category: category,
+                after: cursor,
+                limit: limit
+            )
+        }
+        self.markReadAction = markRead ?? { messageID in
+            try await SystemMessageService.shared.markRead(
+                messageID: messageID,
+                category: category
+            )
+        }
+        self.markAllReadAction = markAllRead ?? {
+            try await SystemMessageService.shared.markAllRead(category: category)
+        }
         self.availabilityAction = respondToSecondhand
     }
 
@@ -430,14 +538,24 @@ final class SystemMessageViewModel: ObservableObject {
 }
 
 private struct SystemMessagesPageParams: Encodable {
+    let category: String
     let beforeCreatedAt: Date?
     let beforeID: UUID?
     let limit: Int
 
     enum CodingKeys: String, CodingKey {
+        case category = "p_category"
         case beforeCreatedAt = "p_before_created_at"
         case beforeID = "p_before_id"
         case limit = "p_limit"
+    }
+}
+
+private struct SystemMessageCategoryParams: Encodable {
+    let category: String
+
+    enum CodingKeys: String, CodingKey {
+        case category = "p_category"
     }
 }
 

@@ -4,11 +4,25 @@ struct SystemMessageTimelineView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
     @StateObject private var service = SystemMessageService.shared
-    @StateObject private var viewModel = SystemMessageViewModel()
+    @StateObject private var viewModel: SystemMessageViewModel
     @State private var pendingSoldMessage: SystemMessageItem?
 
+    let category: SystemMessageCategory
     let onOpenPost: (PostDeepLinkRoute) -> Void
     let onOpenProfile: (UUID) -> Void
+
+    init(
+        category: SystemMessageCategory,
+        onOpenPost: @escaping (PostDeepLinkRoute) -> Void,
+        onOpenProfile: @escaping (UUID) -> Void
+    ) {
+        self.category = category
+        self.onOpenPost = onOpenPost
+        self.onOpenProfile = onOpenProfile
+        _viewModel = StateObject(
+            wrappedValue: SystemMessageViewModel(category: category)
+        )
+    }
 
     var body: some View {
         ZStack {
@@ -38,7 +52,7 @@ struct SystemMessageTimelineView: View {
                 }
                 .buttonStyle(.plain)
             } center: {
-                Text("系统消息")
+                Text(category.title)
                     .font(.system(size: 17, weight: .semibold))
             } trailing: {
                 Button("全部已读") {
@@ -78,7 +92,7 @@ struct SystemMessageTimelineView: View {
             Text("「\(item.title)」会从二手列表下架。")
         }
         .alert(
-            "系统消息",
+            category.title,
             isPresented: Binding(
                 get: { viewModel.actionMessage != nil },
                 set: { if !$0 { viewModel.actionMessage = nil } }
@@ -144,7 +158,7 @@ struct SystemMessageTimelineView: View {
     private var loadingState: some View {
         VStack(spacing: 10) {
             ProgressView()
-            Text("正在加载系统消息…")
+            Text("正在加载\(category.title)…")
                 .font(.system(size: 13))
                 .foregroundStyle(AppColors.textMuted)
         }
@@ -152,12 +166,12 @@ struct SystemMessageTimelineView: View {
 
     private var emptyState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "bell.slash")
+            Image(systemName: category == .system ? "bell.slash" : "heart.slash")
                 .font(.system(size: 40))
                 .foregroundStyle(AppColors.textMuted)
-            Text("还没有系统消息")
+            Text(category.emptyTitle)
                 .font(.system(size: 16, weight: .semibold))
-            Text("回复、评论、提及、点赞、关注和商品状态提醒会显示在这里。")
+            Text(category.emptyDescription)
                 .font(.system(size: 13))
                 .foregroundStyle(AppColors.textMuted)
                 .multilineTextAlignment(.center)

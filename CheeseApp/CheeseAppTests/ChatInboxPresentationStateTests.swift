@@ -2,7 +2,7 @@ import XCTest
 @testable import CheeseApp
 
 final class ChatInboxPresentationStateTests: XCTestCase {
-    func testBrowsingStateKeepsMessageRequestShortcutAndPrimarySections() {
+    func testBrowsingStateKeepsPrimaryConversationSectionsSeparateFromInboxCategories() {
         let request = ChatConversationPreview.fixture(
             id: UUID(uuidString: "70000000-0000-0000-0000-000000000001")!,
             otherUserName: "陌生人",
@@ -29,12 +29,11 @@ final class ChatInboxPresentationStateTests: XCTestCase {
             ]
         )
 
-        XCTAssertTrue(state.showsMessageRequestsShortcut)
         XCTAssertEqual(state.visibleSections.map(\.kind), [.groups, .directMessages])
         XCTAssertEqual(state.visibleItemCount, 2)
     }
 
-    func testSearchMatchesConversationRemarkAndHidesShortcut() {
+    func testSearchMatchesConversationRemark() {
         let direct = ChatConversationPreview.fixture(
             id: UUID(uuidString: "70000000-0000-0000-0000-000000000011")!,
             otherUserName: "Alex",
@@ -49,7 +48,6 @@ final class ChatInboxPresentationStateTests: XCTestCase {
             displayNamesByConversationId: [direct.id: "新室友"]
         )
 
-        XCTAssertFalse(state.showsMessageRequestsShortcut)
         XCTAssertEqual(state.visibleSections.map(\.kind), [.directMessages])
         XCTAssertEqual(state.visibleItemCount, 1)
 
@@ -62,6 +60,22 @@ final class ChatInboxPresentationStateTests: XCTestCase {
         }
 
         XCTAssertEqual(matchedConversation.id, direct.id)
+    }
+
+    func testNotificationCategoryRoutesHaveStableDistinctIdentities() {
+        XCTAssertEqual(
+            ChatInboxRoute.systemMessages(.system).id,
+            "system-messages:system"
+        )
+        XCTAssertEqual(
+            ChatInboxRoute.systemMessages(.interaction).id,
+            "system-messages:interaction"
+        )
+        XCTAssertNotEqual(
+            ChatInboxRoute.systemMessages(.system).id,
+            ChatInboxRoute.systemMessages(.interaction).id
+        )
+        XCTAssertEqual(ChatInboxRoute.messageRequests.id, "message-requests")
     }
 
     func testSearchMatchesGroupNameAndReportsEmptyStateWhenNothingMatches() {

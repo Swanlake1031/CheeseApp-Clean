@@ -248,7 +248,7 @@ struct NotificationNavigationAction: Identifiable, Equatable {
 enum NotificationNavigationTarget: Equatable {
     case conversation(UUID)
     case group(UUID)
-    case systemMessages(UUID?)
+    case systemMessages(UUID?, SystemMessageCategory?)
     case post(PostDeepLinkRoute)
 }
 
@@ -272,7 +272,13 @@ private enum RemoteNotificationPayloadParser {
                 firstUUIDValue(
                     userInfo,
                     keys: ["system_message_id", "systemMessageId", "id"]
+                ),
+                firstStringValue(
+                    userInfo,
+                    keys: ["notification_kind", "notificationKind"]
                 )
+                .flatMap(SystemMessageKind.init(rawValue:))?
+                .category
             )
 
         case "post", "content", "deep_link", "deep-link":

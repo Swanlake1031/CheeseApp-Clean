@@ -8,6 +8,15 @@ final class SystemMessageViewModelTests: XCTestCase {
         XCTAssertEqual(SystemMessageKind(rawValue: "comment_reply"), .commentReply)
     }
 
+    func testNotificationKindsMapToSeparatedInboxCategories() {
+        XCTAssertEqual(SystemMessageKind.automatic.category, .system)
+        XCTAssertEqual(SystemMessageKind.secondhandAvailability.category, .system)
+        XCTAssertEqual(SystemMessageKind.postComment.category, .interaction)
+        XCTAssertEqual(SystemMessageKind.commentReply.category, .interaction)
+        XCTAssertEqual(SystemMessageKind.postLike.category, .interaction)
+        XCTAssertEqual(SystemMessageKind.follow.category, .interaction)
+    }
+
     func testAccountSwitchClearsItemsAndDiscardsLatePage() async {
         let accountA = UUID(uuidString: "a9100000-0000-4000-8000-000000000001")!
         let accountB = UUID(uuidString: "b9100000-0000-4000-8000-000000000001")!

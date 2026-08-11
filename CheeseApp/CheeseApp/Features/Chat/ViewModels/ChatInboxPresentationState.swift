@@ -1,7 +1,7 @@
 import Foundation
 
 enum ChatInboxRoute: Hashable, Identifiable {
-    case systemMessages
+    case systemMessages(SystemMessageCategory)
     case messageRequests
     case group(ChatGroupPreview)
     case conversation(ChatConversationPreview)
@@ -9,8 +9,8 @@ enum ChatInboxRoute: Hashable, Identifiable {
 
     var id: String {
         switch self {
-        case .systemMessages:
-            return "system-messages"
+        case .systemMessages(let category):
+            return "system-messages:\(category.rawValue)"
         case .messageRequests:
             return "message-requests"
         case .group(let group):
@@ -82,10 +82,6 @@ struct ChatInboxPresentationState {
 
     var isSearching: Bool {
         !searchTokens.isEmpty
-    }
-
-    var showsMessageRequestsShortcut: Bool {
-        !isSearching && !messageRequests.isEmpty
     }
 
     var visibleSections: [ChatInboxSection] {

@@ -110,52 +110,28 @@ struct ChatListView: View {
                     .foregroundStyle(AppColors.textPrimary)
                     .lineLimit(1)
             } trailing: {
-                HStack(spacing: 14) {
+                Menu {
                     Button {
-                        activeRoute = .messageRequests
+                        activeSheetDestination = .createGroup
                     } label: {
-                        ZStack(alignment: .topTrailing) {
-                            PostToolbarIconCircle(
-                                icon: chatService.messageRequests.isEmpty ? "person.crop.circle" : "person.crop.circle.badge.exclamationmark"
-                            )
-
-                            if !chatService.messageRequests.isEmpty {
-                                Text("\(min(chatService.messageRequests.count, 99))")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(Color.red)
-                                    .clipShape(Capsule())
-                                    .offset(x: 12, y: -9)
-                            }
-                        }
+                        Label("创建群聊", systemImage: "person.3.fill")
                     }
-                    .buttonStyle(.plain)
 
-                    Menu {
-                        Button {
-                            activeSheetDestination = .createGroup
-                        } label: {
-                            Label("创建群聊", systemImage: "person.3.fill")
-                        }
-
-                        Button {
-                            activeSheetDestination = .addFollow
-                        } label: {
-                            Label("新增关注", systemImage: "person.badge.plus")
-                        }
-
-                        Divider()
-
-                        Button {
-                            Task { await chatService.refreshConversations() }
-                        } label: {
-                            Label("刷新消息", systemImage: "arrow.clockwise")
-                        }
+                    Button {
+                        activeSheetDestination = .addFollow
                     } label: {
-                        PostToolbarIconCircle(icon: "plus")
+                        Label("新增关注", systemImage: "person.badge.plus")
                     }
+
+                    Divider()
+
+                    Button {
+                        Task { await chatService.refreshConversations() }
+                    } label: {
+                        Label("刷新消息", systemImage: "arrow.clockwise")
+                    }
+                } label: {
+                    PostToolbarIconCircle(icon: "plus")
                 }
             }
 
@@ -208,8 +184,8 @@ struct ChatListView: View {
                 rowActionErrorMessage = error.localizedDescription
             }
 
-        case .systemMessages:
-            activeRoute = .systemMessages
+        case .systemMessages(_, let category):
+            activeRoute = .systemMessages(category ?? .system)
             notificationRouter.consume(action)
 
         case .post:
@@ -217,52 +193,11 @@ struct ChatListView: View {
         }
     }
 
-    private var messageRequestsEntry: some View {
-        Button {
-            activeRoute = .messageRequests
-        } label: {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(AppColors.textPrimary.opacity(0.08))
-                    .frame(width: 44, height: 44)
-                    .overlay {
-                        Image(systemName: "person.crop.circle.badge.exclamationmark")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(AppColors.textPrimary)
-                    }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("陌生人消息")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(AppColors.textPrimary)
-
-                    Text("共 \(chatService.messageRequests.count) 个等待处理")
-                        .font(.system(size: 12))
-                        .foregroundStyle(AppColors.textMuted)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(AppColors.textMuted)
-            }
-            .padding(12)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .cheeseCardChrome(cornerRadius: 14)
-        }
-        .buttonStyle(CheeseContainerButtonStyle())
-    }
-
     private var conversationListContent: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 14) {
-                systemMessagesEntry
-                    .padding(.horizontal, 16)
-
-                if inboxState.showsMessageRequestsShortcut {
-                    messageRequestsEntry
+                if !inboxState.isSearching {
+                    inboxCategoryEntries
                         .padding(.horizontal, 16)
                 }
 
@@ -323,7 +258,7 @@ struct ChatListView: View {
     private var emptyState: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 18) {
-                systemMessagesEntry
+                inboxCategoryEntries
 
                 Image(systemName: "bubble.left.and.bubble.right")
                     .font(.system(size: 52))
@@ -342,51 +277,127 @@ struct ChatListView: View {
         }
     }
 
-    private var systemMessagesEntry: some View {
-        Button {
-            activeRoute = .systemMessages
-        } label: {
-            HStack(spacing: 12) {
+    private var inboxCategoryEntries: some View {
+        VStack(spacing: 0) {
+            systemCategoryEntry(.system)
+
+            Divider()
+                .padding(.leading, 76)
+
+            systemCategoryEntry(.interaction)
+
+            Divider()
+                .padding(.leading, 76)
+
+            inboxCategoryEntry(
+                title: "陌生人消息",
+                preview: strangerMessagePreview,
+                icon: "bubble.left.fill",
+                tint: Color(red: 1.0, green: 0.36, blue: 0.39),
+                date: latestMessageRequest?.lastMessageAt,
+                unreadCount: strangerMessageBadgeCount
+            ) {
+                activeRoute = .messageRequests
+            }
+        }
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .cheeseCardChrome(cornerRadius: 20)
+    }
+
+    private func systemCategoryEntry(_ category: SystemMessageCategory) -> some View {
+        let summary = systemMessageService.inboxSummaries[category]
+        return inboxCategoryEntry(
+            title: category.title,
+            preview: summary?.latestBody ?? category.fallbackPreview,
+            icon: category == .system ? "bell.fill" : "bolt.fill",
+            tint: category == .system ? Color.blue : AppColors.likeActive,
+            date: summary?.latestCreatedAt,
+            unreadCount: summary?.unreadCount ?? 0
+        ) {
+            activeRoute = .systemMessages(category)
+        }
+    }
+
+    private func inboxCategoryEntry(
+        title: String,
+        preview: String,
+        icon: String,
+        tint: Color,
+        date: Date?,
+        unreadCount: Int,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
                 Circle()
-                    .fill(AppColors.accent.opacity(0.2))
-                    .frame(width: 46, height: 46)
+                    .fill(tint)
+                    .frame(width: 48, height: 48)
                     .overlay {
-                        Image(systemName: "bell.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(AppColors.link)
+                        Image(systemName: icon)
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(.white)
                     }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("系统消息")
-                        .font(.system(size: 15, weight: .semibold))
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(AppColors.textPrimary)
-                    Text("回复、评论、提及、点赞、关注与商品提醒")
-                        .font(.system(size: 12))
+
+                    Text(preview)
+                        .font(.system(size: 13))
                         .foregroundStyle(AppColors.textMuted)
+                        .lineLimit(1)
                 }
 
-                Spacer()
+                Spacer(minLength: 8)
 
-                if systemMessageService.unreadCount > 0 {
-                    Text("\(min(systemMessageService.unreadCount, 99))")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 4)
-                        .background(Color.red)
-                        .clipShape(Capsule())
+                VStack(alignment: .trailing, spacing: 7) {
+                    if let date {
+                        Text(Formatters.formatCompactTimeAgo(date, useJustNow: true))
+                            .font(.system(size: 11))
+                            .foregroundStyle(AppColors.textMuted.opacity(0.85))
+                            .lineLimit(1)
+                    }
+
+                    if unreadCount > 0 {
+                        Text("\(min(unreadCount, 99))")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .frame(minWidth: 20, minHeight: 20)
+                            .background(Color.red)
+                            .clipShape(Capsule())
+                    }
                 }
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(AppColors.textMuted)
             }
-            .padding(13)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .cheeseCardChrome(cornerRadius: 16)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(CheeseContainerButtonStyle())
+        .buttonStyle(.plain)
+    }
+
+    private var latestMessageRequest: ChatConversationPreview? {
+        chatService.messageRequests.max { $0.lastMessageAt < $1.lastMessageAt }
+    }
+
+    private var strangerMessageBadgeCount: Int {
+        let unread = chatService.messageRequests.reduce(0) { partial, conversation in
+            partial + max(conversation.unreadCount, 0)
+        }
+        return unread > 0 ? unread : chatService.messageRequests.count
+    }
+
+    private var strangerMessagePreview: String {
+        guard let latestMessageRequest else { return "暂无陌生人消息" }
+        let name = chatService.displayName(for: latestMessageRequest)
+        let message = latestMessageRequest.lastMessagePreview?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let message, !message.isEmpty else {
+            return "\(name) 发来陌生人消息"
+        }
+        return "\(name)：\(message)"
     }
 
     private var loadingState: some View {
@@ -490,8 +501,9 @@ struct ChatListView: View {
     @ViewBuilder
     private func destinationView(_ route: ChatInboxRoute) -> some View {
         switch route {
-        case .systemMessages:
+        case .systemMessages(let category):
             SystemMessageTimelineView(
+                category: category,
                 onOpenPost: { route in
                     postDeepLinkCoordinator.openRoute(
                         route,

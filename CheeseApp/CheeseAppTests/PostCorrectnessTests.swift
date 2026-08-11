@@ -392,7 +392,7 @@ final class PostCorrectnessTests: XCTestCase {
             .chat
         )
         XCTAssertEqual(
-            AppTabNavigationPolicy.tab(for: .systemMessages(nil)),
+            AppTabNavigationPolicy.tab(for: .systemMessages(nil, nil)),
             .chat
         )
     }
