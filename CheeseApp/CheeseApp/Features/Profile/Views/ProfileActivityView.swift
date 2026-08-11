@@ -951,30 +951,49 @@ private struct ProfileActivityRow: View {
                 HStack(spacing: 10) {
                     Spacer()
 
-                    Button(action: onShare) {
-                        HStack(spacing: 5) {
-                            Text("分享")
-                            Image(systemName: "square.and.arrow.up")
+                    if isPrivate {
+                        Button {
+                            onSetPrivacy(false)
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text("恢复公开")
+                                Image(systemName: "eye")
+                            }
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(AppColors.textPrimary)
+                            .padding(.horizontal, 12)
+                            .frame(height: 32)
+                            .background(AppColors.accent.opacity(0.24))
+                            .clipShape(Capsule())
                         }
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(AppColors.textPrimary)
-                        .padding(.horizontal, 12)
-                        .frame(height: 32)
-                        .background(Color(.systemGray6))
-                        .clipShape(Capsule())
+                        .buttonStyle(.plain)
+                        .disabled(isPublishedActionDisabled)
+                        .accessibilityLabel("恢复公开帖子")
+                    } else {
+                        Button(action: onShare) {
+                            HStack(spacing: 5) {
+                                Text("分享")
+                                Image(systemName: "square.and.arrow.up")
+                            }
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(AppColors.textPrimary)
+                            .padding(.horizontal, 12)
+                            .frame(height: 32)
+                            .background(Color(.systemGray6))
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isPublishedActionDisabled)
+                        .accessibilityLabel("分享帖子")
                     }
-                    .buttonStyle(.plain)
-                    .disabled(isPublishedActionDisabled)
-                    .accessibilityLabel("分享帖子")
 
                     Menu {
-                        Button {
-                            onSetPrivacy(!isPrivate)
-                        } label: {
-                            Label(
-                                isPrivate ? "恢复公开" : "隐藏",
-                                systemImage: isPrivate ? "eye" : "eye.slash"
-                            )
+                        if !isPrivate {
+                            Button {
+                                onSetPrivacy(true)
+                            } label: {
+                                Label("隐藏", systemImage: "eye.slash")
+                            }
                         }
 
                         Button {
@@ -983,10 +1002,12 @@ private struct ProfileActivityRow: View {
                             Label("编辑", systemImage: "square.and.pencil")
                         }
 
-                        Button {
-                            onShare()
-                        } label: {
-                            Label("分享", systemImage: "square.and.arrow.up")
+                        if !isPrivate {
+                            Button {
+                                onShare()
+                            } label: {
+                                Label("分享", systemImage: "square.and.arrow.up")
+                            }
                         }
 
                         Divider()
