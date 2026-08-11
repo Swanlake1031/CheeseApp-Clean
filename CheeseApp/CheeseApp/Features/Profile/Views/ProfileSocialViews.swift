@@ -89,7 +89,7 @@ struct ProfileFollowListView: View {
                                 Image(systemName: "dot.radiowaves.left.and.right")
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(.red)
-                                Text("新关注 \(newFollowerCount)")
+                                Text("新粉丝 \(newFollowerCount)")
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(.red)
                                 Spacer()
@@ -198,7 +198,7 @@ struct ProfileFollowListView: View {
             Spacer()
 
             if entry.isNew {
-                Text("新关注")
+                Text("新粉丝")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.red)
                     .padding(.horizontal, 8)

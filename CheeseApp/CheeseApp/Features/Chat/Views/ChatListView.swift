@@ -120,7 +120,7 @@ struct ChatListView: View {
                     Button {
                         activeSheetDestination = .addFollow
                     } label: {
-                        Label("新增关注", systemImage: "person.badge.plus")
+                        Label("添加好友", systemImage: "person.badge.plus")
                     }
 
                     Divider()
@@ -267,7 +267,7 @@ struct ChatListView: View {
                 Text("还没有聊天")
                     .font(.system(size: 20, weight: .semibold))
 
-                Text("可从贴文或主页发起私信，也可以用右上角创建群聊或新增关注。")
+                Text("可从贴文或主页发起私信，也可以用右上角创建群聊或添加好友。")
                     .font(.system(size: 15))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

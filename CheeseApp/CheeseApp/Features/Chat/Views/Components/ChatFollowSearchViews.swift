@@ -26,7 +26,7 @@ struct ChatFollowSearchSheet: View {
                 .padding(.top, 14)
                 .padding(.bottom, 20)
             }
-            .navigationTitle("新增关注")
+            .navigationTitle("添加好友")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -65,8 +65,8 @@ struct ChatFollowSearchSheet: View {
         } else if viewModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             emptyPrompt(
                 icon: "person.2.wave.2",
-                title: "搜索想关注的人",
-                message: "可以按昵称、学校或地区查找，找到后可直接关注。"
+                title: "搜索想添加的人",
+                message: "可以按昵称、学校或地区查找，找到后可查看主页或关注。"
             )
         } else if viewModel.isLoading && viewModel.results.isEmpty {
             VStack(spacing: 12) {
