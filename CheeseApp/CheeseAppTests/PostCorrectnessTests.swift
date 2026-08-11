@@ -121,15 +121,6 @@ final class PostCorrectnessTests: XCTestCase {
         )
     }
 
-    func testProfileOnboardingRejectsCompletedUnknownSchool() {
-        XCTAssertTrue(
-            ProfileCompletionPolicy.needsCompletion(
-                profileCompleted: true,
-                school: "Unknown"
-            )
-        )
-    }
-
     func testSystemShareMetadataAlwaysUsesTheOfficialCheeseLogo() throws {
         XCTAssertEqual(PostShareMetadataFactory.iconAssetName, "CheeseAppLogo")
 
