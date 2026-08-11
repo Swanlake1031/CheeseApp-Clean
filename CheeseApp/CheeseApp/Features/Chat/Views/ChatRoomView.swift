@@ -528,11 +528,11 @@ struct ChatRoomView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.circle.fill")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(Color(red: 0.86, green: 0.34, blue: 0.05))
 
             Text("你和对方尚未互相关注。请注意隐私和交易安全。")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.orange.opacity(0.95))
+                .foregroundStyle(Color(red: 0.86, green: 0.34, blue: 0.05))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(1)
                 .minimumScaleFactor(0.86)
@@ -540,10 +540,10 @@ struct ChatRoomView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.11))
+        .background(Color(red: 1.0, green: 0.94, blue: 0.87))
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.orange.opacity(0.16))
+                .fill(Color(red: 0.96, green: 0.74, blue: 0.53))
                 .frame(height: 1)
         }
     }
