@@ -294,22 +294,30 @@ struct ChatRoomView: View {
                             .foregroundStyle(AppColors.textMuted)
                     }
 
-                    Text(intent.status.displayTitle)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(secondhandTransactionStatusTint(intent.status))
-                        .padding(.horizontal, 8)
-                        .frame(height: 22)
-                        .background(
-                            secondhandTransactionStatusTint(intent.status)
-                                .opacity(0.12)
-                        )
-                        .clipShape(Capsule())
-                }
+                    HStack(spacing: 8) {
+                        Text(intent.status.displayTitle)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(secondhandTransactionStatusTint(intent.status))
+                            .padding(.horizontal, 8)
+                            .frame(height: 22)
+                            .background(
+                                secondhandTransactionStatusTint(intent.status)
+                                    .opacity(0.12)
+                            )
+                            .clipShape(Capsule())
 
-                Spacer(minLength: 4)
+                        if intent.status == .active,
+                           intent.viewerRole == .buyer {
+                            Spacer(minLength: 8)
+                            secondhandTransactionActions(intent)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if intent.status == .active {
+            if intent.status == .active,
+               intent.viewerRole == .seller {
                 HStack(spacing: 8) {
                     Spacer()
                     secondhandTransactionActions(intent)
