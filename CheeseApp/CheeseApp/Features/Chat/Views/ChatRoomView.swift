@@ -508,12 +508,12 @@ struct ChatRoomView: View {
                 Button {
                     viewModel.openSettings()
                 } label: {
-                    PostToolbarIconCircle(icon: "square.grid.2x2")
+                    PostToolbarIconCircle(icon: "ellipsis")
                 }
                 .buttonStyle(.plain)
             }
 
-            if let intent = viewModel.secondhandPurchaseIntent {
+            if let intent = viewModel.activeSecondhandPurchaseIntent {
                 secondhandTransactionCard(intent)
                 Divider()
             }

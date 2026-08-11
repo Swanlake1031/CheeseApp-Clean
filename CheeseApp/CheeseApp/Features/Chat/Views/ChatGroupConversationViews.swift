@@ -206,7 +206,7 @@ struct GroupChatRoomView: View {
             Button {
                 viewModel.openDetails()
             } label: {
-                PostToolbarIconCircle(icon: "square.grid.2x2")
+                PostToolbarIconCircle(icon: "ellipsis")
             }
             .buttonStyle(.plain)
             .accessibilityLabel("群聊详情")

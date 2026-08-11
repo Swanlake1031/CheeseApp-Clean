@@ -617,6 +617,7 @@ final class ChatRoomViewModelTests: XCTestCase {
         }
         XCTAssertEqual(transactionService.cancelAttempts, 1)
         XCTAssertFalse(viewModel.secondhandPurchaseIntent?.status.isActive ?? true)
+        XCTAssertNil(viewModel.activeSecondhandPurchaseIntent)
     }
 
     func testSellerWithMultipleActiveBuyersMustSelectBeforeCompletion() async {
@@ -665,6 +666,7 @@ final class ChatRoomViewModelTests: XCTestCase {
             viewModel.secondhandPurchaseIntent?.status == .listingSold
         }
         XCTAssertEqual(transactionService.completedBuyerIDs, [otherBuyerID])
+        XCTAssertNil(viewModel.activeSecondhandPurchaseIntent)
     }
 
     func testUserDefaultsSafetyAcknowledgementIsScopedToUserAndConversation() {

@@ -948,7 +948,7 @@ private struct UserPostCard: View {
                         Button {
                             onToggleHidden()
                         } label: {
-                            Label("隐藏", systemImage: "eye.slash")
+                            Label("私密", systemImage: "lock.fill")
                         }
 
                         Button {

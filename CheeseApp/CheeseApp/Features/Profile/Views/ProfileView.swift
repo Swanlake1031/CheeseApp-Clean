@@ -98,7 +98,9 @@ struct ProfileView: View {
         }
         .onChange(of: isActive) { _, active in
             guard active else { return }
-            Task { await refreshProfile(force: false) }
+            // Re-entering Profile is the membership reconciliation point for
+            // liked/saved snapshots and for completed/private post state.
+            Task { await refreshProfile(force: true) }
         }
         .shareFeedbackToast(message: $uidCopyFeedbackMessage)
     }

@@ -124,6 +124,11 @@ final class ChatRoomViewModel: ObservableObject {
     @Published var sheetDestination: ChatRoomSheetDestination?
     @Published var alertDestination: ChatRoomAlertDestination?
 
+    var activeSecondhandPurchaseIntent: SecondhandChatPurchaseIntent? {
+        guard secondhandPurchaseIntent?.status.isActive == true else { return nil }
+        return secondhandPurchaseIntent
+    }
+
     private let chatService: any ChatRoomServicing
     private let mediaService: any ChatRoomMediaServicing
     private let strangerSafetyStore: any ChatStrangerSafetyStoring
@@ -384,6 +389,11 @@ final class ChatRoomViewModel: ObservableObject {
                 listingId: intent.listingId,
                 buyerId: buyerID
             )
+            PostFeatureEvents.postDidChange(
+                kind: .secondhand,
+                authorId: intent.sellerId,
+                postId: intent.listingId
+            )
         }
     }
 
@@ -397,6 +407,11 @@ final class ChatRoomViewModel: ObservableObject {
         performSecondhandTransactionAction {
             try await secondhandTransactionService
                 .stopSellingSecondhandListing(listingId: intent.listingId)
+            PostFeatureEvents.postDidChange(
+                kind: .secondhand,
+                authorId: intent.sellerId,
+                postId: intent.listingId
+            )
         }
     }
 
@@ -842,6 +857,10 @@ final class ChatRoomViewModel: ObservableObject {
             defer { self.isApplyingSecondhandTransactionAction = false }
             do {
                 try await action()
+                // The mutation is authoritative. Clear the sticky snapshot
+                // before the follow-up fetch so a transient refresh failure
+                // cannot leave an ended transaction pinned in the room.
+                self.secondhandPurchaseIntent = nil
                 await self.refreshSecondhandPurchaseIntent()
             } catch {
                 self.roomState.setError(error.localizedDescription)

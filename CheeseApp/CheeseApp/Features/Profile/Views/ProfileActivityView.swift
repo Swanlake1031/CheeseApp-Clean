@@ -259,6 +259,7 @@ struct ProfileActivityView: View {
     ) -> some View {
         ProfileActivityPageView(
             kind: kind,
+            isSelected: selectedKind == kind,
             userID: authService.currentUser?.id,
             refreshGeneration: refreshGeneration &+ externalRefreshGeneration,
             openingPostID: openingPostID,
@@ -456,7 +457,7 @@ struct ProfileActivityView: View {
         _ item: ProfileActivityItem,
         activityKind: ProfileActivityKind
     ) async {
-        guard activityKind == .published,
+        guard activityKind == .published || activityKind == .privateContent,
               openingPostID == nil,
               editingPostID == nil,
               let userID = authService.currentUser?.id,
@@ -579,6 +580,7 @@ struct ProfileActivityView: View {
 
 private struct ProfileActivityPageView: View {
     let kind: ProfileActivityKind
+    let isSelected: Bool
     let userID: UUID?
     let refreshGeneration: Int
     let openingPostID: UUID?
@@ -596,11 +598,12 @@ private struct ProfileActivityPageView: View {
     let onSelectPublishedKind: (PostKind?) -> Void
 
     @StateObject private var service: ProfileActivityService
-    @StateObject private var activityMutations = PostActivityMutationCenter.shared
+    @StateObject private var interactionStore = PostInteractionStore.shared
     @State private var appliedRefreshGeneration = 0
 
     init(
         kind: ProfileActivityKind,
+        isSelected: Bool,
         userID: UUID?,
         refreshGeneration: Int,
         openingPostID: UUID?,
@@ -618,6 +621,7 @@ private struct ProfileActivityPageView: View {
         onSelectPublishedKind: @escaping (PostKind?) -> Void
     ) {
         self.kind = kind
+        self.isSelected = isSelected
         self.userID = userID
         self.refreshGeneration = refreshGeneration
         self.openingPostID = openingPostID
@@ -633,19 +637,25 @@ private struct ProfileActivityPageView: View {
         self.onShare = onShare
         self.onDelete = onDelete
         self.onSelectPublishedKind = onSelectPublishedKind
+        let initialServiceKind: ProfileActivityKind = kind == .privateContent
+            ? .published
+            : kind
+        let initialVisibility: PublishedPostVisibility = kind == .privateContent
+            ? .hidden
+            : publishedVisibility
         _service = StateObject(
             wrappedValue: ProfileActivityService(
-                initialKind: kind,
-                initialPublishedVisibility: publishedVisibility
+                initialKind: initialServiceKind,
+                initialPublishedVisibility: initialVisibility
             )
         )
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            if kind == .published {
-                if publishedVisibility == .visible {
-                    privateContentEntry
+            if isPublishedManagement {
+                if kind == .published && servicePublishedVisibility == .visible {
+                    completedTransactionsEntry
                         .padding(.horizontal, embedsInParentScroll ? 12 : 16)
                         .padding(.top, 12)
                 }
@@ -667,35 +677,32 @@ private struct ProfileActivityPageView: View {
             )
             .task(id: loadTaskID) {
                 service.activateAccount(userID)
+                guard isSelected else { return }
+                let shouldReconcileMembership = service.hasResolvedInitialLoad
                 await service.select(
-                    kind,
+                    serviceKind,
                     publishedPostKind: publishedPostKind,
-                    publishedVisibility: publishedVisibility
+                    publishedVisibility: servicePublishedVisibility
                 )
+                if shouldReconcileMembership {
+                    await service.loadInitial(force: true)
+                }
             }
             .task(id: refreshGeneration) {
-                guard refreshGeneration > appliedRefreshGeneration else { return }
+                guard isSelected,
+                      refreshGeneration > appliedRefreshGeneration
+                else { return }
                 appliedRefreshGeneration = refreshGeneration
                 service.activateAccount(userID)
                 let shouldForceRefresh = service.hasResolvedInitialLoad
                 await service.loadInitial(force: shouldForceRefresh)
             }
-            .task(id: relevantActivityRevision) {
-                guard relevantActivityRevision > 0 else { return }
-                do {
-                    try await Task.sleep(for: .milliseconds(250))
-                } catch {
-                    return
-                }
-                service.activateAccount(userID)
-                await service.loadInitial(force: true)
-            }
     }
 
-    private var privateContentEntry: some View {
-        NavigationLink(destination: PrivateContentView()) {
+    private var completedTransactionsEntry: some View {
+        NavigationLink(destination: CompletedSecondhandTransactionsView()) {
             HStack(spacing: 12) {
-                Image(systemName: "lock.fill")
+                Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(AppColors.textPrimary)
                     .frame(width: 34, height: 34)
@@ -703,10 +710,10 @@ private struct ProfileActivityPageView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("私密内容")
+                    Text("已交易")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(AppColors.textPrimary)
-                    Text("查看和恢复已隐藏的二手与论坛帖子")
+                    Text("查看已完成的二手买入与卖出记录")
                         .font(.system(size: 11))
                         .foregroundStyle(AppColors.textMuted)
                 }
@@ -793,8 +800,14 @@ private struct ProfileActivityPageView: View {
                     isEditing: editingPostID == item.postID,
                     isUpdatingPrivacy: updatingPrivacyPostID == item.postID,
                     isDeleting: deletingPostID == item.postID,
-                    isPrivate: service.isPostPrivate(item.postID),
+                    isPrivate: servicePublishedVisibility == .hidden
+                        || service.isPostPrivate(item.postID),
                     hiddenReason: service.hiddenReason(item.postID),
+                    interactionState: interactionStore.state(
+                        for: item.postID,
+                        fallbackIsLiked: kind == .liked,
+                        fallbackIsFavorited: kind == .favorited
+                    ),
                     onOpen: { onOpen(item) },
                     onEdit: { onEdit(item) },
                     onSetPrivacy: { hidden in
@@ -802,8 +815,13 @@ private struct ProfileActivityPageView: View {
                     },
                     onShare: { onShare(item) },
                     onDelete: { onDelete(item) },
-                    onRemove: {
-                        Task { await service.removeReaction(item) }
+                    onToggleReaction: { currentlyActive in
+                        Task {
+                            await service.toggleReaction(
+                                item,
+                                currentlyActive: currentlyActive
+                            )
+                        }
                     }
                 )
                 .onAppear {
@@ -829,34 +847,35 @@ private struct ProfileActivityPageView: View {
     }
 
     private var loadTaskID: String {
-        "\(userID?.uuidString ?? "signed-out"):\(kind.rawValue):\(publishedPostKind?.rawValue ?? "all"):\(publishedVisibility.rawValue)"
+        "\(userID?.uuidString ?? "signed-out"):\(kind.rawValue):\(publishedPostKind?.rawValue ?? "all"):\(servicePublishedVisibility.rawValue):\(isSelected)"
     }
 
-    private var relevantActivityRevision: UInt64 {
-        switch kind {
-        case .liked:
-            return activityMutations.likedRevision
-        case .favorited:
-            return activityMutations.favoritedRevision
-        case .published, .commented:
-            return 0
-        }
+    private var serviceKind: ProfileActivityKind {
+        kind == .privateContent ? .published : kind
+    }
+
+    private var servicePublishedVisibility: PublishedPostVisibility {
+        kind == .privateContent ? .hidden : publishedVisibility
+    }
+
+    private var isPublishedManagement: Bool {
+        kind == .published || kind == .privateContent
     }
 
     private var emptyIcon: String {
-        if kind == .published && publishedVisibility == .hidden {
+        if servicePublishedVisibility == .hidden {
             return "lock"
         }
         switch kind {
         case .published: return "square.and.pencil"
         case .liked: return "heart"
-        case .commented: return "bubble.left"
+        case .privateContent: return "lock.fill"
         case .favorited: return "bookmark"
         }
     }
 
     private var emptyTitle: String {
-        if kind == .published && publishedVisibility == .hidden {
+        if servicePublishedVisibility == .hidden {
             return "暂无私密内容"
         }
         return kind.emptyTitle
@@ -872,12 +891,13 @@ private struct ProfileActivityRow: View {
     let isDeleting: Bool
     let isPrivate: Bool
     let hiddenReason: PostHiddenReason?
+    let interactionState: PostInteractionState
     let onOpen: () -> Void
     let onEdit: () -> Void
     let onSetPrivacy: (Bool) -> Void
     let onShare: () -> Void
     let onDelete: () -> Void
-    let onRemove: () -> Void
+    let onToggleReaction: (Bool) -> Void
 
     var body: some View {
         VStack(spacing: 10) {
@@ -906,15 +926,13 @@ private struct ProfileActivityRow: View {
                             .foregroundStyle(AppColors.textPrimary)
                             .lineLimit(2)
 
-                        Text(activityKind == .commented
-                            ? item.activitySummary
-                            : item.postSummary)
+                        Text(item.postSummary)
                             .font(.system(size: 12))
                             .foregroundStyle(AppColors.textMuted)
                             .lineLimit(2)
 
                         if hiddenReason == .autoExpired {
-                            Label("已自动隐藏 · 发布超过 30 天", systemImage: "clock.badge.exclamationmark")
+                            Label("已自动转为私密 · 发布超过 30 天", systemImage: "clock.badge.exclamationmark")
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(Color.orange)
                                 .lineLimit(1)
@@ -927,14 +945,6 @@ private struct ProfileActivityRow: View {
                         .controlSize(.small)
                         .frame(width: 18, height: 18)
                         .accessibilityLabel("正在打开内容")
-                } else if activityKind == .liked || activityKind == .favorited {
-                    Button(action: onRemove) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(.red.opacity(0.8))
-                            .accessibilityLabel(actionKindTitle)
-                    }
-                    .buttonStyle(.plain)
                 }
             }
             .contentShape(Rectangle())
@@ -947,7 +957,7 @@ private struct ProfileActivityRow: View {
                 onOpen()
             }
 
-            if activityKind == .published {
+            if isPublishedManagement {
                 HStack(spacing: 10) {
                     Spacer()
 
@@ -957,7 +967,7 @@ private struct ProfileActivityRow: View {
                         } label: {
                             HStack(spacing: 5) {
                                 Text("恢复公开")
-                                Image(systemName: "eye")
+                                Image(systemName: "lock.open.fill")
                             }
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(AppColors.textPrimary)
@@ -992,7 +1002,7 @@ private struct ProfileActivityRow: View {
                             Button {
                                 onSetPrivacy(true)
                             } label: {
-                                Label("隐藏", systemImage: "eye.slash")
+                                Label("私密", systemImage: "lock.fill")
                             }
                         }
 
@@ -1037,6 +1047,22 @@ private struct ProfileActivityRow: View {
                     .disabled(isPublishedActionDisabled)
                     .accessibilityLabel("帖子操作")
                 }
+            } else if activityKind == .liked || activityKind == .favorited {
+                HStack {
+                    Spacer()
+                    Button {
+                        onToggleReaction(isReactionActive)
+                    } label: {
+                        Image(systemName: reactionIcon)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(reactionColor)
+                            .frame(width: 36, height: 32)
+                            .background(Color(.systemGray6))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(actionKindTitle)
+                }
             }
         }
         .padding(12)
@@ -1072,13 +1098,215 @@ private struct ProfileActivityRow: View {
     }
 
     private var actionKindTitle: String {
-        activityKind == .liked ? "取消喜欢" : "取消收藏"
+        if activityKind == .liked {
+            return interactionState.isLiked ? "取消喜欢" : "重新喜欢"
+        }
+        return interactionState.isFavorited ? "取消收藏" : "重新收藏"
+    }
+
+    private var isPublishedManagement: Bool {
+        activityKind == .published || activityKind == .privateContent
+    }
+
+    private var isReactionActive: Bool {
+        activityKind == .liked
+            ? interactionState.isLiked
+            : interactionState.isFavorited
+    }
+
+    private var reactionIcon: String {
+        if activityKind == .liked {
+            return interactionState.isLiked ? "heart.fill" : "heart"
+        }
+        return interactionState.isFavorited ? "bookmark.fill" : "bookmark"
+    }
+
+    private var reactionColor: Color {
+        if activityKind == .liked, interactionState.isLiked {
+            return AppColors.likeActive
+        }
+        return interactionState.isFavorited ? AppColors.accentStrong : AppColors.textMuted
     }
 
     private var isPublishedActionDisabled: Bool {
         isOpening || isEditing || isUpdatingPrivacy || isDeleting
     }
 
+}
+
+struct CompletedSecondhandTransactionsView: View {
+    @StateObject private var service = CompletedSecondhandTransactionsService()
+
+    var body: some View {
+        VStack(spacing: 0) {
+            rolePicker
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+
+            content
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppColors.pageBackground.ignoresSafeArea())
+        .cheesePageTopBar(title: "已交易")
+        .task {
+            await service.select(.buyer)
+        }
+    }
+
+    private var rolePicker: some View {
+        HStack(spacing: 8) {
+            ForEach(CompletedSecondhandRole.allCases) { role in
+                Button {
+                    Task { await service.select(role) }
+                } label: {
+                    Text(role.title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(
+                            service.selectedRole == role
+                                ? Color.black
+                                : AppColors.textMuted
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            service.selectedRole == role
+                                ? AppColors.accent
+                                : Color.white
+                        )
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch service.loadState {
+        case .unresolved, .initialLoading:
+            Spacer()
+            ProgressView()
+            Spacer()
+        case .empty:
+            Spacer()
+            VStack(spacing: 10) {
+                Image(systemName: "checkmark.seal")
+                    .font(.system(size: 36))
+                    .foregroundStyle(AppColors.textMuted)
+                Text(service.selectedRole == .buyer ? "暂无买入记录" : "暂无卖出记录")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(AppColors.textMuted)
+            }
+            Spacer()
+        case .error(let message):
+            Spacer()
+            ErrorView(message) {
+                Task { await service.select(service.selectedRole, force: true) }
+            }
+            Spacer()
+        case .loaded:
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: 10) {
+                    ForEach(service.items) { item in
+                        CompletedSecondhandTransactionRow(item: item)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 2)
+                .padding(.bottom, 32)
+            }
+            .refreshable {
+                await service.select(service.selectedRole, force: true)
+            }
+        }
+    }
+}
+
+private struct CompletedSecondhandTransactionRow: View {
+    let item: CompletedSecondhandTransaction
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            cover
+
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 6) {
+                    Text("交易完成")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(AppColors.accentStrong)
+                    Spacer()
+                    Text(item.completedAt.formatted(date: .numeric, time: .shortened))
+                        .font(.system(size: 10))
+                        .foregroundStyle(AppColors.textMuted)
+                }
+
+                Text(item.listingTitle)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .lineLimit(2)
+
+                Text("CAD \(item.price, specifier: "%.2f")")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(AppColors.accentStrong)
+
+                HStack(spacing: 6) {
+                    counterpartyAvatar
+                    Text("\(item.role == .buyer ? "卖家" : "买家")：\(item.counterpartyName)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(AppColors.textMuted)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .cheeseCardChrome(cornerRadius: 15)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.listingTitle)，交易完成")
+    }
+
+    @ViewBuilder
+    private var cover: some View {
+        if let rawURL = item.coverImage, let url = URL(string: rawURL) {
+            CachedRemoteImage(url: url, targetPixelWidth: 192) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                coverFallback
+            }
+            .frame(width: 72, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        } else {
+            coverFallback
+        }
+    }
+
+    private var coverFallback: some View {
+        RoundedRectangle(cornerRadius: 11, style: .continuous)
+            .fill(AppColors.accent.opacity(0.18))
+            .frame(width: 72, height: 72)
+            .overlay {
+                Image(systemName: "bag.fill")
+                    .foregroundStyle(AppColors.textMuted)
+            }
+    }
+
+    @ViewBuilder
+    private var counterpartyAvatar: some View {
+        if let rawURL = item.counterpartyAvatar, let url = URL(string: rawURL) {
+            CachedRemoteImage(url: url, targetPixelWidth: 72) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                Circle().fill(Color(.systemGray5))
+            }
+            .frame(width: 18, height: 18)
+            .clipShape(Circle())
+        } else {
+            Image(systemName: "person.crop.circle.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(AppColors.textMuted)
+        }
+    }
 }
 
 struct PrivateContentView: View {

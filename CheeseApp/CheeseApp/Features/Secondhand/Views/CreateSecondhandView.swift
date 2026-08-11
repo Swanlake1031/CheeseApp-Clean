@@ -151,7 +151,7 @@ struct CreateSecondhandView: View {
 
                         PostFormSection(title: "帖子有效期") {
                             Label(
-                                "发布后公开展示 30 天，第 14 天会收到提醒，满 30 天自动隐藏到私密内容。",
+                                "发布后公开展示 30 天，第 14 天会收到提醒，满 30 天自动转为私密内容。",
                                 systemImage: "clock.badge.checkmark"
                             )
                             .font(.system(size: 13, weight: .medium))

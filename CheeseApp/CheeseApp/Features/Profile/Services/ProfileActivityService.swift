@@ -4,7 +4,7 @@ import Supabase
 enum ProfileActivityKind: String, CaseIterable, Identifiable {
     case published
     case liked
-    case commented
+    case privateContent = "private_content"
     case favorited
 
     var id: String { rawValue }
@@ -13,7 +13,7 @@ enum ProfileActivityKind: String, CaseIterable, Identifiable {
         switch self {
         case .published: return L10n.tr("Posts", "发布")
         case .liked: return L10n.tr("Likes", "喜欢")
-        case .commented: return L10n.tr("Comments", "评论")
+        case .privateContent: return L10n.tr("Private", "私密内容")
         case .favorited: return L10n.tr("Saved", "收藏")
         }
     }
@@ -22,7 +22,7 @@ enum ProfileActivityKind: String, CaseIterable, Identifiable {
         switch self {
         case .published: return L10n.tr("No posts yet", "尚未发布内容")
         case .liked: return L10n.tr("No liked content yet", "尚未喜欢任何内容")
-        case .commented: return L10n.tr("No comments yet", "尚未发表评论")
+        case .privateContent: return L10n.tr("No private content yet", "暂无私密内容")
         case .favorited: return L10n.tr("No saved content yet", "尚未收藏内容")
         }
     }
@@ -77,6 +77,129 @@ struct ProfileActivityPage {
     let nextCursor: ProfileActivityCursor?
 }
 
+enum CompletedSecondhandRole: String, CaseIterable, Identifiable, Codable {
+    case buyer
+    case seller
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .buyer: return "我买的"
+        case .seller: return "我卖的"
+        }
+    }
+}
+
+struct CompletedSecondhandTransaction: Decodable, Identifiable, Hashable {
+    let transactionID: UUID
+    let listingID: UUID
+    let role: CompletedSecondhandRole
+    let listingTitle: String
+    let price: Double
+    let coverImage: String?
+    let counterpartyID: UUID
+    let counterpartyName: String
+    let counterpartyAvatar: String?
+    let completedAt: Date
+
+    var id: UUID { transactionID }
+
+    enum CodingKeys: String, CodingKey {
+        case transactionID = "transaction_id"
+        case listingID = "listing_id"
+        case role
+        case listingTitle = "listing_title"
+        case price
+        case coverImage = "cover_image"
+        case counterpartyID = "counterparty_id"
+        case counterpartyName = "counterparty_name"
+        case counterpartyAvatar = "counterparty_avatar"
+        case completedAt = "completed_at"
+    }
+}
+
+@MainActor
+final class CompletedSecondhandTransactionsService: ObservableObject {
+    @Published private(set) var selectedRole: CompletedSecondhandRole = .buyer
+    @Published private(set) var items: [CompletedSecondhandTransaction] = []
+    @Published private(set) var isLoading = false
+    @Published private(set) var hasResolved = false
+    @Published var errorMessage: String?
+
+    private var cache: [CompletedSecondhandRole: [CompletedSecondhandTransaction]] = [:]
+    private var generation: UInt64 = 0
+
+    var loadState: CollectionLoadState {
+        CollectionLoadState.resolve(
+            hasResolvedInitialLoad: hasResolved,
+            isLoading: isLoading,
+            hasContent: !items.isEmpty,
+            errorMessage: errorMessage
+        )
+    }
+
+    func select(_ role: CompletedSecondhandRole, force: Bool = false) async {
+        if selectedRole != role {
+            selectedRole = role
+            generation &+= 1
+            if let cached = cache[role], !force {
+                items = cached
+                hasResolved = true
+                errorMessage = nil
+                return
+            }
+            items = []
+            hasResolved = false
+            errorMessage = nil
+        } else if hasResolved && !force {
+            return
+        }
+
+        let requestGeneration = generation
+        let requestRole = selectedRole
+        isLoading = true
+        errorMessage = nil
+        defer {
+            if requestGeneration == generation && requestRole == selectedRole {
+                isLoading = false
+            }
+        }
+
+        do {
+            let rows: [CompletedSecondhandTransaction] = try await SupabaseManager
+                .shared.client
+                .rpc(
+                    "get_my_completed_secondhand_transactions",
+                    params: CompletedSecondhandTransactionsParams(role: requestRole)
+                )
+                .execute()
+                .value
+            guard requestGeneration == generation, requestRole == selectedRole else {
+                return
+            }
+            items = rows
+            cache[requestRole] = rows
+            hasResolved = true
+        } catch {
+            guard requestGeneration == generation, requestRole == selectedRole else {
+                return
+            }
+            if error.isCancellationLike { return }
+            hasResolved = true
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct CompletedSecondhandTransactionsParams: Encodable {
+    let role: CompletedSecondhandRole
+
+    enum CodingKeys: String, CodingKey {
+        case role = "p_role"
+    }
+}
+
 @MainActor
 final class ProfileActivityService: ObservableObject {
     typealias PageLoader = (
@@ -94,6 +217,7 @@ final class ProfileActivityService: ObservableObject {
         ProfileActivityKind,
         [UUID]
     ) async throws -> ProfileActivityVisibilitySnapshot
+    typealias ReactionToggler = (UUID, Bool) async throws -> Bool
 
     @Published private(set) var selectedKind: ProfileActivityKind
     @Published private(set) var selectedPublishedPostKind: PostKind?
@@ -110,6 +234,8 @@ final class ProfileActivityService: ObservableObject {
     private let pageSize: Int
     private let loadPage: PageLoader
     private let loadVisibility: VisibilityLoader
+    private let toggleLike: ReactionToggler
+    private let toggleFavorite: ReactionToggler
     private var ownerID: UUID?
     private var generation: UInt64 = 0
     private var cursor: ProfileActivityCursor?
@@ -120,13 +246,27 @@ final class ProfileActivityService: ObservableObject {
         initialPublishedVisibility: PublishedPostVisibility = .visible,
         pageSize: Int = 30,
         loadPage: PageLoader? = nil,
-        privacyLoader: PrivacyLoader? = nil
+        privacyLoader: PrivacyLoader? = nil,
+        likeToggler: ReactionToggler? = nil,
+        favoriteToggler: ReactionToggler? = nil
     ) {
         selectedKind = initialKind
         selectedPublishedPostKind = nil
         selectedPublishedVisibility = initialPublishedVisibility
         self.pageSize = pageSize
         self.loadPage = loadPage ?? Self.remotePage
+        self.toggleLike = likeToggler ?? { postID, isLiked in
+            try await PostReactionService.shared.toggle(
+                postId: postID,
+                currentlyLiked: isLiked
+            )
+        }
+        self.toggleFavorite = favoriteToggler ?? { postID, isFavorited in
+            try await PostFavoriteService.shared.toggleFavorite(
+                postId: postID,
+                currentlyFavorited: isFavorited
+            )
+        }
         if let privacyLoader {
             self.loadVisibility = { kind, postIDs in
                 ProfileActivityVisibilitySnapshot(
@@ -328,25 +468,23 @@ final class ProfileActivityService: ObservableObject {
         }
     }
 
-    func removeReaction(_ item: ProfileActivityItem) async {
+    func toggleReaction(
+        _ item: ProfileActivityItem,
+        currentlyActive: Bool
+    ) async {
         do {
             switch selectedKind {
             case .liked:
-                _ = try await PostReactionService.shared.toggle(
-                    postId: item.postID,
-                    currentlyLiked: true
-                )
+                _ = try await toggleLike(item.postID, currentlyActive)
             case .favorited:
-                _ = try await PostFavoriteService.shared.toggleFavorite(
-                    postId: item.postID,
-                    currentlyFavorited: true
-                )
-            case .published, .commented:
+                _ = try await toggleFavorite(item.postID, currentlyActive)
+            case .published, .privateContent:
                 return
             }
-            items.removeAll { $0.id == item.id }
+            // Keep the current page snapshot stable. The shared interaction
+            // store updates the icon immediately; membership is reconciled
+            // from server truth when the user next enters this tab or refreshes.
             errorMessage = nil
-            cacheCurrentPageIfResolved()
         } catch {
             if error.isCancellationLike { return }
             errorMessage = error.localizedDescription

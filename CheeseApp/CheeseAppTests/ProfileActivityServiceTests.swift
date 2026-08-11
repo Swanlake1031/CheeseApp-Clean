@@ -3,6 +3,13 @@ import XCTest
 
 @MainActor
 final class ProfileActivityServiceTests: XCTestCase {
+    func testProfileTabsExcludeCommentsAndPlacePrivateContentThird() {
+        XCTAssertEqual(
+            ProfileActivityKind.allCases,
+            [.published, .liked, .privateContent, .favorited]
+        )
+    }
+
     func testSelectingTabLoadsOnlySelectedActivityKind() async {
         let account = UUID(uuidString: "a9400000-0000-4000-8000-000000000001")!
         var requestedKinds: [ProfileActivityKind] = []
@@ -17,10 +24,10 @@ final class ProfileActivityServiceTests: XCTestCase {
         )
 
         service.activateAccount(account)
-        await service.select(.commented)
+        await service.select(.liked)
 
-        XCTAssertEqual(requestedKinds, [.commented])
-        XCTAssertEqual(service.selectedKind, .commented)
+        XCTAssertEqual(requestedKinds, [.liked])
+        XCTAssertEqual(service.selectedKind, .liked)
         XCTAssertEqual(service.items.count, 1)
     }
 
@@ -246,6 +253,31 @@ final class ProfileActivityServiceTests: XCTestCase {
         XCTAssertEqual(service.selectedPublishedVisibility, .visible)
     }
 
+    func testUnlikeKeepsCurrentLikedSnapshotUntilNextReload() async {
+        let account = UUID(uuidString: "a9960000-0000-4000-8000-000000000001")!
+        let likedItem = ProfileActivityItem.fixture(index: 41, kind: .liked)
+        var toggleInputs: [(UUID, Bool)] = []
+        let service = ProfileActivityService(
+            initialKind: .liked,
+            loadPage: { _, _, _, _, _ in
+                ProfileActivityPage(items: [likedItem], nextCursor: nil)
+            },
+            likeToggler: { postID, currentlyLiked in
+                toggleInputs.append((postID, currentlyLiked))
+                return false
+            }
+        )
+
+        service.activateAccount(account)
+        await service.loadInitial()
+        await service.toggleReaction(likedItem, currentlyActive: true)
+
+        XCTAssertEqual(service.items, [likedItem])
+        XCTAssertEqual(toggleInputs.count, 1)
+        XCTAssertEqual(toggleInputs.first?.0, likedItem.postID)
+        XCTAssertEqual(toggleInputs.first?.1, true)
+    }
+
 }
 
 @MainActor
@@ -315,7 +347,7 @@ private extension ProfileActivityItem {
             postTitle: "测试帖子 \(index)",
             postSummary: "摘要",
             activitySummary: kind.title,
-            commentID: kind == .commented ? id : nil,
+            commentID: nil,
             activityCreatedAt: Date(
                 timeIntervalSince1970: 1_800_000_000 - Double(index)
             ),

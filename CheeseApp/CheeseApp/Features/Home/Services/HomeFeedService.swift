@@ -92,6 +92,7 @@ final class HomeFeedService {
         let rows: [ForumPreviewRow] = try await supabase
             .database("forum_posts_view")
             .select()
+            .eq("is_private", value: false)
             .order("view_count", ascending: false)
             .order("created_at", ascending: false)
             .order("id", ascending: false)
@@ -127,6 +128,7 @@ final class HomeFeedService {
             .database("forum_posts_view")
             .select()
             .in("user_id", values: authorIDValues)
+            .eq("is_private", value: false)
             .eq("is_anonymous", value: false)
             .order("created_at", ascending: false)
             .order("id", ascending: false)
@@ -137,6 +139,7 @@ final class HomeFeedService {
             .database("secondhand_posts_view")
             .select()
             .in("user_id", values: authorIDValues)
+            .eq("is_private", value: false)
             .eq("is_anonymous", value: false)
             .order("created_at", ascending: false)
             .order("id", ascending: false)
@@ -160,6 +163,7 @@ final class HomeFeedService {
         try await supabase
             .database("secondhand_posts_view")
             .select()
+            .eq("is_private", value: false)
             .order("view_count", ascending: false)
             .order("created_at", ascending: false)
             .order("id", ascending: false)
