@@ -257,13 +257,7 @@ struct ChatRoomView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            VStack(spacing: 0) {
-                if let intent = viewModel.secondhandPurchaseIntent {
-                    secondhandTransactionCard(intent)
-                    Divider()
-                }
-                messageTimeline
-            }
+            messageTimeline
         }
     }
 
@@ -428,6 +422,11 @@ struct ChatRoomView: View {
                     PostToolbarIconCircle(icon: "square.grid.2x2")
                 }
                 .buttonStyle(.plain)
+            }
+
+            if let intent = viewModel.secondhandPurchaseIntent {
+                secondhandTransactionCard(intent)
+                Divider()
             }
 
             if viewModel.shouldShowStrangerSafetyBanner {
