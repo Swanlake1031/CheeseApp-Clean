@@ -35,17 +35,23 @@ private struct SecondhandTransactionActionButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(role == .primary ? Color.black : AppColors.textPrimary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 13)
+            .frame(height: 32)
             .background(
                 role == .primary
                     ? AppColors.accent.opacity(configuration.isPressed ? 0.72 : 1)
                     : Color(uiColor: .secondarySystemBackground)
                         .opacity(configuration.isPressed ? 0.7 : 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(Capsule())
+            .overlay {
+                if role == .secondary {
+                    Capsule()
+                        .stroke(AppColors.textMuted.opacity(0.18), lineWidth: 1)
+                }
+            }
     }
 }
 
@@ -264,36 +270,111 @@ struct ChatRoomView: View {
     private func secondhandTransactionCard(
         _ intent: SecondhandChatPurchaseIntent
     ) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Label {
+        let preview = secondhandListingPreview(for: intent)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                secondhandListingThumbnail(preview)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(preview?.title ?? intent.listingTitle)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .lineLimit(1)
+
+                    if let subtitle = preview?.subtitle,
+                       !subtitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text(subtitle)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(AppColors.accentStrong)
+                            .lineLimit(1)
+                    } else {
+                        Text(L10n.tr("Secondhand listing", "二手商品"))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(AppColors.textMuted)
+                    }
+
                     Text(intent.status.displayTitle)
-                } icon: {
-                    Image(systemName: intent.status.isActive ? "arrow.triangle.2.circlepath" : "checkmark.circle")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(secondhandTransactionStatusTint(intent.status))
+                        .padding(.horizontal, 8)
+                        .frame(height: 22)
+                        .background(
+                            secondhandTransactionStatusTint(intent.status)
+                                .opacity(0.12)
+                        )
+                        .clipShape(Capsule())
                 }
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(AppColors.textPrimary)
 
-                Spacer(minLength: 8)
-
-                Text(L10n.tr("Secondhand", "二手"))
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(AppColors.categoryColor(for: "secondhand"))
+                Spacer(minLength: 4)
             }
 
-            Text(intent.listingTitle)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(AppColors.textMuted)
-                .lineLimit(1)
-
             if intent.status == .active {
-                secondhandTransactionActions(intent)
+                HStack(spacing: 8) {
+                    Spacer()
+                    secondhandTransactionActions(intent)
+                }
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .systemBackground))
+    }
+
+    private func secondhandListingPreview(
+        for intent: SecondhandChatPurchaseIntent
+    ) -> PostContactCardMetadata? {
+        viewModel.messages.lazy.reversed().compactMap { message in
+            message.metadata?.postContactCard
+        }.first { card in
+            card.postKind == PostKind.secondhand.rawValue
+                && card.postId == intent.listingId
+        }
+    }
+
+    @ViewBuilder
+    private func secondhandListingThumbnail(
+        _ preview: PostContactCardMetadata?
+    ) -> some View {
+        Group {
+            if let imageURL = preview?.imageURL,
+               let url = URL(string: imageURL),
+               !imageURL.isEmpty {
+                CachedRemoteImage(url: url, targetPixelWidth: 180) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    secondhandListingThumbnailPlaceholder
+                }
+            } else {
+                secondhandListingThumbnailPlaceholder
+            }
+        }
+        .frame(width: 62, height: 62)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private var secondhandListingThumbnailPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(AppColors.accent.opacity(0.16))
+            .overlay {
+                Image(systemName: "bag.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(AppColors.accentStrong)
+            }
+    }
+
+    private func secondhandTransactionStatusTint(
+        _ status: SecondhandPurchaseIntentStatus
+    ) -> Color {
+        switch status {
+        case .active:
+            return AppColors.accentStrong
+        case .completed:
+            return .green
+        case .buyerCancelled, .listingSold, .sellerStopped:
+            return AppColors.textMuted
+        }
     }
 
     @ViewBuilder
@@ -436,27 +517,26 @@ struct ChatRoomView: View {
     }
 
     private var strangerSafetyBanner: some View {
-        HStack(alignment: .top, spacing: 9) {
-            Image(systemName: "exclamationmark.shield.fill")
-                .font(.system(size: 14, weight: .semibold))
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.orange)
 
             Text("你和对方尚未互相关注。请注意隐私和交易安全。")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(AppColors.textPrimary)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color.orange.opacity(0.95))
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(1)
+                .minimumScaleFactor(0.86)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+        .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .systemBackground))
-        .overlay(alignment: .leading) {
-            Rectangle()
-                .fill(Color.orange)
-                .frame(width: 3)
-        }
+        .background(Color.orange.opacity(0.11))
         .overlay(alignment: .bottom) {
-            Divider()
+            Rectangle()
+                .fill(Color.orange.opacity(0.16))
+                .frame(height: 1)
         }
     }
 
