@@ -364,10 +364,23 @@ final class PostCorrectnessTests: XCTestCase {
     func testSecondhandCreateFormRejectsInvalidPricesAndTrimsRequiredText() {
         XCTAssertEqual(SecondhandCreateFormRules.normalizedRequiredText("  Desk lamp\n"), "Desk lamp")
         XCTAssertEqual(SecondhandCreateFormRules.validPrice(from: " 18.50 "), 18.5)
+        XCTAssertEqual(
+            SecondhandCreateFormRules.validPrice(from: "99999999.99"),
+            SecondhandCreateFormRules.maximumPrice
+        )
         XCTAssertNil(SecondhandCreateFormRules.validPrice(from: ""))
         XCTAssertNil(SecondhandCreateFormRules.validPrice(from: "-1"))
         XCTAssertNil(SecondhandCreateFormRules.validPrice(from: "nan"))
         XCTAssertNil(SecondhandCreateFormRules.validPrice(from: "inf"))
+        XCTAssertNil(SecondhandCreateFormRules.validPrice(from: "100000000"))
+        XCTAssertTrue(SecondhandCreateFormRules.priceExceedsMaximum("100000000"))
+        XCTAssertFalse(SecondhandCreateFormRules.priceExceedsMaximum("99999999.99"))
+        XCTAssertNil(
+            SecondhandCreateFormRules.validOriginalPrice(
+                from: "100000000",
+                sellingPrice: 20
+            )
+        )
     }
 
     func testSecondhandCreateFormRequiresAtLeastOneImage() {

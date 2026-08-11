@@ -18,6 +18,8 @@ private struct SecondhandDraftPayload: Codable {
 }
 
 enum SecondhandCreateFormRules {
+    static let maximumPrice = 99_999_999.99
+    static let maximumPriceText = "CAD 99,999,999.99"
     static let defaultCategory: SecondhandPost.Category = .homeAppliances
     static let defaultCondition = SecondhandPost.Condition.good.rawValue
     static let defaultIsNegotiable = false
@@ -28,10 +30,20 @@ enum SecondhandCreateFormRules {
 
     static func validPrice(from value: String) -> Double? {
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let price = Double(trimmedValue), price.isFinite, price >= 0 else {
+        guard let price = Double(trimmedValue),
+              price.isFinite,
+              price >= 0,
+              price <= maximumPrice
+        else {
             return nil
         }
         return price
+    }
+
+    static func priceExceedsMaximum(_ value: String) -> Bool {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let price = Double(trimmedValue), price.isFinite else { return false }
+        return price > maximumPrice
     }
 
     static func isValid(title: String, price: String, imageCount: Int) -> Bool {
@@ -45,6 +57,7 @@ enum SecondhandCreateFormRules {
         guard !trimmed.isEmpty else { return nil }
         guard let originalPrice = Double(trimmed),
               originalPrice.isFinite,
+              originalPrice <= maximumPrice,
               originalPrice >= sellingPrice
         else { return nil }
         return originalPrice
@@ -78,12 +91,26 @@ struct CreateSecondhandView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     
-    var isValid: Bool {
-        SecondhandCreateFormRules.isValid(
-            title: title,
-            price: price,
-            imageCount: selectedImages.count
-        )
+    private var canAttemptPublish: Bool {
+        !SecondhandCreateFormRules.normalizedRequiredText(title).isEmpty
+            && !price.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !selectedImages.isEmpty
+    }
+
+    private var priceLimitMessage: String? {
+        if SecondhandCreateFormRules.priceExceedsMaximum(price) {
+            return L10n.tr(
+                "The selling price cannot exceed \(SecondhandCreateFormRules.maximumPriceText).",
+                "卖价不能超过 \(SecondhandCreateFormRules.maximumPriceText)"
+            )
+        }
+        if SecondhandCreateFormRules.priceExceedsMaximum(originalPrice) {
+            return L10n.tr(
+                "The original price cannot exceed \(SecondhandCreateFormRules.maximumPriceText).",
+                "原价不能超过 \(SecondhandCreateFormRules.maximumPriceText)"
+            )
+        }
+        return nil
     }
     
     var body: some View {
@@ -99,6 +126,13 @@ struct CreateSecondhandView: View {
                             price: $price,
                             originalPrice: $originalPrice
                         )
+
+                        if let priceLimitMessage {
+                            Label(priceLimitMessage, systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Color.red)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
 
                         PostFormSection(title: L10n.tr("Images (required)", "图片（必填）")) {
                             VStack(alignment: .leading, spacing: 8) {
@@ -207,8 +241,8 @@ struct CreateSecondhandView: View {
                             .font(.system(size: 16, weight: .semibold))
                     }
                 }
-                .foregroundStyle(isValid ? AppColors.accentStrong : AppColors.textMuted)
-                .disabled(!isValid || isLoading)
+                .foregroundStyle(canAttemptPublish ? AppColors.accentStrong : AppColors.textMuted)
+                .disabled(!canAttemptPublish || isLoading)
             }
         }
         .overlay(alignment: .top) {
@@ -247,11 +281,25 @@ struct CreateSecondhandView: View {
     private func submit() async {
         guard !isLoading else { return }
 
+        if SecondhandCreateFormRules.priceExceedsMaximum(price) {
+            errorMessage = L10n.tr(
+                "The selling price cannot exceed \(SecondhandCreateFormRules.maximumPriceText).",
+                "卖价不能超过 \(SecondhandCreateFormRules.maximumPriceText)"
+            )
+            return
+        }
         guard let priceValue = SecondhandCreateFormRules.validPrice(from: price) else {
             errorMessage = L10n.tr("Please enter a valid price", "请输入有效价格")
             return
         }
         let trimmedOriginalPrice = originalPrice.trimmingCharacters(in: .whitespacesAndNewlines)
+        if SecondhandCreateFormRules.priceExceedsMaximum(originalPrice) {
+            errorMessage = L10n.tr(
+                "The original price cannot exceed \(SecondhandCreateFormRules.maximumPriceText).",
+                "原价不能超过 \(SecondhandCreateFormRules.maximumPriceText)"
+            )
+            return
+        }
         let originalPriceValue = SecondhandCreateFormRules.validOriginalPrice(
             from: originalPrice,
             sellingPrice: priceValue
