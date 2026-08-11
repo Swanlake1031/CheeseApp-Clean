@@ -306,22 +306,13 @@ struct ChatRoomView: View {
                             )
                             .clipShape(Capsule())
 
-                        if intent.status == .active,
-                           intent.viewerRole == .buyer {
+                        if intent.status == .active {
                             Spacer(minLength: 8)
                             secondhandTransactionActions(intent)
                         }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            if intent.status == .active,
-               intent.viewerRole == .seller {
-                HStack(spacing: 8) {
-                    Spacer()
-                    secondhandTransactionActions(intent)
-                }
             }
         }
         .padding(.horizontal, 14)
