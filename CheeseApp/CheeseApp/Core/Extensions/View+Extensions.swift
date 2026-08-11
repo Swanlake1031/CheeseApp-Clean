@@ -32,6 +32,82 @@ private struct KeyboardDismissPriorityModifier: ViewModifier {
     }
 }
 
+private struct BackgroundKeyboardDismissInstaller: UIViewRepresentable {
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeUIView(context: Context) -> UIView {
+        let marker = UIView(frame: .zero)
+        marker.isUserInteractionEnabled = false
+        return marker
+    }
+
+    func updateUIView(_ marker: UIView, context: Context) {
+        DispatchQueue.main.async {
+            context.coordinator.installIfNeeded(from: marker)
+        }
+    }
+
+    static func dismantleUIView(_ marker: UIView, coordinator: Coordinator) {
+        coordinator.uninstall()
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        private weak var installedView: UIView?
+        private lazy var recognizer: UITapGestureRecognizer = {
+            let recognizer = UITapGestureRecognizer(
+                target: self,
+                action: #selector(dismissKeyboard)
+            )
+            recognizer.cancelsTouchesInView = false
+            recognizer.delaysTouchesBegan = false
+            recognizer.delaysTouchesEnded = false
+            recognizer.delegate = self
+            return recognizer
+        }()
+
+        func installIfNeeded(from marker: UIView) {
+            guard let target = marker.superview else { return }
+            guard installedView !== target else { return }
+            uninstall()
+            installedView = target
+            target.addGestureRecognizer(recognizer)
+        }
+
+        func uninstall() {
+            installedView?.removeGestureRecognizer(recognizer)
+            installedView = nil
+        }
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldReceive touch: UITouch
+        ) -> Bool {
+            var touchedView = touch.view
+            while let view = touchedView {
+                if view is UITextField || view is UITextView {
+                    return false
+                }
+                if view === installedView {
+                    break
+                }
+                touchedView = view.superview
+            }
+            return true
+        }
+
+        @objc private func dismissKeyboard() {
+            UIApplication.shared.sendAction(
+                #selector(UIResponder.resignFirstResponder),
+                to: nil,
+                from: nil,
+                for: nil
+            )
+        }
+    }
+}
+
 extension View {
     func onHeightChange(_ action: @escaping (CGFloat) -> Void) -> some View {
         background {
@@ -481,12 +557,7 @@ extension View {
 
     /// 点击空白区域收起键盘
     func dismissKeyboardOnTap() -> some View {
-        simultaneousGesture(
-            TapGesture().onEnded {
-                hideKeyboard()
-            },
-            including: .gesture
-        )
+        background(BackgroundKeyboardDismissInstaller())
     }
     
     /// 控制 MainTabView 的自定义底部导航显示

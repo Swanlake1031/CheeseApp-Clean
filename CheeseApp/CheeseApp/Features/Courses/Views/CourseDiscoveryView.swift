@@ -4,6 +4,8 @@ struct CourseDiscoveryView: View {
     @Environment(\.dismiss) private var dismiss
 
     let universityName: String
+    let showsBackButton: Bool
+    let hidesTabBar: Bool
 
     @StateObject private var state = CourseDiscoveryViewModel()
     @State private var query = ""
@@ -22,6 +24,16 @@ struct CourseDiscoveryView: View {
 
     private var isSearching: Bool {
         !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    init(
+        universityName: String,
+        showsBackButton: Bool = true,
+        hidesTabBar: Bool = true
+    ) {
+        self.universityName = universityName
+        self.showsBackButton = showsBackButton
+        self.hidesTabBar = hidesTabBar
     }
 
     var body: some View {
@@ -56,8 +68,8 @@ struct CourseDiscoveryView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .cheeseTabBarHidden(true)
-        .enableSwipeBackGesture()
+        .cheeseTabBarHidden(hidesTabBar)
+        .enableSwipeBackGesture(showsBackButton)
         .onAppear {
             Task { await state.load() }
         }
@@ -65,19 +77,27 @@ struct CourseDiscoveryView: View {
 
     private var campusNavigationHeader: some View {
         HStack(spacing: 12) {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 48, height: 48)
-                    .background(Color(uiColor: .systemBackground))
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.07), radius: 8, y: 3)
+            Group {
+                if showsBackButton {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 48, height: 48)
+                            .background(Color(uiColor: .systemBackground))
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.07), radius: 8, y: 3)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(L10n.tr("Back", "返回")))
+                } else {
+                    Color.clear
+                        .frame(width: 48, height: 48)
+                        .accessibilityHidden(true)
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text(L10n.tr("Back", "返回")))
 
             Spacer(minLength: 0)
 

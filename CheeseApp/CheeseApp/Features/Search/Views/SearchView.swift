@@ -1209,6 +1209,10 @@ struct SearchProfileCard: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(AppColors.textPrimary)
 
+                        Text("UID: \(profile.publicID)")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(AppColors.textMuted)
+
                         if let university = profile.university, !university.isEmpty {
                             Text(university)
                                 .font(.system(size: 12, weight: .medium))

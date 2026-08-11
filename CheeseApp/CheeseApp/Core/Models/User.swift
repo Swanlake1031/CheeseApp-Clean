@@ -13,6 +13,7 @@ import Foundation
 
 struct Profile: Codable, Identifiable {
     let id: UUID
+    let publicID: String?
     let email: String?
     var fullName: String?
     var avatarUrl: String?
@@ -40,6 +41,7 @@ struct Profile: Codable, Identifiable {
     
     enum CodingKeys: String, CodingKey {
         case id, email
+        case publicID = "public_uid"
         case fullName = "full_name"
         case avatarUrl = "avatar_url"
         case school = "university"

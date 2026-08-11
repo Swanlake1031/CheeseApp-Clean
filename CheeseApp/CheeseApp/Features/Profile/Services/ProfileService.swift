@@ -41,7 +41,7 @@ enum ProfileService {
 
         let profiles: [Profile] = try await SupabaseManager.shared
             .database("profile_public_view")
-            .select("id,full_name,avatar_url,university,is_official,is_mcmaster_verified")
+            .select("id,full_name,avatar_url,university,is_official,is_mcmaster_verified,public_uid")
             .`in`("id", values: userIds.map { $0 as any PostgrestFilterValue })
             .execute()
             .value

@@ -2,6 +2,7 @@ import Foundation
 
 struct SearchProfileResult: Codable, Identifiable, Hashable {
     let id: UUID
+    let publicID: String
     let fullName: String
     let avatarURL: String?
     let university: String?
@@ -11,6 +12,7 @@ struct SearchProfileResult: Codable, Identifiable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case id
+        case publicID = "public_uid"
         case fullName = "full_name"
         case avatarURL = "avatar_url"
         case university
@@ -22,6 +24,7 @@ struct SearchProfileResult: Codable, Identifiable, Hashable {
     func applyingFollowState(_ isFollowing: Bool) -> SearchProfileResult {
         SearchProfileResult(
             id: id,
+            publicID: publicID,
             fullName: fullName,
             avatarURL: avatarURL,
             university: university,

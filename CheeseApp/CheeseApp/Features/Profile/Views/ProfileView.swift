@@ -19,6 +19,7 @@ struct ProfileView: View {
     @State private var activityRefreshGeneration = 0
     @State private var lastProfileRefreshAt: Date?
     @State private var myPostCount = 0
+    @State private var fallbackPublicID: String?
     @State private var uidCopyFeedbackMessage: String?
     @StateObject private var profileSocialService = ProfileSocialService.shared
     @StateObject private var userPostsService = UserPostsService()
@@ -189,8 +190,8 @@ struct ProfileView: View {
                     ProfileGenderBadge(gender: user?.gender)
                 }
 
-                if let userID = user?.id {
-                    ProfileUIDBadge(userID: userID) {
+                if let publicID = user?.publicID ?? fallbackPublicID {
+                    ProfileUIDBadge(publicID: publicID) {
                         showUIDCopiedFeedback()
                     }
                 }
@@ -325,9 +326,18 @@ struct ProfileView: View {
 
         async let socialSummaryRefresh: Void = loadSocialSummary()
         async let postCountRefresh: Void = loadMyPostCount()
-        _ = await (socialSummaryRefresh, postCountRefresh)
+        async let publicIDRefresh: Void = loadPublicIDIfNeeded()
+        _ = await (socialSummaryRefresh, postCountRefresh, publicIDRefresh)
         activityRefreshGeneration &+= 1
         lastProfileRefreshAt = Date()
+    }
+
+    private func loadPublicIDIfNeeded() async {
+        guard user?.publicID == nil,
+              let userID = user?.id,
+              let profile = try? await ProfileService.fetchProfile(userId: userID)
+        else { return }
+        fallbackPublicID = profile.publicID
     }
 
     private func showUIDCopiedFeedback() {
@@ -344,35 +354,35 @@ struct ProfileView: View {
 }
 
 enum ProfileUIDPresentation {
-    static func clipboardText(for userID: UUID) -> String {
-        userID.uuidString.lowercased()
+    static func clipboardText(for publicID: String) -> String {
+        publicID.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    static func badgeText(for userID: UUID) -> String {
-        "UID \(clipboardText(for: userID).prefix(8))…"
+    static func badgeText(for publicID: String) -> String {
+        "UID: \(clipboardText(for: publicID))"
     }
 }
 
 struct ProfileUIDBadge: View {
-    let userID: UUID
+    let publicID: String
     let onCopied: () -> Void
 
-    init(userID: UUID, onCopied: @escaping () -> Void = {}) {
-        self.userID = userID
+    init(publicID: String, onCopied: @escaping () -> Void = {}) {
+        self.publicID = publicID
         self.onCopied = onCopied
     }
 
     var body: some View {
         Button {
             UIPasteboard.general.string = ProfileUIDPresentation.clipboardText(
-                for: userID
+                for: publicID
             )
             onCopied()
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "doc.on.doc")
                     .font(.system(size: 9, weight: .semibold))
-                Text(ProfileUIDPresentation.badgeText(for: userID))
+                Text(ProfileUIDPresentation.badgeText(for: publicID))
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .lineLimit(1)
             }
@@ -383,7 +393,7 @@ struct ProfileUIDBadge: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("UID \(ProfileUIDPresentation.clipboardText(for: userID))")
+        .accessibilityLabel("UID \(ProfileUIDPresentation.clipboardText(for: publicID))")
         .accessibilityHint(L10n.tr("Copies UID", "点击复制 UID"))
     }
 }

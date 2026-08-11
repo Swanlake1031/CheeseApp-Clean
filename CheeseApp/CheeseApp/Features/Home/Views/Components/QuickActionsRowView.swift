@@ -257,7 +257,7 @@ struct HomeNavigationDrawerView: View {
     let onCourseRadarTap: () -> Void
 
     @State private var isForumExpanded = true
-    @State private var isSecondhandExpanded = false
+    @State private var isSecondhandExpanded = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

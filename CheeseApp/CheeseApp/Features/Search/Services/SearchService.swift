@@ -80,22 +80,7 @@ final class SearchService {
         limit: Int
     ) async throws -> [SearchProfileResult] {
         let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let profileID = UUID(uuidString: normalized) else {
-            return try await searchProfilesUsingRPC(
-                query: normalized,
-                limit: limit
-            )
-        }
-
-        let rpcRows = (try? await searchProfilesUsingRPC(
-            query: normalized,
-            limit: limit
-        )) ?? []
-        guard !rpcRows.contains(where: { $0.id == profileID }),
-              let exactProfile = try? await exactProfileResult(userID: profileID)
-        else { return rpcRows }
-
-        return [exactProfile] + rpcRows
+        return try await searchProfilesUsingRPC(query: normalized, limit: limit)
     }
 
     private func searchProfilesUsingRPC(
@@ -108,75 +93,12 @@ final class SearchService {
             .value
     }
 
-    private func exactProfileResult(userID: UUID) async throws -> SearchProfileResult {
-        let profile = try await ProfileService.fetchProfile(userId: userID)
-        let normalizedName = profile.fullName?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let currentUserID = AuthService.shared.currentUser?.id
-        let relationship = await profileRelationship(
-            currentUserID: currentUserID,
-            targetUserID: userID
-        )
-
-        return SearchProfileResult(
-            id: profile.id,
-            fullName: normalizedName.isEmpty
-                ? L10n.tr("Cheese user", "奶酪用户")
-                : normalizedName,
-            avatarURL: profile.avatarUrl,
-            university: profile.school,
-            bio: profile.bio,
-            isFollowing: relationship.isFollowing,
-            isMutualFollow: relationship.isMutualFollow
-        )
-    }
-
-    private func profileRelationship(
-        currentUserID: UUID?,
-        targetUserID: UUID
-    ) async -> (isFollowing: Bool, isMutualFollow: Bool) {
-        guard let currentUserID, currentUserID != targetUserID else {
-            return (false, false)
-        }
-
-        async let outgoingRows: [ProfileFollowLookupRow]? = try? await supabase
-            .database("user_follows")
-            .select("follower_id,following_id")
-            .eq("follower_id", value: currentUserID.uuidString)
-            .eq("following_id", value: targetUserID.uuidString)
-            .limit(1)
-            .execute()
-            .value
-        async let incomingRows: [ProfileFollowLookupRow]? = try? await supabase
-            .database("user_follows")
-            .select("follower_id,following_id")
-            .eq("follower_id", value: targetUserID.uuidString)
-            .eq("following_id", value: currentUserID.uuidString)
-            .limit(1)
-            .execute()
-            .value
-
-        let isFollowing = await outgoingRows?.isEmpty == false
-        let followsCurrentUser = await incomingRows?.isEmpty == false
-        return (isFollowing, isFollowing && followsCurrentUser)
-    }
-
     func followUser(targetUserId: UUID) async throws {
         try await ProfileSocialService.shared.follow(targetUserId: targetUserId)
     }
 
     func unfollowUser(targetUserId: UUID) async throws {
         try await ProfileSocialService.shared.unfollow(targetUserId: targetUserId)
-    }
-}
-
-private struct ProfileFollowLookupRow: Decodable {
-    let followerID: UUID
-    let followingID: UUID
-
-    enum CodingKeys: String, CodingKey {
-        case followerID = "follower_id"
-        case followingID = "following_id"
     }
 }
 

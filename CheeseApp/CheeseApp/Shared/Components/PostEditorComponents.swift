@@ -472,33 +472,58 @@ struct PostInlineHighlightStatus: View {
     }
 }
 
+enum PostCurrencyPriceFieldEmphasis {
+    case primary
+    case secondary
+}
+
+private struct PostCurrencyPriceFieldChrome: ViewModifier {
+    let emphasis: PostCurrencyPriceFieldEmphasis
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        switch emphasis {
+        case .primary:
+            content.cheeseInputChrome(cornerRadius: 12)
+        case .secondary:
+            content.overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.black.opacity(0.06), lineWidth: 0.7)
+            }
+        }
+    }
+}
+
 struct PostCurrencyPriceField: View {
     let label: String
     let placeholder: String
     let iconColor: Color
+    let emphasis: PostCurrencyPriceFieldEmphasis
     @Binding var text: String
 
     init(
         label: String,
         placeholder: String,
         iconColor: Color = .secondary,
+        emphasis: PostCurrencyPriceFieldEmphasis = .primary,
         text: Binding<String>
     ) {
         self.label = label
         self.placeholder = placeholder
         self.iconColor = iconColor
+        self.emphasis = emphasis
         self._text = text
     }
 
     var body: some View {
         HStack(spacing: 12) {
             Text(label)
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(iconColor)
+                .font(.subheadline.weight(emphasis == .primary ? .semibold : .medium))
+                .foregroundColor(emphasis == .primary ? iconColor : AppColors.textMuted)
                 .frame(width: 36, alignment: .leading)
             Text("CAD")
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.secondary)
+                .font(.subheadline.weight(emphasis == .primary ? .semibold : .regular))
+                .foregroundColor(.secondary.opacity(emphasis == .primary ? 1 : 0.72))
             CheeseSystemTextField(
                 text: $text,
                 placeholder: placeholder,
@@ -507,9 +532,13 @@ struct PostCurrencyPriceField: View {
             .frame(height: 24)
         }
         .padding()
-        .background(Color.white)
+        .background(
+            emphasis == .primary
+                ? Color.white
+                : Color(uiColor: .secondarySystemBackground).opacity(0.72)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .cheeseInputChrome(cornerRadius: 12)
+        .modifier(PostCurrencyPriceFieldChrome(emphasis: emphasis))
     }
 }
 

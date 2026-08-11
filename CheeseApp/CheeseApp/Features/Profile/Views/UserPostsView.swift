@@ -417,14 +417,16 @@ struct UserPostsView: View {
                     ProfileGenderBadge(gender: service.profile?.gender)
                 }
 
-                ProfileUIDBadge(userID: userId) {
-                    ShareFeedbackPresenter.show(
-                        L10n.tr(
-                            "UID copied. Paste it into Search to find this profile.",
-                            "UID 已复制，可粘贴到搜索中查找该用户"
-                        )
-                    ) {
-                        uidCopyFeedbackMessage = $0
+                if let publicID = service.profile?.publicID {
+                    ProfileUIDBadge(publicID: publicID) {
+                        ShareFeedbackPresenter.show(
+                            L10n.tr(
+                                "UID copied. Paste it into Search to find this profile.",
+                                "UID 已复制，可粘贴到搜索中查找该用户"
+                            )
+                        ) {
+                            uidCopyFeedbackMessage = $0
+                        }
                     }
                 }
 

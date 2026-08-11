@@ -3,7 +3,7 @@
 //  CheeseApp
 //
 //  🎯 主标签导航视图
-//  自定义底部导航栏：Home - Search - Create(+) - Chat - Profile
+//  自定义底部导航栏：Home - Courses - Create(+) - Chat - Profile
 //
 
 import SwiftUI
@@ -24,8 +24,7 @@ struct MainTabView: View {
     @State private var showCreatePost = false
     @State private var showProfileOnboarding = false
     @State private var homeRootResetID = UUID()
-    @State private var searchRootResetID = UUID()
-    @State private var shouldAutoFocusSearch = false
+    @State private var courseRootResetID = UUID()
     @State private var chatRootResetID = UUID()
     @State private var profileRootResetID = UUID()
     @State private var isKeyboardVisible = false
@@ -70,15 +69,19 @@ struct MainTabView: View {
                     .accessibilityHidden(selectedTab != .home)
                 }
 
-                if shouldMount(.search) {
+                if shouldMount(.courses) {
                     NavigationStack {
-                        SearchView(shouldAutoFocus: $shouldAutoFocusSearch)
+                        CourseDiscoveryView(
+                            universityName: resolvedUniversityName,
+                            showsBackButton: false,
+                            hidesTabBar: false
+                        )
                     }
                     .enableSwipeBackGesture()
-                    .id(searchRootResetID)
-                    .opacity(selectedTab == .search ? 1 : 0)
-                    .allowsHitTesting(selectedTab == .search)
-                    .accessibilityHidden(selectedTab != .search)
+                    .id(courseRootResetID)
+                    .opacity(selectedTab == .courses ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .courses)
+                    .accessibilityHidden(selectedTab != .courses)
                 }
 
                 if shouldMount(.chat) {
@@ -106,7 +109,7 @@ struct MainTabView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             
             // 自定义底部导航栏。动画必须限定在这个子树：如果动画整个
-            // MainTabView，键盘安全区收起时会再次插值 Search 页的 ScrollView
+            // MainTabView，键盘安全区收起时会再次插值当前页的 ScrollView
             // 布局，导致水平筛选栏短暂跳位、重叠。
             Group {
                 if !tabBarVisibilityController.isHidden && !isKeyboardVisible {
@@ -117,8 +120,8 @@ struct MainTabView: View {
                         onHomeReselect: {
                             homeRootResetID = UUID()
                         },
-                        onSearchReselect: {
-                            searchRootResetID = UUID()
+                        onCourseReselect: {
+                            courseRootResetID = UUID()
                         },
                         onChatReselect: {
                             chatRootResetID = UUID()
@@ -214,7 +217,7 @@ struct MainTabView: View {
         }
         .onChange(of: authService.currentUser?.id) { _, _ in
             homeRootResetID = UUID()
-            searchRootResetID = UUID()
+            courseRootResetID = UUID()
             chatRootResetID = UUID()
             profileRootResetID = UUID()
             syncProfileOnboardingState()
@@ -302,19 +305,32 @@ struct MainTabView: View {
         activatedTabs.contains(tab) || selectedTab == tab
     }
 
+    private var resolvedUniversityName: String {
+        guard let rawSchool = authService.currentUser?.school else {
+            return L10n.tr("Unknown University", "未知学校")
+        }
+        if let option = CheeseUniversityOption.option(matching: rawSchool) {
+            return option.displayText
+        }
+        let trimmed = rawSchool.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty
+            ? L10n.tr("Unknown University", "未知学校")
+            : trimmed
+    }
+
 }
 
 // MARK: - Tab 枚举
 enum TabItem: String, CaseIterable {
     case home
-    case search
+    case courses
     case chat
     case profile
     
     var icon: String {
         switch self {
         case .home: return "house"
-        case .search: return "magnifyingglass"
+        case .courses: return "graduationcap"
         case .chat: return "bubble.left.and.bubble.right"
         case .profile: return "person"
         }
@@ -323,9 +339,18 @@ enum TabItem: String, CaseIterable {
     var selectedIcon: String {
         switch self {
         case .home: return "house.fill"
-        case .search: return "magnifyingglass"
+        case .courses: return "graduationcap.fill"
         case .chat: return "bubble.left.and.bubble.right.fill"
         case .profile: return "person.fill"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .home: return L10n.tr("Home", "首页")
+        case .courses: return L10n.tr("Course ratings", "课程评分")
+        case .chat: return L10n.tr("Messages", "消息")
+        case .profile: return L10n.tr("Profile", "个人档案")
         }
     }
 }
@@ -351,7 +376,7 @@ struct CustomTabBar: View {
     let chatUnreadBadgeCount: Int
     let showProfileRedDot: Bool
     var onHomeReselect: () -> Void
-    var onSearchReselect: () -> Void
+    var onCourseReselect: () -> Void
     var onChatReselect: () -> Void
     var onCreateTap: () -> Void
     
@@ -361,6 +386,7 @@ struct CustomTabBar: View {
             TabBarButton(
                 icon: TabItem.home.icon,
                 selectedIcon: TabItem.home.selectedIcon,
+                accessibilityLabel: TabItem.home.title,
                 isSelected: selectedTab == .home,
                 showIndicator: true
             ) {
@@ -371,17 +397,18 @@ struct CustomTabBar: View {
                 }
             }
             
-            // Search
+            // Course ratings
             TabBarButton(
-                icon: TabItem.search.icon,
-                selectedIcon: TabItem.search.selectedIcon,
-                isSelected: selectedTab == .search,
+                icon: TabItem.courses.icon,
+                selectedIcon: TabItem.courses.selectedIcon,
+                accessibilityLabel: TabItem.courses.title,
+                isSelected: selectedTab == .courses,
                 showIndicator: true
             ) {
-                if selectedTab == .search {
-                    onSearchReselect()
+                if selectedTab == .courses {
+                    onCourseReselect()
                 } else {
-                    selectedTab = .search
+                    selectedTab = .courses
                 }
             }
             
@@ -392,6 +419,7 @@ struct CustomTabBar: View {
             TabBarButton(
                 icon: TabItem.chat.icon,
                 selectedIcon: TabItem.chat.selectedIcon,
+                accessibilityLabel: TabItem.chat.title,
                 isSelected: selectedTab == .chat,
                 showIndicator: true,
                 badgeCount: chatUnreadBadgeCount
@@ -407,6 +435,7 @@ struct CustomTabBar: View {
             TabBarButton(
                 icon: TabItem.profile.icon,
                 selectedIcon: TabItem.profile.selectedIcon,
+                accessibilityLabel: TabItem.profile.title,
                 isSelected: selectedTab == .profile,
                 showIndicator: true,
                 showRedDot: showProfileRedDot
@@ -453,6 +482,7 @@ struct CustomTabBar: View {
 struct TabBarButton: View {
     let icon: String
     let selectedIcon: String
+    let accessibilityLabel: String
     let isSelected: Bool
     let showIndicator: Bool
     var badgeCount: Int = 0
@@ -497,6 +527,9 @@ struct TabBarButton: View {
             }
             .frame(maxWidth: .infinity)
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(accessibilityLabel))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var badgeLabel: String {
@@ -523,6 +556,7 @@ struct CreateButton: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Text(L10n.tr("Create post", "发布帖子")))
     }
 }
 

@@ -13,25 +13,29 @@ SELECT is(
   (
     SELECT id
     FROM public.search_profiles(
-      '00000000-0000-0000-0000-000000000001',
+      (
+        SELECT profile.public_uid
+        FROM public.profiles profile
+        WHERE profile.id = '00000000-0000-0000-0000-000000000001'::UUID
+      ),
       20
     )
     LIMIT 1
   ),
   '00000000-0000-0000-0000-000000000001'::UUID,
-  'a complete database UID finds the matching visible profile'
+  'an eight-digit public UID finds the matching visible profile'
 );
 
 SELECT is(
   (
     SELECT COUNT(*)
     FROM public.search_profiles(
-      'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      '00000000',
       20
     )
   ),
   0::BIGINT,
-  'an unknown UID does not match unrelated profiles'
+  'an unknown public UID does not match unrelated profiles'
 );
 
 SELECT * FROM finish();

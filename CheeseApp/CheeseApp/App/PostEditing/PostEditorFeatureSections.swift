@@ -28,8 +28,8 @@ struct SecondhandBasicInfoSection: View {
                 text: $title
             )
             PostCurrencyPriceField(
-                label: "卖价",
-                placeholder: "输入卖价",
+                label: "现价",
+                placeholder: "输入现价",
                 iconColor: iconColor,
                 text: $price
             )
@@ -37,6 +37,7 @@ struct SecondhandBasicInfoSection: View {
                 label: "原价",
                 placeholder: "选填",
                 iconColor: iconColor,
+                emphasis: .secondary,
                 text: $originalPrice
             )
         }

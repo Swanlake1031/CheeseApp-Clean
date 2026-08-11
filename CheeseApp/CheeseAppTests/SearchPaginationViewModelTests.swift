@@ -158,10 +158,12 @@ final class SearchPaginationViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.hotPosts(for: .forum).map(\.id), [forum.id])
     }
 
-    func testFullUIDSearchPublishesExactProfileResult() async {
+    func testPublicUIDSearchPublishesExactProfileResult() async {
         let profileID = UUID(uuidString: "08fcfe03-47d3-471e-a684-03bf064cf3b2")!
+        let publicID = "58310427"
         let expectedProfile = SearchProfileResult(
             id: profileID,
+            publicID: publicID,
             fullName: "UID Match",
             avatarURL: nil,
             university: nil,
@@ -182,10 +184,10 @@ final class SearchPaginationViewModelTests: XCTestCase {
             searchDebounceNanoseconds: 0
         )
 
-        viewModel.updateSearch(text: "  \(profileID.uuidString.lowercased())  ", category: .all)
+        viewModel.updateSearch(text: "  \(publicID)  ", category: .all)
         await waitUntil { viewModel.profileResults == [expectedProfile] }
 
-        XCTAssertEqual(receivedProfileQuery, profileID.uuidString.lowercased())
+        XCTAssertEqual(receivedProfileQuery, publicID)
         XCTAssertEqual(viewModel.profileResults.first?.id, profileID)
     }
 
@@ -193,6 +195,7 @@ final class SearchPaginationViewModelTests: XCTestCase {
         let profileID = UUID()
         let profile = SearchProfileResult(
             id: profileID,
+            publicID: "58310428",
             fullName: "Follow target",
             avatarURL: nil,
             university: nil,

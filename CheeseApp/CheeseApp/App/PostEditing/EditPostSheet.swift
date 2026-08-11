@@ -109,9 +109,7 @@ struct EditPostSheet: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    hideKeyboard()
-                }
+                .dismissKeyboardOnTap()
 
                 if showEditedToast {
                     VStack {
