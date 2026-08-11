@@ -508,34 +508,6 @@ struct ChatRoomView: View {
                 secondhandTransactionCard(intent)
                 Divider()
             }
-
-            if viewModel.shouldShowStrangerSafetyBanner {
-                strangerSafetyBanner
-            }
-        }
-    }
-
-    private var strangerSafetyBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.circle.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color(red: 0.86, green: 0.34, blue: 0.05))
-
-            Text("你和对方尚未互相关注。请注意隐私和交易安全。")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color(red: 0.86, green: 0.34, blue: 0.05))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .lineLimit(1)
-                .minimumScaleFactor(0.86)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(red: 1.0, green: 0.94, blue: 0.87))
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color(red: 0.96, green: 0.74, blue: 0.53))
-                .frame(height: 1)
         }
     }
 
@@ -575,12 +547,6 @@ struct ChatRoomView: View {
             Text(viewModel.blockedComposeHint)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.red.opacity(0.85))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 2)
-        } else if let hint = viewModel.strangerComposerHint {
-            Text(hint)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.orange.opacity(0.92))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 2)
         }
@@ -964,25 +930,6 @@ struct ChatRoomView: View {
 
     private func alert(for destination: ChatRoomAlertDestination) -> Alert {
         switch destination {
-        case .strangerEntry:
-            return Alert(
-                title: Text("陌生人消息"),
-                message: Text("你和对方尚未互相关注。请勿透露验证码、住址等敏感信息，交易前请确认对方身份。"),
-                dismissButton: .default(Text("我知道了")) {
-                    viewModel.acknowledgeStrangerSafety()
-                }
-            )
-        case .strangerSendConfirmation:
-            return Alert(
-                title: Text("发送给陌生人？"),
-                message: Text("你们尚未互相关注。在对方回复前，你只能发送一条消息。请注意隐私和交易安全。"),
-                primaryButton: .cancel(Text("取消")) {
-                    viewModel.cancelPendingSend()
-                },
-                secondaryButton: .default(Text("继续发送")) {
-                    viewModel.confirmPendingSend()
-                }
-            )
         case .clearHistoryConfirmation:
             return Alert(
                 title: Text("清空聊天记录？"),

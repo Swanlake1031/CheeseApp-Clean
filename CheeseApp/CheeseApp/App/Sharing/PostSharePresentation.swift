@@ -184,7 +184,7 @@ struct CheesePostShareBottomSheet: View {
 
     private var directTargets: [PostChatShareTarget] {
         var seen = Set<UUID>()
-        let conversations = (chatService.conversations + chatService.messageRequests).filter {
+        let conversations = chatService.conversations.filter {
             seen.insert($0.id).inserted
         }
 
@@ -215,8 +215,7 @@ struct CheesePostShareBottomSheet: View {
 
     private var friendTargets: [PostChatShareTarget] {
         let existingDirectUserIDs = Set(
-            (chatService.conversations + chatService.messageRequests)
-                .map(\.otherUserId)
+            chatService.conversations.map(\.otherUserId)
         )
 
         return PostShareRecipientPolicy

@@ -166,12 +166,6 @@ struct ChatRoomSettingsView: View {
 
                 HStack(spacing: 12) {
                     quickActionButton(icon: "person.2.badge.plus", title: "建立群组") {
-                        let isNonMutual = conversation.isMutualFollow == false || conversation.canChatFreely == false
-                        guard !isNonMutual else {
-                            showCreateGroupSheet = false
-                            quickActionErrorMessage = "当前不是互相关注关系，无法建立群组。"
-                            return
-                        }
                         quickActionErrorMessage = nil
                         showCreateGroupSheet = true
                     }

@@ -335,39 +335,23 @@ final class ChatRoomViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.displayedRoomError, "send failed")
     }
 
-    func testFirstStrangerSendWaitsForConfirmationAndPersistsAcknowledgement() async {
-        let conversation = ChatConversationPreview.fixture(
-            canChatFreely: false,
-            isMutualFollow: false
-        )
+    func testFirstDirectMessageSendsWithoutClassificationConfirmation() async {
+        let conversation = ChatConversationPreview.fixture()
         let senderID = UUID()
         let recorder = ChatRoomSendRecorder(conversationID: conversation.id, senderID: senderID)
-        let safetyStore = ChatStrangerSafetyStoreStub()
         let viewModel = makeViewModel(
             conversation,
             senderID: senderID,
-            recorder: recorder,
-            safetyStore: safetyStore
+            recorder: recorder
         )
 
         viewModel.draftText = "hello"
         viewModel.submitText()
-
-        XCTAssertEqual(viewModel.alertDestination, .strangerSendConfirmation)
-        let attemptsBeforeConfirmation = await recorder.textAttempts
-        XCTAssertEqual(attemptsBeforeConfirmation, 0)
-
-        viewModel.confirmPendingSend()
         await waitUntil { !viewModel.isSubmittingComposer && viewModel.messages.count == 1 }
 
-        XCTAssertTrue(
-            safetyStore.hasAcknowledged(
-                userID: senderID,
-                conversationID: conversation.id
-            )
-        )
-        let attemptsAfterConfirmation = await recorder.textAttempts
-        XCTAssertEqual(attemptsAfterConfirmation, 1)
+        XCTAssertNil(viewModel.alertDestination)
+        let attempts = await recorder.textAttempts
+        XCTAssertEqual(attempts, 1)
     }
 
     func testImageRetryReusesUploadedAsset() async {
@@ -669,21 +653,6 @@ final class ChatRoomViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.activeSecondhandPurchaseIntent)
     }
 
-    func testUserDefaultsSafetyAcknowledgementIsScopedToUserAndConversation() {
-        let suiteName = "ChatRoomViewModelTests.\(UUID().uuidString)"
-        let defaults = try! XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        let store = UserDefaultsChatStrangerSafetyStore(defaults: defaults)
-        let userID = UUID()
-        let conversationID = UUID()
-        store.acknowledge(userID: userID, conversationID: conversationID)
-
-        XCTAssertTrue(store.hasAcknowledged(userID: userID, conversationID: conversationID))
-        XCTAssertFalse(store.hasAcknowledged(userID: UUID(), conversationID: conversationID))
-        XCTAssertFalse(store.hasAcknowledged(userID: userID, conversationID: UUID()))
-    }
-
     private func makeViewModel(
         _ conversation: ChatConversationPreview,
         senderID: UUID,
@@ -691,7 +660,6 @@ final class ChatRoomViewModelTests: XCTestCase {
         chatService: (any ChatRoomServicing)? = nil,
         transactionService: (any SecondhandChatTransactionServicing)? = nil,
         mediaService: ChatRoomMediaServiceStub? = nil,
-        safetyStore: ChatStrangerSafetyStoreStub = ChatStrangerSafetyStoreStub(),
         stagedImages: [UIImage] = []
     ) -> ChatRoomViewModel {
         let state = ChatRoomMessageState<Message>(
@@ -717,7 +685,6 @@ final class ChatRoomViewModelTests: XCTestCase {
             chatService: chatService,
             secondhandTransactionService: transactionService,
             mediaService: mediaService ?? ChatRoomMediaServiceStub(),
-            strangerSafetyStore: safetyStore,
             currentUserID: senderID,
             stagedImages: stagedImages
         )
@@ -939,27 +906,8 @@ private actor ChatMediaLoaderRecorder {
     }
 }
 
-private final class ChatStrangerSafetyStoreStub: ChatStrangerSafetyStoring {
-    private var acknowledgements = Set<String>()
-
-    func hasAcknowledged(userID: UUID, conversationID: UUID) -> Bool {
-        acknowledgements.contains(key(userID: userID, conversationID: conversationID))
-    }
-
-    func acknowledge(userID: UUID, conversationID: UUID) {
-        acknowledgements.insert(key(userID: userID, conversationID: conversationID))
-    }
-
-    private func key(userID: UUID, conversationID: UUID) -> String {
-        "\(userID.uuidString):\(conversationID.uuidString)"
-    }
-}
-
 private extension ChatConversationPreview {
-    static func fixture(
-        canChatFreely: Bool? = true,
-        isMutualFollow: Bool? = true
-    ) -> ChatConversationPreview {
+    static func fixture() -> ChatConversationPreview {
         ChatConversationPreview(
             id: UUID(),
             otherUserId: UUID(),
@@ -968,9 +916,7 @@ private extension ChatConversationPreview {
             relatedPostId: nil,
             lastMessageAt: Date(),
             lastMessagePreview: nil,
-            unreadCount: 0,
-            canChatFreely: canChatFreely,
-            isMutualFollow: isMutualFollow
+            unreadCount: 0
         )
     }
 }

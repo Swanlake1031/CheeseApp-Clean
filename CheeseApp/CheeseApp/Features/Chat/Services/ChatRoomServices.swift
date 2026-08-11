@@ -346,31 +346,3 @@ private struct ResolveChatMediaCleanupParams: Encodable {
         case resolution = "p_resolution"
     }
 }
-
-protocol ChatStrangerSafetyStoring {
-    func hasAcknowledged(userID: UUID, conversationID: UUID) -> Bool
-    func acknowledge(userID: UUID, conversationID: UUID)
-}
-
-struct UserDefaultsChatStrangerSafetyStore: ChatStrangerSafetyStoring {
-    private let defaults: UserDefaults
-
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-    }
-
-    func hasAcknowledged(userID: UUID, conversationID: UUID) -> Bool {
-        defaults.bool(forKey: storageKey(userID: userID, conversationID: conversationID))
-    }
-
-    func acknowledge(userID: UUID, conversationID: UUID) {
-        defaults.set(
-            true,
-            forKey: storageKey(userID: userID, conversationID: conversationID)
-        )
-    }
-
-    private func storageKey(userID: UUID, conversationID: UUID) -> String {
-        "chat.strangerSafetyAcknowledged.\(userID.uuidString).\(conversationID.uuidString)"
-    }
-}

@@ -2,7 +2,7 @@ import XCTest
 @testable import CheeseApp
 
 final class ChatConversationStateUpdaterTests: XCTestCase {
-    func testMarkConversationReadClearsUnreadAcrossConversationBuckets() {
+    func testMarkConversationReadClearsUnread() {
         let updater = ChatConversationStateUpdater()
         let conversationId = UUID(uuidString: "71000000-0000-0000-0000-000000000001")!
         var conversations = [
@@ -12,22 +12,12 @@ final class ChatConversationStateUpdaterTests: XCTestCase {
                 unreadCount: 3
             )
         ]
-        var messageRequests = [
-            ChatConversationPreview.fixture(
-                id: conversationId,
-                otherUserName: "阿哲",
-                unreadCount: 2
-            )
-        ]
-
         updater.markConversationRead(
             conversationId: conversationId,
-            conversations: &conversations,
-            messageRequests: &messageRequests
+            conversations: &conversations
         )
 
         XCTAssertEqual(conversations.first?.unreadCount, 0)
-        XCTAssertEqual(messageRequests.first?.unreadCount, 0)
     }
 
     func testSetGroupConversationUnreadCountClampsToZero() {
@@ -67,8 +57,6 @@ private extension ChatConversationPreview {
             lastMessageAt: Date(),
             lastMessagePreview: "你好",
             unreadCount: unreadCount,
-            canChatFreely: true,
-            isMutualFollow: true,
             isMuted: false
         )
     }

@@ -64,8 +64,6 @@ struct ChatConversationStateUpdater {
                 lastMessageAt: preview.lastMessageAt,
                 lastMessagePreview: nil,
                 unreadCount: 0,
-                canChatFreely: preview.canChatFreely,
-                isMutualFollow: preview.isMutualFollow,
                 isMuted: preview.isMuted
             )
         }
@@ -73,81 +71,56 @@ struct ChatConversationStateUpdater {
 
     func markConversationRead(
         conversationId: UUID,
-        conversations: inout [ChatConversationPreview],
-        messageRequests: inout [ChatConversationPreview]
+        conversations: inout [ChatConversationPreview]
     ) {
         if let index = conversations.firstIndex(where: { $0.id == conversationId }) {
             conversations[index].unreadCount = 0
-        }
-
-        if let index = messageRequests.firstIndex(where: { $0.id == conversationId }) {
-            messageRequests[index].unreadCount = 0
         }
     }
 
     func markConversationUnread(
         conversationId: UUID,
-        conversations: inout [ChatConversationPreview],
-        messageRequests: inout [ChatConversationPreview]
+        conversations: inout [ChatConversationPreview]
     ) {
         if let index = conversations.firstIndex(where: { $0.id == conversationId }) {
             conversations[index].unreadCount = max(1, conversations[index].unreadCount)
-        }
-
-        if let index = messageRequests.firstIndex(where: { $0.id == conversationId }) {
-            messageRequests[index].unreadCount = max(1, messageRequests[index].unreadCount)
         }
     }
 
     func setConversationMuted(
         conversationId: UUID,
         isMuted: Bool,
-        conversations: inout [ChatConversationPreview],
-        messageRequests: inout [ChatConversationPreview]
+        conversations: inout [ChatConversationPreview]
     ) {
         if let index = conversations.firstIndex(where: { $0.id == conversationId }) {
             conversations[index].isMuted = isMuted
-        }
-        if let index = messageRequests.firstIndex(where: { $0.id == conversationId }) {
-            messageRequests[index].isMuted = isMuted
         }
     }
 
     func clearConversationPreview(
         conversationId: UUID,
-        conversations: inout [ChatConversationPreview],
-        messageRequests: inout [ChatConversationPreview]
+        conversations: inout [ChatConversationPreview]
     ) {
         if let index = conversations.firstIndex(where: { $0.id == conversationId }) {
             conversations[index] = clearedConversationPreview(from: conversations[index])
-        }
-
-        if let index = messageRequests.firstIndex(where: { $0.id == conversationId }) {
-            messageRequests[index] = clearedConversationPreview(from: messageRequests[index])
         }
     }
 
     func removeConversation(
         conversationId: UUID,
-        conversations: inout [ChatConversationPreview],
-        messageRequests: inout [ChatConversationPreview]
+        conversations: inout [ChatConversationPreview]
     ) {
         conversations.removeAll { $0.id == conversationId }
-        messageRequests.removeAll { $0.id == conversationId }
     }
 
     func upsertConversation(
         _ preview: ChatConversationPreview,
-        conversations: inout [ChatConversationPreview],
-        messageRequests: inout [ChatConversationPreview]
+        conversations: inout [ChatConversationPreview]
     ) {
         var preview = preview
-        if let existing = conversations.first(where: { $0.id == preview.id })
-            ?? messageRequests.first(where: { $0.id == preview.id }) {
+        if let existing = conversations.first(where: { $0.id == preview.id }) {
             preview.isMuted = existing.isMuted
         }
-
-        messageRequests.removeAll { $0.id == preview.id }
 
         if let index = conversations.firstIndex(where: { $0.id == preview.id }) {
             conversations[index] = preview
@@ -217,8 +190,6 @@ struct ChatConversationStateUpdater {
             lastMessageAt: preview.lastMessageAt,
             lastMessagePreview: nil,
             unreadCount: 0,
-            canChatFreely: preview.canChatFreely,
-            isMutualFollow: preview.isMutualFollow,
             isMuted: preview.isMuted
         )
     }

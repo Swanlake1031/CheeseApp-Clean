@@ -2,7 +2,6 @@ import Foundation
 
 enum ChatInboxRoute: Hashable, Identifiable {
     case systemMessages(SystemMessageCategory)
-    case messageRequests
     case group(ChatGroupPreview)
     case conversation(ChatConversationPreview)
     case profile(UUID)
@@ -11,8 +10,6 @@ enum ChatInboxRoute: Hashable, Identifiable {
         switch self {
         case .systemMessages(let category):
             return "system-messages:\(category.rawValue)"
-        case .messageRequests:
-            return "message-requests"
         case .group(let group):
             return "group:\(group.id.uuidString)"
         case .conversation(let conversation):
@@ -24,7 +21,6 @@ enum ChatInboxRoute: Hashable, Identifiable {
 }
 
 enum ChatInboxSectionKind: String, Hashable, Identifiable {
-    case messageRequests
     case groups
     case directMessages
 
@@ -32,8 +28,6 @@ enum ChatInboxSectionKind: String, Hashable, Identifiable {
 
     var title: String {
         switch self {
-        case .messageRequests:
-            return "陌生人消息"
         case .groups:
             return "群聊"
         case .directMessages:
@@ -43,14 +37,11 @@ enum ChatInboxSectionKind: String, Hashable, Identifiable {
 }
 
 enum ChatInboxSectionItem: Hashable, Identifiable {
-    case messageRequest(ChatConversationPreview)
     case group(ChatGroupPreview)
     case direct(ChatConversationPreview)
 
     var id: UUID {
         switch self {
-        case .messageRequest(let conversation):
-            return conversation.id
         case .group(let group):
             return group.id
         case .direct(let conversation):
@@ -69,7 +60,6 @@ struct ChatInboxSection: Hashable, Identifiable {
 
 struct ChatInboxPresentationState {
     let searchText: String
-    let messageRequests: [ChatConversationPreview]
     let directConversations: [ChatConversationPreview]
     let groupConversations: [ChatGroupPreview]
     let displayNamesByConversationId: [UUID: String]
@@ -87,11 +77,6 @@ struct ChatInboxPresentationState {
     var visibleSections: [ChatInboxSection] {
         if isSearching {
             return [
-                makeConversationSection(
-                    kind: .messageRequests,
-                    conversations: messageRequests,
-                    itemBuilder: ChatInboxSectionItem.messageRequest
-                ),
                 makeGroupSection(),
                 makeConversationSection(
                     kind: .directMessages,

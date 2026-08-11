@@ -42,8 +42,6 @@ enum ChatRoomSheetDestination: Identifiable {
 }
 
 enum ChatRoomAlertDestination: Identifiable, Equatable {
-    case strangerEntry
-    case strangerSendConfirmation
     case clearHistoryConfirmation
     case blockConfirmation
     case unblockConfirmation
@@ -54,8 +52,6 @@ enum ChatRoomAlertDestination: Identifiable, Equatable {
 
     var id: String {
         switch self {
-        case .strangerEntry: return "stranger-entry"
-        case .strangerSendConfirmation: return "stranger-send-confirmation"
         case .clearHistoryConfirmation: return "clear-history-confirmation"
         case .blockConfirmation: return "block-confirmation"
         case .unblockConfirmation: return "unblock-confirmation"
@@ -114,7 +110,6 @@ final class ChatRoomViewModel: ObservableObject {
     @Published private(set) var clearBeforeAt: Date?
     @Published private(set) var blockRelation: UserBlockRelation = .none
     @Published private(set) var isApplyingPrivacyAction = false
-    @Published private(set) var hasAcknowledgedStrangerSafety = false
     @Published private(set) var conversationDisplayName: String
     @Published private(set) var conversationRemark: String?
     @Published private(set) var secondhandPurchaseIntent: SecondhandChatPurchaseIntent?
@@ -131,10 +126,8 @@ final class ChatRoomViewModel: ObservableObject {
 
     private let chatService: any ChatRoomServicing
     private let mediaService: any ChatRoomMediaServicing
-    private let strangerSafetyStore: any ChatStrangerSafetyStoring
     private let secondhandTransactionService: (any SecondhandChatTransactionServicing)?
     private var currentUserID: UUID?
-    private var pendingSendConfirmation: ChatRoomPendingSend?
     private var failedSend: ChatRoomPendingSend?
     private var messageStateObservation: AnyCancellable?
     private var mediaPreparationTask: Task<Void, Never>?
@@ -151,30 +144,21 @@ final class ChatRoomViewModel: ObservableObject {
         chatService: (any ChatRoomServicing)? = nil,
         secondhandTransactionService: (any SecondhandChatTransactionServicing)? = nil,
         mediaService: (any ChatRoomMediaServicing)? = nil,
-        strangerSafetyStore: (any ChatStrangerSafetyStoring)? = nil,
         currentUserID: UUID? = nil,
         stagedImages: [UIImage] = []
     ) {
         let resolvedChatService = chatService ?? ChatService.shared
-        let resolvedSafetyStore = strangerSafetyStore ?? UserDefaultsChatStrangerSafetyStore()
 
         self.conversation = conversation
         self.roomState = roomState ?? .direct(conversationID: conversation.id)
         self.chatService = resolvedChatService
         self.secondhandTransactionService = secondhandTransactionService
         self.mediaService = mediaService ?? LiveChatRoomMediaService()
-        self.strangerSafetyStore = resolvedSafetyStore
         self.currentUserID = currentUserID
         self.stagedMedia = stagedImages.map { ChatRoomPendingImage(image: $0) }
         self.conversationDisplayName = resolvedChatService.displayName(for: conversation)
         self.conversationRemark = resolvedChatService.conversationRemark(for: conversation.id)
         self.secondhandPurchaseIntent = nil
-        if let currentUserID {
-            hasAcknowledgedStrangerSafety = resolvedSafetyStore.hasAcknowledged(
-                userID: currentUserID,
-                conversationID: conversation.id
-            )
-        }
 
         messageStateObservation = self.roomState.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
@@ -202,29 +186,7 @@ final class ChatRoomViewModel: ObservableObject {
         !stagedMedia.isEmpty
             || !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
-    var isStrangerConversation: Bool {
-        ChatStrangerSafetyPolicy.isExplicitStranger(
-            isMutualFollow: conversation.isMutualFollow,
-            canChatFreely: conversation.canChatFreely
-        )
-    }
-    var shouldShowStrangerSafetyBanner: Bool {
-        roomState.hasResolvedInitialLoad && isStrangerConversation
-    }
-    var imageSelectionLimit: Int {
-        isStrangerConversation && !hasEverSentMessage && !hasReceivedMessage ? 1 : 9
-    }
-    var strangerComposerHint: String? {
-        guard roomState.hasResolvedInitialLoad, canCompose, isStrangerConversation else {
-            return nil
-        }
-        if hasReceivedMessage && !hasEverSentMessage {
-            return "对方目前只能给你发送一条消息。你回复后，双方可继续聊天。"
-        }
-        return !hasEverSentMessage && !hasReceivedMessage
-            ? "在对方回复前，你只能发送一条消息。"
-            : nil
-    }
+    var imageSelectionLimit: Int { 9 }
     var blockedComposeHint: String {
         if blockRelation.isBlockedByMe && blockRelation.isBlockedByOther {
             return "双方处于封锁状态，当前会话仅可查看历史消息。"
@@ -243,41 +205,13 @@ final class ChatRoomViewModel: ObservableObject {
         })?.id
     }
 
-    private var hasEverSentMessage: Bool {
-        guard let currentUserID else { return false }
-        return messages.contains { $0.senderId == currentUserID }
-    }
-
-    private var hasReceivedMessage: Bool {
-        guard let currentUserID else { return false }
-        return messages.contains { $0.senderId != currentUserID }
-    }
-
-    private var strangerSafetyPolicy: ChatStrangerSafetyPolicy {
-        ChatStrangerSafetyPolicy(
-            isStranger: isStrangerConversation,
-            hasSentMessage: hasEverSentMessage,
-            hasReceivedMessage: hasReceivedMessage,
-            hasAcknowledgedNotice: hasAcknowledgedStrangerSafety
-        )
-    }
-
     func bootstrap(currentUserID: UUID?) async {
         self.currentUserID = currentUserID
-        if let currentUserID {
-            hasAcknowledgedStrangerSafety = strangerSafetyStore.hasAcknowledged(
-                userID: currentUserID,
-                conversationID: conversation.id
-            )
-        }
         await roomState.bootstrap { [weak self] in
             guard let self else { return }
             await self.loadPrivacyState()
             await self.refreshSecondhandPurchaseIntent()
             self.roomState.updateMinimumVisibleDate(self.clearBeforeAt)
-        }
-        if strangerSafetyPolicy.shouldShowEntryNotice {
-            alertDestination = .strangerEntry
         }
     }
 
@@ -481,19 +415,6 @@ final class ChatRoomViewModel: ObservableObject {
         requestSend(stagedMedia.isEmpty ? .text(draftText, pendingQuote) : .images)
     }
 
-    func confirmPendingSend() {
-        guard let send = pendingSendConfirmation else { return }
-        pendingSendConfirmation = nil
-        alertDestination = nil
-        acknowledgeStrangerSafety()
-        launchSend(send)
-    }
-
-    func cancelPendingSend() {
-        pendingSendConfirmation = nil
-        alertDestination = nil
-    }
-
     func retryFailedSend() {
         guard let send = failedSend else { return }
         launchSend(send)
@@ -507,16 +428,6 @@ final class ChatRoomViewModel: ObservableObject {
         guard isSubmittingComposer, !stagedMedia.isEmpty else { return }
         mediaCancellationRequested = true
         isCancellingMediaSend = true
-    }
-
-    func acknowledgeStrangerSafety() {
-        hasAcknowledgedStrangerSafety = true
-        alertDestination = nil
-        guard let currentUserID else { return }
-        strangerSafetyStore.acknowledge(
-            userID: currentUserID,
-            conversationID: conversation.id
-        )
     }
 
     func openOtherUserProfile() {
@@ -670,12 +581,7 @@ final class ChatRoomViewModel: ObservableObject {
 
     private func requestSend(_ send: ChatRoomPendingSend) {
         guard canCompose, !isSubmittingComposer, !isPreparingMedia, hasContent(for: send) else { return }
-        if strangerSafetyPolicy.requiresSendConfirmation {
-            pendingSendConfirmation = send
-            alertDestination = .strangerSendConfirmation
-        } else {
-            launchSend(send)
-        }
+        launchSend(send)
     }
 
     private func launchSend(_ send: ChatRoomPendingSend) {

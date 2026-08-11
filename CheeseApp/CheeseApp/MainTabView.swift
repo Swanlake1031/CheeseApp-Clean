@@ -43,16 +43,11 @@ struct MainTabView: View {
             guard !conversation.isMuted else { return }
             partial += max(0, conversation.unreadCount)
         }
-        let requestUnread = chatService.messageRequests.reduce(into: 0) { partial, conversation in
-            guard !conversation.isMuted else { return }
-            partial += max(0, conversation.unreadCount)
-        }
         let groupUnread = chatService.groupConversations.reduce(into: 0) { partial, group in
             guard !group.isMuted else { return }
             partial += max(0, group.unreadCount)
         }
         return directUnread
-            + requestUnread
             + groupUnread
             + systemMessageService.unreadCount
     }

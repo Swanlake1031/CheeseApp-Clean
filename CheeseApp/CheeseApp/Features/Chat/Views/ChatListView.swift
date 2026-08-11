@@ -2,7 +2,7 @@
 //  ChatListView.swift
 //  CheeseApp
 //
-//  💬 聊天列表视图（主消息 + 陌生人消息 + 群聊）
+//  💬 聊天列表视图（私信 + 群聊）
 //
 
 import SwiftUI
@@ -22,8 +22,7 @@ struct ChatListView: View {
     @State private var isSearchFieldFocused = false
 
     private var conversationDisplayNamesById: [UUID: String] {
-        let previews = chatService.messageRequests + chatService.conversations
-        return previews.reduce(into: [UUID: String]()) { partialResult, preview in
+        chatService.conversations.reduce(into: [UUID: String]()) { partialResult, preview in
             partialResult[preview.id] = chatService.displayName(for: preview)
         }
     }
@@ -31,7 +30,6 @@ struct ChatListView: View {
     private var inboxState: ChatInboxPresentationState {
         ChatInboxPresentationState(
             searchText: searchText,
-            messageRequests: chatService.messageRequests,
             directConversations: chatService.conversations,
             groupConversations: chatService.groupConversations,
             displayNamesByConversationId: conversationDisplayNamesById
@@ -155,9 +153,7 @@ struct ChatListView: View {
         case .conversation(let conversationID):
             do {
                 let preview: ChatConversationPreview
-                if let existing =
-                    chatService.messageRequests.first(where: { $0.id == conversationID })
-                    ?? chatService.conversations.first(where: { $0.id == conversationID }) {
+                if let existing = chatService.conversations.first(where: { $0.id == conversationID }) {
                     preview = existing
                 } else {
                     preview = try await chatService.fetchConversationPreview(
@@ -285,20 +281,6 @@ struct ChatListView: View {
                 .padding(.leading, 76)
 
             systemCategoryEntry(.interaction)
-
-            Divider()
-                .padding(.leading, 76)
-
-            inboxCategoryEntry(
-                title: "陌生人消息",
-                preview: strangerMessagePreview,
-                icon: "bubble.left.fill",
-                tint: Color(red: 1.0, green: 0.36, blue: 0.39),
-                date: latestMessageRequest?.lastMessageAt,
-                unreadCount: strangerMessageBadgeCount
-            ) {
-                activeRoute = .messageRequests
-            }
         }
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -378,28 +360,6 @@ struct ChatListView: View {
         .buttonStyle(.plain)
     }
 
-    private var latestMessageRequest: ChatConversationPreview? {
-        chatService.messageRequests.max { $0.lastMessageAt < $1.lastMessageAt }
-    }
-
-    private var strangerMessageBadgeCount: Int {
-        let unread = chatService.messageRequests.reduce(0) { partial, conversation in
-            partial + max(conversation.unreadCount, 0)
-        }
-        return unread > 0 ? unread : chatService.messageRequests.count
-    }
-
-    private var strangerMessagePreview: String {
-        guard let latestMessageRequest else { return "暂无陌生人消息" }
-        let name = chatService.displayName(for: latestMessageRequest)
-        let message = latestMessageRequest.lastMessagePreview?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let message, !message.isEmpty else {
-            return "\(name) 发来陌生人消息"
-        }
-        return "\(name)：\(message)"
-    }
-
     private var loadingState: some View {
         VStack(spacing: 12) {
             ProgressView()
@@ -466,7 +426,7 @@ struct ChatListView: View {
             }
             .buttonStyle(.plain)
 
-        case .direct(let conversation), .messageRequest(let conversation):
+        case .direct(let conversation):
             ConversationSwipeActionRow(
                 conversation: conversation,
                 activeSwipeConversationId: $activeSwipeConversationId,
@@ -514,8 +474,6 @@ struct ChatListView: View {
                     activeRoute = .profile(userID)
                 }
             )
-        case .messageRequests:
-            MessageRequestsView()
         case .group(let group):
             GroupChatRoomView(group: currentGroupRoute(group))
         case .conversation(let conversation):
@@ -568,7 +526,6 @@ private extension ChatListView {
 
     func currentConversationRoute(_ fallback: ChatConversationPreview) -> ChatConversationPreview {
         chatService.conversations.first(where: { $0.id == fallback.id })
-        ?? chatService.messageRequests.first(where: { $0.id == fallback.id })
         ?? fallback
     }
 

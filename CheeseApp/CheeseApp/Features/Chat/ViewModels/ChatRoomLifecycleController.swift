@@ -40,28 +40,6 @@ struct ChatRoomLifecycleController: Equatable {
     }
 }
 
-struct ChatStrangerSafetyPolicy {
-    let isStranger: Bool
-    let hasSentMessage: Bool
-    let hasReceivedMessage: Bool
-    let hasAcknowledgedNotice: Bool
-
-    static func isExplicitStranger(
-        isMutualFollow: Bool?,
-        canChatFreely: Bool?
-    ) -> Bool {
-        isMutualFollow == false || canChatFreely == false
-    }
-
-    var shouldShowEntryNotice: Bool {
-        isStranger && hasReceivedMessage && !hasSentMessage && !hasAcknowledgedNotice
-    }
-
-    var requiresSendConfirmation: Bool {
-        isStranger && !hasSentMessage && !hasAcknowledgedNotice
-    }
-}
-
 protocol ChatRoomTimelineMessage: Identifiable where ID == UUID {
     var createdAt: Date { get }
 }

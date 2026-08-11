@@ -3,11 +3,6 @@ import XCTest
 
 final class ChatInboxPresentationStateTests: XCTestCase {
     func testBrowsingStateKeepsPrimaryConversationSectionsSeparateFromInboxCategories() {
-        let request = ChatConversationPreview.fixture(
-            id: UUID(uuidString: "70000000-0000-0000-0000-000000000001")!,
-            otherUserName: "陌生人",
-            lastMessagePreview: "你好呀"
-        )
         let direct = ChatConversationPreview.fixture(
             id: UUID(uuidString: "70000000-0000-0000-0000-000000000002")!,
             otherUserName: "阿哲",
@@ -20,13 +15,9 @@ final class ChatInboxPresentationStateTests: XCTestCase {
 
         let state = ChatInboxPresentationState(
             searchText: "",
-            messageRequests: [request],
             directConversations: [direct],
             groupConversations: [group],
-            displayNamesByConversationId: [
-                request.id: "陌生人",
-                direct.id: "阿哲"
-            ]
+            displayNamesByConversationId: [direct.id: "阿哲"]
         )
 
         XCTAssertEqual(state.visibleSections.map(\.kind), [.groups, .directMessages])
@@ -42,7 +33,6 @@ final class ChatInboxPresentationStateTests: XCTestCase {
 
         let state = ChatInboxPresentationState(
             searchText: "室友",
-            messageRequests: [],
             directConversations: [direct],
             groupConversations: [],
             displayNamesByConversationId: [direct.id: "新室友"]
@@ -75,7 +65,6 @@ final class ChatInboxPresentationStateTests: XCTestCase {
             ChatInboxRoute.systemMessages(.system).id,
             ChatInboxRoute.systemMessages(.interaction).id
         )
-        XCTAssertEqual(ChatInboxRoute.messageRequests.id, "message-requests")
     }
 
     func testSearchMatchesGroupNameAndReportsEmptyStateWhenNothingMatches() {
@@ -86,7 +75,6 @@ final class ChatInboxPresentationStateTests: XCTestCase {
 
         let matchingState = ChatInboxPresentationState(
             searchText: "Markham",
-            messageRequests: [],
             directConversations: [],
             groupConversations: [group],
             displayNamesByConversationId: [:]
@@ -97,7 +85,6 @@ final class ChatInboxPresentationStateTests: XCTestCase {
 
         let emptyState = ChatInboxPresentationState(
             searchText: "Vancouver",
-            messageRequests: [],
             directConversations: [],
             groupConversations: [group],
             displayNamesByConversationId: [:]
@@ -124,8 +111,6 @@ private extension ChatConversationPreview {
             lastMessageAt: Date(),
             lastMessagePreview: lastMessagePreview,
             unreadCount: 0,
-            canChatFreely: true,
-            isMutualFollow: true,
             isMuted: false
         )
     }

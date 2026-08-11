@@ -476,14 +476,6 @@ SELECT throws_like(
 );
 
 SELECT throws_like(
-  $$SELECT * FROM public.get_user_message_requests(
-    '00000000-0000-0000-0000-000000000002'::UUID
-  )$$,
-  '%identity mismatch%',
-  'user A cannot list user B message requests'
-);
-
-SELECT throws_like(
   $$SELECT * FROM public.get_user_chat_groups(
     '00000000-0000-0000-0000-000000000002'::UUID
   )$$,

@@ -75,7 +75,6 @@ class ChatService: ObservableObject {
     static let shared = ChatService()
     
     @Published var conversations: [ChatConversationPreview] = []
-    @Published var messageRequests: [ChatConversationPreview] = []
     @Published var groupConversations: [ChatGroupPreview] = []
     @Published private(set) var conversationRemarks: [UUID: String] = [:]
     @Published var isLoadingConversations = false
@@ -129,7 +128,6 @@ class ChatService: ObservableObject {
         accountGeneration &+= 1
         stateOwnerID = ownerID
         conversations = []
-        messageRequests = []
         groupConversations = []
         conversationRemarks = [:]
         remarksOwnerId = nil
@@ -156,7 +154,7 @@ class ChatService: ObservableObject {
         CollectionLoadState.resolve(
             hasResolvedInitialLoad: hasResolvedInitialConversationLoad,
             isLoading: isLoadingConversations,
-            hasContent: !conversations.isEmpty || !messageRequests.isEmpty || !groupConversations.isEmpty,
+            hasContent: !conversations.isEmpty || !groupConversations.isEmpty,
             errorMessage: conversationErrorMessage
         )
     }
@@ -256,7 +254,6 @@ class ChatService: ObservableObject {
             ) else { return }
 
             conversations = snapshot.directConversations
-            messageRequests = snapshot.messageRequests
             groupConversations = snapshot.groupConversations
             hasResolvedInitialConversationLoad = true
         } catch {
@@ -284,7 +281,7 @@ class ChatService: ObservableObject {
             return try await injectedConversationStateLoader(userID)
         }
 
-        // Resolve the three list endpoints as one atomic snapshot first. The previous
+        // Resolve the direct and group endpoints as one atomic snapshot first. The previous
         // implementation also launched five settings requests at the same time (including
         // duplicate reads of user_conversation_settings), which could overload the mobile
         // connection and cancel part of the refresh.
@@ -301,32 +298,16 @@ class ChatService: ObservableObject {
             snapshot.directConversations,
             clearMap: conversationSettings.clearBeforeMap
         )
-        let messageRequests = stateUpdater.applyClearHistoryToPreviews(
-            snapshot.messageRequests,
-            clearMap: conversationSettings.clearBeforeMap
-        )
-        let requests = stateUpdater.applyConversationListState(
-            to: stateUpdater.applyMuteState(
-                to: messageRequests,
-                mutedConversationIDs: conversationSettings.mutedConversationIDs
-            ),
-            manualUnreadConversationIDs: conversationSettings.manualUnreadConversationIDs,
-            hiddenConversationUntilMap: conversationSettings.hiddenConversationUntilMap
-        )
-        let requestIDs = Set(requests.map(\.id))
 
         return ChatConversationRepositorySnapshot(
             directConversations: stateUpdater.applyConversationListState(
                 to: stateUpdater.applyMuteState(
-                    to: directConversations.filter {
-                        !requestIDs.contains($0.id)
-                    },
+                    to: directConversations,
                     mutedConversationIDs: conversationSettings.mutedConversationIDs
                 ),
                 manualUnreadConversationIDs: conversationSettings.manualUnreadConversationIDs,
                 hiddenConversationUntilMap: conversationSettings.hiddenConversationUntilMap
             ),
-            messageRequests: requests,
             groupConversations: stateUpdater.applyGroupMuteState(
                 to: snapshot.groupConversations,
                 mutedGroupIDs: mutedGroupIDs
@@ -366,8 +347,7 @@ class ChatService: ObservableObject {
                 ) else { return preview }
                 stateUpdater.upsertConversation(
                     preview,
-                    conversations: &conversations,
-                    messageRequests: &messageRequests
+                    conversations: &conversations
                 )
                 return preview
             }
@@ -402,8 +382,7 @@ class ChatService: ObservableObject {
         ) else { return preview }
         stateUpdater.upsertConversation(
             preview,
-            conversations: &conversations,
-            messageRequests: &messageRequests
+            conversations: &conversations
         )
         return preview
     }
@@ -437,8 +416,7 @@ class ChatService: ObservableObject {
         ) else { return preview }
         stateUpdater.upsertConversation(
             preview,
-            conversations: &conversations,
-            messageRequests: &messageRequests
+            conversations: &conversations
         )
         return preview
     }
@@ -870,8 +848,7 @@ class ChatService: ObservableObject {
         stateUpdater.setConversationMuted(
             conversationId: conversationId,
             isMuted: isMuted,
-            conversations: &conversations,
-            messageRequests: &messageRequests
+            conversations: &conversations
         )
     }
 
@@ -889,8 +866,7 @@ class ChatService: ObservableObject {
         await markConversationRead(conversationId)
         stateUpdater.clearConversationPreview(
             conversationId: conversationId,
-            conversations: &conversations,
-            messageRequests: &messageRequests
+            conversations: &conversations
         )
         return clearedAt
     }
@@ -910,8 +886,7 @@ class ChatService: ObservableObject {
         ) else { return }
         stateUpdater.markConversationUnread(
             conversationId: conversationId,
-            conversations: &conversations,
-            messageRequests: &messageRequests
+            conversations: &conversations
         )
     }
 
@@ -927,8 +902,7 @@ class ChatService: ObservableObject {
         ) else { return }
         stateUpdater.removeConversation(
             conversationId: conversationId,
-            conversations: &conversations,
-            messageRequests: &messageRequests
+            conversations: &conversations
         )
     }
 
@@ -945,8 +919,7 @@ class ChatService: ObservableObject {
         await markConversationRead(conversationId)
         stateUpdater.removeConversation(
             conversationId: conversationId,
-            conversations: &conversations,
-            messageRequests: &messageRequests
+            conversations: &conversations
         )
     }
 
@@ -1130,10 +1103,7 @@ class ChatService: ObservableObject {
             return NSError(
                 domain: "",
                 code: 403,
-                userInfo: [
-                    NSLocalizedDescriptionKey:
-                        "陌生人聊天需等待对方回复后才能继续发送；互相关注后可自由聊天。"
-                ]
+                userInfo: [NSLocalizedDescriptionKey: "当前无法发送私信，请稍后重试。"]
             )
         }
         return error
@@ -1156,8 +1126,7 @@ class ChatService: ObservableObject {
     func markConversationRead(_ conversationId: UUID) async {
         stateUpdater.markConversationRead(
             conversationId: conversationId,
-            conversations: &conversations,
-            messageRequests: &messageRequests
+            conversations: &conversations
         )
         await privacyActions.markConversationRead(conversationId: conversationId)
     }
@@ -1186,8 +1155,7 @@ class ChatService: ObservableObject {
         ) else { return }
         stateUpdater.upsertConversation(
             preview,
-            conversations: &conversations,
-            messageRequests: &messageRequests
+            conversations: &conversations
         )
     }
 
@@ -1212,14 +1180,11 @@ class ChatService: ObservableObject {
                 lastMessageAt: messageCreatedAt,
                 lastMessagePreview: lastMessagePreview,
                 unreadCount: current.unreadCount,
-                canChatFreely: current.canChatFreely,
-                isMutualFollow: current.isMutualFollow,
                 isMuted: current.isMuted
             )
             stateUpdater.upsertConversation(
                 updated,
-                conversations: &conversations,
-                messageRequests: &messageRequests
+                conversations: &conversations
             )
             return
         }
@@ -1297,14 +1262,6 @@ struct ChatGetOrCreateConversationParams: Encodable {
 }
 
 struct ChatGetUserConversationsParams: Encodable {
-    let pUserId: UUID
-
-    enum CodingKeys: String, CodingKey {
-        case pUserId = "p_user_id"
-    }
-}
-
-struct ChatGetUserMessageRequestsParams: Encodable {
     let pUserId: UUID
 
     enum CodingKeys: String, CodingKey {

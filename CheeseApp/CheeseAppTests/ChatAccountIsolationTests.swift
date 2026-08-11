@@ -38,13 +38,12 @@ final class ChatAccountIsolationTests: XCTestCase {
         await accountATask.value
 
         XCTAssertEqual(service.conversations.map(\.otherUserName), ["Account B"])
-        XCTAssertTrue(service.messageRequests.isEmpty)
         XCTAssertNil(service.conversationErrorMessage)
         XCTAssertTrue(service.hasResolvedInitialConversationLoad)
         XCTAssertFalse(service.isLoadingConversations)
     }
 
-    func testAccountTransitionClearsConversationRequestGroupAndUnreadState() async {
+    func testAccountTransitionClearsConversationGroupAndUnreadState() async {
         let accountA = UUID(uuidString: "a2000000-0000-4000-8000-000000000001")!
         let accountB = UUID(uuidString: "b2000000-0000-4000-8000-000000000001")!
         let identity = TestChatIdentity(accountA)
@@ -53,7 +52,6 @@ final class ChatAccountIsolationTests: XCTestCase {
             conversationStateLoader: { _ in
                 ChatConversationRepositorySnapshot(
                     directConversations: [.fixture(name: "Direct", unreadCount: 4)],
-                    messageRequests: [.fixture(name: "Request", unreadCount: 2)],
                     groupConversations: [.fixture(name: "Group", unreadCount: 7)]
                 )
             }
@@ -62,14 +60,12 @@ final class ChatAccountIsolationTests: XCTestCase {
         service.activateAccount(accountA)
         await service.refreshConversations()
         XCTAssertEqual(service.conversations.first?.unreadCount, 4)
-        XCTAssertEqual(service.messageRequests.first?.unreadCount, 2)
         XCTAssertEqual(service.groupConversations.first?.unreadCount, 7)
 
         let previousGeneration = service.accountGeneration
         service.beginAccountTransition()
 
         XCTAssertTrue(service.conversations.isEmpty)
-        XCTAssertTrue(service.messageRequests.isEmpty)
         XCTAssertTrue(service.groupConversations.isEmpty)
         XCTAssertFalse(service.hasResolvedInitialConversationLoad)
         XCTAssertFalse(service.isLoadingConversations)
@@ -288,7 +284,6 @@ private extension ChatConversationRepositorySnapshot {
     static func fixture(ownerName: String) -> ChatConversationRepositorySnapshot {
         ChatConversationRepositorySnapshot(
             directConversations: [.fixture(name: ownerName, unreadCount: 0)],
-            messageRequests: [],
             groupConversations: []
         )
     }
@@ -305,8 +300,6 @@ private extension ChatConversationPreview {
             lastMessageAt: Date(),
             lastMessagePreview: "Test message",
             unreadCount: unreadCount,
-            canChatFreely: true,
-            isMutualFollow: true,
             isMuted: false
         )
     }

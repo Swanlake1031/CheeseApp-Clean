@@ -320,8 +320,6 @@ struct ChatConversationPreview: Codable, Identifiable, Hashable {
     let lastMessageAt: Date
     let lastMessagePreview: String?
     var unreadCount: Int
-    let canChatFreely: Bool?
-    let isMutualFollow: Bool?
     var isMuted: Bool = false
 
     var displayName: String {
@@ -338,8 +336,6 @@ struct ChatConversationPreview: Codable, Identifiable, Hashable {
         case lastMessageAt = "last_message_at"
         case lastMessagePreview = "last_message_preview"
         case unreadCount = "unread_count"
-        case canChatFreely = "can_chat_freely"
-        case isMutualFollow = "is_mutual_follow"
     }
 }
 

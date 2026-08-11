@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(8);
+SELECT plan(7);
 
 DELETE FROM public.user_blocks
 WHERE (blocker_id, blocked_id) IN (
@@ -34,7 +34,7 @@ VALUES (
   '131a0000-0000-4000-8000-000000000002',
   '131a0000-0000-4000-8000-000000000001',
   '00000000-0000-0000-0000-000000000002',
-  'request created before block',
+  'message created before block',
   'text'
 );
 
@@ -71,18 +71,6 @@ SELECT is(
   ),
   1::BIGINT,
   'blocking does not remove an existing conversation from the blocker inbox'
-);
-
-SELECT is(
-  (
-    SELECT COUNT(*)
-    FROM public.get_user_message_requests(
-      '00000000-0000-0000-0000-000000000001'::UUID
-    )
-    WHERE id = '131a0000-0000-4000-8000-000000000001'::UUID
-  ),
-  1::BIGINT,
-  'blocking does not erase an existing message request'
 );
 
 SELECT is(

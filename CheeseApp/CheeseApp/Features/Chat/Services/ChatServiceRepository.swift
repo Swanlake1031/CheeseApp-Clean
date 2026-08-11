@@ -10,7 +10,6 @@ import Supabase
 
 struct ChatConversationRepositorySnapshot {
     let directConversations: [ChatConversationPreview]
-    let messageRequests: [ChatConversationPreview]
     let groupConversations: [ChatGroupPreview]
 }
 
@@ -36,12 +35,10 @@ struct ChatServiceRepository {
 
     func fetchConversationSnapshot(userId: UUID) async throws -> ChatConversationRepositorySnapshot {
         async let directTask = fetchUserConversations(userId: userId)
-        async let requestTask = fetchMessageRequests(userId: userId)
         async let groupTask = fetchUserChatGroups(userId: userId)
 
         return ChatConversationRepositorySnapshot(
             directConversations: try await directTask,
-            messageRequests: try await requestTask,
             groupConversations: try await groupTask
         )
     }
@@ -358,9 +355,7 @@ struct ChatServiceRepository {
             relatedPostId: conversation.relatedPostId,
             lastMessageAt: conversation.lastMessageAt,
             lastMessagePreview: conversation.lastMessagePreview,
-            unreadCount: unreadCount,
-            canChatFreely: nil,
-            isMutualFollow: nil
+            unreadCount: unreadCount
         )
     }
 
@@ -532,17 +527,6 @@ struct ChatServiceRepository {
     private func fetchUserConversations(userId: UUID) async throws -> [ChatConversationPreview] {
         let rows: [ChatConversationPreview] = try await supabase.client
             .rpc("get_user_conversations", params: ChatGetUserConversationsParams(pUserId: userId))
-            .execute()
-            .value
-
-        return rows.sorted { lhs, rhs in
-            lhs.lastMessageAt > rhs.lastMessageAt
-        }
-    }
-
-    private func fetchMessageRequests(userId: UUID) async throws -> [ChatConversationPreview] {
-        let rows: [ChatConversationPreview] = try await supabase.client
-            .rpc("get_user_message_requests", params: ChatGetUserMessageRequestsParams(pUserId: userId))
             .execute()
             .value
 
