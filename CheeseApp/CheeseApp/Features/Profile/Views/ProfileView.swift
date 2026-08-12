@@ -21,6 +21,7 @@ struct ProfileView: View {
     @State private var myPostCount = 0
     @State private var fallbackPublicID: String?
     @State private var uidCopyFeedbackMessage: String?
+    @State private var activityPostActions: ProfileActivityPostActions?
     @StateObject private var profileSocialService = ProfileSocialService.shared
     @StateObject private var userPostsService = UserPostsService()
 
@@ -57,7 +58,10 @@ struct ProfileView: View {
                             minimumEmbeddedPagerHeight: max(
                                 contentProxy.size.height + 24,
                                 320
-                            )
+                            ),
+                            onPresentPostActions: { actions in
+                                activityPostActions = actions
+                            }
                         )
                     }
                     .frame(
@@ -70,8 +74,10 @@ struct ProfileView: View {
                 .refreshable {
                     await refreshProfile(force: true)
                 }
+                .scrollDisabled(activityPostActions != nil)
             }
         }
+        .profileActivityPostActionOverlay(actions: $activityPostActions)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             CheeseTabBarVisibilityController.shared.resetVisibility()
