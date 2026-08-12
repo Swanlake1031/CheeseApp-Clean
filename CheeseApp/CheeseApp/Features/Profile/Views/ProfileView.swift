@@ -82,12 +82,6 @@ struct ProfileView: View {
                 .scrollDisabled(activityPostActions != nil)
             }
         }
-        .profileActivityPostActionOverlay(actions: $activityPostActions)
-        .cheesePostSharePanel(item: $activitySharingPost) { message in
-            ShareFeedbackPresenter.show(message) {
-                activityShareFeedbackMessage = $0
-            }
-        }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             CheeseTabBarVisibilityController.shared.resetVisibility()
@@ -108,6 +102,15 @@ struct ProfileView: View {
                     PostToolbarIconCircle(icon: "gearshape")
                 }
                 .buttonStyle(.plain)
+            }
+        }
+        // Presentation overlays must wrap the inline top bar as well as the
+        // scrolling content. Applying them before `safeAreaInset` left the bar
+        // outside the dimming scrim and produced a hard horizontal seam.
+        .profileActivityPostActionOverlay(actions: $activityPostActions)
+        .cheesePostSharePanel(item: $activitySharingPost) { message in
+            ShareFeedbackPresenter.show(message) {
+                activityShareFeedbackMessage = $0
             }
         }
         .task(id: authService.currentUser?.id) {
