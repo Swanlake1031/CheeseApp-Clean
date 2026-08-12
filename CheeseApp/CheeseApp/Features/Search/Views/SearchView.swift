@@ -150,6 +150,7 @@ struct SearchView: View {
             dismissSearchKeyboard()
         }
         .cheeseTabBarHidden(showsBackButton)
+        .enableSwipeBackGesture()
     }
 
     // MARK: - 搜索框
