@@ -32,29 +32,49 @@ private struct KeyboardDismissPriorityModifier: ViewModifier {
     }
 }
 
+private final class BackgroundKeyboardDismissMarkerView: UIView {
+    var onWindowChange: ((BackgroundKeyboardDismissMarkerView) -> Void)?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        onWindowChange?(self)
+    }
+}
+
 private struct BackgroundKeyboardDismissInstaller: UIViewRepresentable {
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
 
-    func makeUIView(context: Context) -> UIView {
-        let marker = UIView(frame: .zero)
+    func makeUIView(context: Context) -> BackgroundKeyboardDismissMarkerView {
+        let marker = BackgroundKeyboardDismissMarkerView(frame: .zero)
         marker.isUserInteractionEnabled = false
+        marker.onWindowChange = { [weak coordinator = context.coordinator] marker in
+            coordinator?.installIfNeeded(from: marker)
+        }
         return marker
     }
 
-    func updateUIView(_ marker: UIView, context: Context) {
+    func updateUIView(
+        _ marker: BackgroundKeyboardDismissMarkerView,
+        context: Context
+    ) {
         DispatchQueue.main.async {
             context.coordinator.installIfNeeded(from: marker)
         }
     }
 
-    static func dismantleUIView(_ marker: UIView, coordinator: Coordinator) {
+    static func dismantleUIView(
+        _ marker: BackgroundKeyboardDismissMarkerView,
+        coordinator: Coordinator
+    ) {
+        marker.onWindowChange = nil
         coordinator.uninstall()
     }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        private weak var installedView: UIView?
+        private weak var marker: UIView?
+        private weak var installedWindow: UIWindow?
         private lazy var recognizer: UITapGestureRecognizer = {
             let recognizer = UITapGestureRecognizer(
                 target: self,
@@ -68,33 +88,52 @@ private struct BackgroundKeyboardDismissInstaller: UIViewRepresentable {
         }()
 
         func installIfNeeded(from marker: UIView) {
-            guard let target = marker.superview else { return }
-            guard installedView !== target else { return }
+            self.marker = marker
+            guard let window = marker.window else {
+                uninstallRecognizer()
+                return
+            }
+            guard installedWindow !== window else { return }
             uninstall()
-            installedView = target
-            target.addGestureRecognizer(recognizer)
+            self.marker = marker
+            installedWindow = window
+            window.addGestureRecognizer(recognizer)
         }
 
         func uninstall() {
-            installedView?.removeGestureRecognizer(recognizer)
-            installedView = nil
+            uninstallRecognizer()
+            marker = nil
+        }
+
+        private func uninstallRecognizer() {
+            installedWindow?.removeGestureRecognizer(recognizer)
+            installedWindow = nil
         }
 
         func gestureRecognizer(
             _ gestureRecognizer: UIGestureRecognizer,
             shouldReceive touch: UITouch
         ) -> Bool {
+            guard let marker,
+                  marker.window === installedWindow,
+                  marker.bounds.contains(touch.location(in: marker))
+            else { return false }
+
             var touchedView = touch.view
             while let view = touchedView {
                 if view is UITextField || view is UITextView {
                     return false
                 }
-                if view === installedView {
-                    break
-                }
                 touchedView = view.superview
             }
             return true
+        }
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            true
         }
 
         @objc private func dismissKeyboard() {
