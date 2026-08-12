@@ -1252,6 +1252,7 @@ private struct ProfileActivityRow: View {
 
 struct CompletedSecondhandTransactionsView: View {
     @StateObject private var service = CompletedSecondhandTransactionsService()
+    @State private var pendingRelist: CompletedSecondhandTransaction?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1266,6 +1267,36 @@ struct CompletedSecondhandTransactionsView: View {
         .cheesePageTopBar(title: "已交易")
         .task {
             await service.select(.buyer)
+        }
+        .confirmationDialog(
+            "恢复上架这件商品？",
+            isPresented: Binding(
+                get: { pendingRelist != nil },
+                set: { if !$0 { pendingRelist = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("取消", role: .cancel) {
+                pendingRelist = nil
+            }
+            Button("恢复上架") {
+                guard let item = pendingRelist else { return }
+                pendingRelist = nil
+                Task { _ = await service.relist(item) }
+            }
+        } message: {
+            Text("商品将使用同一个帖子重新公开，并开启新的 30 天展示周期；原交易记录会保留。")
+        }
+        .alert(
+            "恢复上架失败",
+            isPresented: Binding(
+                get: { service.mutationErrorMessage != nil },
+                set: { if !$0 { service.mutationErrorMessage = nil } }
+            )
+        ) {
+            Button("确定", role: .cancel) {}
+        } message: {
+            Text(service.mutationErrorMessage ?? "")
         }
     }
 
@@ -1324,7 +1355,11 @@ struct CompletedSecondhandTransactionsView: View {
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 10) {
                     ForEach(service.items) { item in
-                        CompletedSecondhandTransactionRow(item: item)
+                        CompletedSecondhandTransactionRow(
+                            item: item,
+                            isRelisting: service.relistingTransactionID == item.id,
+                            onRelist: { pendingRelist = item }
+                        )
                     }
                 }
                 .padding(.horizontal, 16)
@@ -1340,6 +1375,8 @@ struct CompletedSecondhandTransactionsView: View {
 
 private struct CompletedSecondhandTransactionRow: View {
     let item: CompletedSecondhandTransaction
+    let isRelisting: Bool
+    let onRelist: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -1347,7 +1384,7 @@ private struct CompletedSecondhandTransactionRow: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 6) {
-                    Text("交易完成")
+                    Text(statusTitle)
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(AppColors.accentStrong)
                     Spacer()
@@ -1371,6 +1408,29 @@ private struct CompletedSecondhandTransactionRow: View {
                         .font(.system(size: 11))
                         .foregroundStyle(AppColors.textMuted)
                         .lineLimit(1)
+
+                    Spacer(minLength: 8)
+
+                    if item.canRelist {
+                        Button(action: onRelist) {
+                            Group {
+                                if isRelisting {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Label("恢复上架", systemImage: "arrow.up.circle.fill")
+                                }
+                            }
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.black)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(AppColors.accent)
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isRelisting)
+                    }
                 }
             }
         }
@@ -1378,8 +1438,13 @@ private struct CompletedSecondhandTransactionRow: View {
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
         .cheeseCardChrome(cornerRadius: 15)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(item.listingTitle)，交易完成")
+        .accessibilityElement(children: .contain)
+    }
+
+    private var statusTitle: String {
+        item.role == .seller && item.listingStatus == "active"
+            ? "已恢复上架"
+            : "交易完成"
     }
 
     @ViewBuilder

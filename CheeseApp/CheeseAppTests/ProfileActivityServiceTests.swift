@@ -3,6 +3,34 @@ import XCTest
 
 @MainActor
 final class ProfileActivityServiceTests: XCTestCase {
+    func testCompletedSecondhandTransactionDecodesRelistState() throws {
+        let transactionID = UUID()
+        let listingID = UUID()
+        let counterpartyID = UUID()
+        let data = try JSONSerialization.data(withJSONObject: [
+            "transaction_id": transactionID.uuidString,
+            "listing_id": listingID.uuidString,
+            "role": "seller",
+            "listing_title": "Desk lamp",
+            "price": 18.5,
+            "counterparty_id": counterpartyID.uuidString,
+            "counterparty_name": "Buyer",
+            "completed_at": "2026-08-12T03:00:00Z",
+            "listing_status": "completed",
+            "can_relist": true
+        ])
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let item = try decoder.decode(CompletedSecondhandTransaction.self, from: data)
+
+        XCTAssertEqual(item.transactionID, transactionID)
+        XCTAssertEqual(item.listingID, listingID)
+        XCTAssertEqual(item.role, .seller)
+        XCTAssertEqual(item.listingStatus, "completed")
+        XCTAssertTrue(item.canRelist)
+    }
+
     func testProfileTabsPlacePrivateContentAfterPublished() {
         XCTAssertEqual(
             ProfileActivityKind.allCases,

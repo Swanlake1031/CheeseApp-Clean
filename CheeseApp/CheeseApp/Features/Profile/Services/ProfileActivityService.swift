@@ -102,6 +102,8 @@ struct CompletedSecondhandTransaction: Decodable, Identifiable, Hashable {
     let counterpartyName: String
     let counterpartyAvatar: String?
     let completedAt: Date
+    let listingStatus: String
+    let canRelist: Bool
 
     var id: UUID { transactionID }
 
@@ -116,6 +118,8 @@ struct CompletedSecondhandTransaction: Decodable, Identifiable, Hashable {
         case counterpartyName = "counterparty_name"
         case counterpartyAvatar = "counterparty_avatar"
         case completedAt = "completed_at"
+        case listingStatus = "listing_status"
+        case canRelist = "can_relist"
     }
 }
 
@@ -125,7 +129,9 @@ final class CompletedSecondhandTransactionsService: ObservableObject {
     @Published private(set) var items: [CompletedSecondhandTransaction] = []
     @Published private(set) var isLoading = false
     @Published private(set) var hasResolved = false
+    @Published private(set) var relistingTransactionID: UUID?
     @Published var errorMessage: String?
+    @Published var mutationErrorMessage: String?
 
     private var cache: [CompletedSecondhandRole: [CompletedSecondhandTransaction]] = [:]
     private var generation: UInt64 = 0
@@ -190,6 +196,43 @@ final class CompletedSecondhandTransactionsService: ObservableObject {
             errorMessage = error.localizedDescription
         }
     }
+
+    func relist(_ item: CompletedSecondhandTransaction) async -> Bool {
+        guard item.role == .seller, item.canRelist,
+              relistingTransactionID == nil else { return false }
+
+        relistingTransactionID = item.transactionID
+        mutationErrorMessage = nil
+        defer { relistingTransactionID = nil }
+
+        do {
+            try await SupabaseManager.shared.client
+                .rpc(
+                    "relist_completed_secondhand_listing",
+                    params: RelistCompletedSecondhandParams(
+                        transactionID: item.transactionID,
+                        listingID: item.listingID
+                    )
+                )
+                .execute()
+
+            let userID = try await AuthService.shared.requireAuthUserId()
+            PostFeatureEvents.postDidChange(
+                kind: .secondhand,
+                authorId: userID,
+                postId: item.listingID
+            )
+            cache.removeAll()
+            if selectedRole == .seller {
+                await select(.seller, force: true)
+            }
+            return true
+        } catch {
+            if error.isCancellationLike { return false }
+            mutationErrorMessage = error.localizedDescription
+            return false
+        }
+    }
 }
 
 private struct CompletedSecondhandTransactionsParams: Encodable {
@@ -197,6 +240,16 @@ private struct CompletedSecondhandTransactionsParams: Encodable {
 
     enum CodingKeys: String, CodingKey {
         case role = "p_role"
+    }
+}
+
+private struct RelistCompletedSecondhandParams: Encodable {
+    let transactionID: UUID
+    let listingID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case transactionID = "p_transaction_id"
+        case listingID = "p_listing_id"
     }
 }
 
