@@ -412,7 +412,7 @@ struct HomeNavigationDrawerView: View {
                     }
                 }
                 .padding(.bottom, 6)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.move(edge: .top))
             }
         }
     }
@@ -495,7 +495,7 @@ struct HomeNavigationDrawerView: View {
                     }
                 }
                 .padding(.bottom, 6)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.move(edge: .top))
             }
         }
     }
