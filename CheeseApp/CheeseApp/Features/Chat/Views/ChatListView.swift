@@ -308,8 +308,15 @@ struct ChatListView: View {
         return inboxCategoryEntry(
             title: category.title,
             preview: summary?.latestBody ?? category.fallbackPreview,
-            icon: category == .system ? "bell.fill" : "bolt.fill",
-            tint: category == .system ? Color.blue : AppColors.likeActive,
+            icon: category == .system
+                ? "bell.fill"
+                : "bubble.left.and.bubble.right.fill",
+            iconTint: category == .system
+                ? AppColors.link
+                : Color(red: 0.68, green: 0.43, blue: 0.22),
+            iconBackground: category == .system
+                ? Color(red: 1.00, green: 0.95, blue: 0.76)
+                : Color(red: 1.00, green: 0.90, blue: 0.78),
             date: summary?.latestCreatedAt,
             unreadCount: summary?.unreadCount ?? 0
         ) {
@@ -321,7 +328,8 @@ struct ChatListView: View {
         title: String,
         preview: String,
         icon: String,
-        tint: Color,
+        iconTint: Color,
+        iconBackground: Color,
         date: Date?,
         unreadCount: Int,
         action: @escaping () -> Void
@@ -329,12 +337,12 @@ struct ChatListView: View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Circle()
-                    .fill(tint)
+                    .fill(iconBackground)
                     .frame(width: 48, height: 48)
                     .overlay {
                         Image(systemName: icon)
                             .font(.system(size: 19, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(iconTint)
                     }
 
                 VStack(alignment: .leading, spacing: 5) {
