@@ -1273,12 +1273,15 @@ private struct ProfileActivityRow: View {
                     Button {
                         onShowActions(isPrivate, actionSource.frameInWindow())
                     } label: {
-                        HStack(spacing: 5) {
-                            if isUpdatingPrivacy || isEditing || isDeleting {
-                                ProgressView().controlSize(.small)
-                            } else {
+                        ZStack {
+                            HStack(spacing: 5) {
                                 Text("编辑")
                                 Image(systemName: "ellipsis")
+                            }
+                            .opacity(isPublishedActionInProgress ? 0 : 1)
+
+                            if isPublishedActionInProgress {
+                                ProgressView().controlSize(.small)
                             }
                         }
                         .font(.system(size: 13, weight: .semibold))
@@ -1354,6 +1357,10 @@ private struct ProfileActivityRow: View {
 
     private var isPublishedManagement: Bool {
         activityKind == .published || activityKind == .privateContent
+    }
+
+    private var isPublishedActionInProgress: Bool {
+        isUpdatingPrivacy || isEditing || isDeleting
     }
 
     private var isReactionActive: Bool {
