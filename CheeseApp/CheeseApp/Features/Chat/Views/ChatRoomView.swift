@@ -152,7 +152,7 @@ extension View {
         topGap: CGFloat,
         keyboardHeight: CGFloat,
         horizontalPadding: CGFloat = 12,
-        restingBottomPadding: CGFloat = 12
+        restingBottomPadding: CGFloat = 8
     ) -> some View {
         modifier(
             ChatComposerContainerModifier(
@@ -177,7 +177,7 @@ struct ChatRoomView: View {
     @State private var showingCamera = false
     @State private var keyboardHeight: CGFloat = 0
 
-    private let composerVerticalGap: CGFloat = 8
+    private let composerVerticalGap: CGFloat = 6
 
     init(conversation: ChatConversationPreview) {
         self.conversation = conversation

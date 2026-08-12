@@ -20,7 +20,7 @@ struct GroupChatRoomView: View {
     @State private var keyboardHeight: CGFloat = 0
     @FocusState private var isDraftFocused: Bool
 
-    private let composerVerticalGap: CGFloat = 10
+    private let composerVerticalGap: CGFloat = 6
 
     init(group: ChatGroupPreview) {
         _viewModel = StateObject(wrappedValue: GroupChatRoomViewModel(group: group))
