@@ -1,4 +1,84 @@
 import SwiftUI
+import UIKit
+
+struct CheeseCustomerSupportView: View {
+    private let weChatID = "Cheese_Support_2026"
+    @State private var didCopyWeChatID = false
+
+    var body: some View {
+        ZStack {
+            AppColors.pageBackground
+                .ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 18) {
+                    Image("CheeseCustomerSupportQR")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: 340)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .cheeseCardChrome(cornerRadius: 22)
+                        .accessibilityLabel(
+                            L10n.tr(
+                                "Cheese Support WeChat QR code",
+                                "奶酪小客服微信二维码"
+                            )
+                        )
+
+                    VStack(spacing: 10) {
+                        Text(L10n.tr("WeChat ID", "微信号"))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(AppColors.textMuted)
+
+                        HStack(spacing: 12) {
+                            Text(weChatID)
+                                .font(.system(size: 17, weight: .bold, design: .monospaced))
+                                .foregroundStyle(AppColors.textPrimary)
+                                .textSelection(.enabled)
+
+                            Button {
+                                UIPasteboard.general.string = weChatID
+                                didCopyWeChatID = true
+                            } label: {
+                                Label(
+                                    didCopyWeChatID
+                                        ? L10n.tr("Copied", "已复制")
+                                        : L10n.tr("Copy", "复制"),
+                                    systemImage: didCopyWeChatID
+                                        ? "checkmark.circle.fill"
+                                        : "doc.on.doc"
+                                )
+                                .font(.system(size: 13, weight: .semibold))
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(AppColors.link)
+                        }
+
+                        Text(
+                            L10n.tr(
+                                "Scan the QR code or copy the WeChat ID to add Cheese Support.",
+                                "扫描二维码，或复制微信号添加奶酪小客服。"
+                            )
+                        )
+                        .font(.system(size: 13))
+                        .foregroundStyle(AppColors.textMuted)
+                        .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, 18)
+
+                    Spacer(minLength: 28)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 16)
+                .padding(.top, 18)
+                .padding(.bottom, 36)
+            }
+        }
+        .cheesePageTopBar(title: L10n.tr("Cheese Support", "奶酪小客服"))
+        .enableSwipeBackGesture()
+    }
+}
 
 struct SupportCenterView: View {
     var body: some View {

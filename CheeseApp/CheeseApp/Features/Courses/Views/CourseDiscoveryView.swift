@@ -147,9 +147,44 @@ struct CourseDiscoveryView: View {
 
             Spacer(minLength: 0)
 
-            CourseRadarLinkButton()
+            VStack(spacing: 4) {
+                CourseRadarAvailabilityCallout()
+                CourseRadarLinkButton()
+            }
+            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.top, 14)
+    }
+
+    private struct CourseRadarAvailabilityCallout: View {
+        var body: some View {
+            VStack(spacing: -2) {
+                Text(
+                    L10n.tr(
+                        "Course full? Get a seat alert",
+                        "课程满员？开启空位提醒"
+                    )
+                )
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(AppColors.textMuted)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(Color(uiColor: .systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                }
+
+                Image(systemName: "triangle.fill")
+                    .font(.system(size: 8))
+                    .foregroundStyle(Color(uiColor: .systemBackground))
+                    .rotationEffect(.degrees(180))
+            }
+            .accessibilityElement(children: .combine)
+        }
     }
 
     private var searchField: some View {

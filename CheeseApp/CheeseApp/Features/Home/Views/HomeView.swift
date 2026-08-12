@@ -30,6 +30,7 @@ struct HomeView: View {
     @State private var showForumList = false
     @State private var showSearch = false
     @State private var shouldAutoFocusSearch = false
+    @State private var showCustomerSupport = false
     @State private var selectedForumBoardID: UUID?
     @State private var showCourseDiscovery = false
     @State private var showNavigationDrawer = false
@@ -111,6 +112,9 @@ struct HomeView: View {
                     selectedSecondhandCategory = category
                     selectFeaturedCategory(.secondhand)
                 },
+                onSupportTap: {
+                    showCustomerSupport = true
+                },
                 onCourseTap: {
                     showCourseDiscovery = true
                 },
@@ -133,6 +137,9 @@ struct HomeView: View {
         }
         .navigationDestination(isPresented: $showCourseDiscovery) {
             CourseDiscoveryView(universityName: resolvedHomeUniversityName)
+        }
+        .navigationDestination(isPresented: $showCustomerSupport) {
+            CheeseCustomerSupportView()
         }
         .navigationDestination(item: $selectedForumPost) { post in
             ForumDetailView(post: post)
@@ -212,13 +219,13 @@ struct HomeView: View {
 
     private var resolvedHomeUniversityName: String {
         guard let rawSchool = authService.currentUser?.school else {
-            return L10n.tr("Unknown University", "未知学校")
+            return CheeseUniversityOption.defaultSchoolName
         }
         if let option = CheeseUniversityOption.option(matching: rawSchool) {
             return option.displayText
         }
         let trimmed = rawSchool.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? L10n.tr("Unknown University", "未知学校") : trimmed
+        return trimmed.isEmpty ? CheeseUniversityOption.defaultSchoolName : trimmed
     }
 
     // MARK: - 板块内容区

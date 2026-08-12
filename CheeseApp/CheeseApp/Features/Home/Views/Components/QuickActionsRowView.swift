@@ -97,6 +97,7 @@ struct HomeNavigationDrawerContainer: View {
     let onBoardTap: (ForumBoard) -> Void
     let onSecondhandTap: () -> Void
     let onSecondhandCategoryTap: (SecondhandPost.Category) -> Void
+    let onSupportTap: () -> Void
     let onCourseTap: () -> Void
     let onCourseRadarTap: () -> Void
 
@@ -151,6 +152,10 @@ struct HomeNavigationDrawerContainer: View {
                     onSecondhandCategoryTap: { category in
                         closeDrawer()
                         onSecondhandCategoryTap(category)
+                    },
+                    onSupportTap: {
+                        closeDrawer()
+                        onSupportTap()
                     },
                     onCourseTap: {
                         closeDrawer()
@@ -253,6 +258,7 @@ struct HomeNavigationDrawerView: View {
     let onBoardTap: (ForumBoard) -> Void
     let onSecondhandTap: () -> Void
     let onSecondhandCategoryTap: (SecondhandPost.Category) -> Void
+    let onSupportTap: () -> Void
     let onCourseTap: () -> Void
     let onCourseRadarTap: () -> Void
 
@@ -312,6 +318,13 @@ struct HomeNavigationDrawerView: View {
                         .padding(.vertical, 14)
 
                     secondhandNavigationSection
+
+                    navigationRow(
+                        title: L10n.tr("Cheese Support", "奶酪小客服"),
+                        subtitle: L10n.tr("WeChat support and app help", "微信客服与使用帮助"),
+                        icon: "headphones",
+                        action: onSupportTap
+                    )
 
                     navigationRow(
                         title: L10n.tr("Course ratings", "课程评分"),

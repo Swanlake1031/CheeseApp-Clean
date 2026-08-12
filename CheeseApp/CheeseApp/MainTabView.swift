@@ -307,14 +307,14 @@ struct MainTabView: View {
 
     private var resolvedUniversityName: String {
         guard let rawSchool = authService.currentUser?.school else {
-            return L10n.tr("Unknown University", "未知学校")
+            return CheeseUniversityOption.defaultSchoolName
         }
         if let option = CheeseUniversityOption.option(matching: rawSchool) {
             return option.displayText
         }
         let trimmed = rawSchool.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty
-            ? L10n.tr("Unknown University", "未知学校")
+            ? CheeseUniversityOption.defaultSchoolName
             : trimmed
     }
 
