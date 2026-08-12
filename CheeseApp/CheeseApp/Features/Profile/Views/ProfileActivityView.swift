@@ -86,13 +86,17 @@ enum ProfileActivityPostAction {
 private struct ProfileActivityPostActionOverlay: View {
     let actions: ProfileActivityPostActions
     let onDismiss: () -> Void
+    @State private var isPresented = false
+    @State private var isDismissing = false
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.12)
+            Color.black.opacity(isPresented ? 0.12 : 0)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
-                .onTapGesture(perform: onDismiss)
+                .onTapGesture {
+                    dismiss()
+                }
 
             VStack(spacing: 0) {
                 if !actions.isPrivate {
@@ -128,12 +132,19 @@ private struct ProfileActivityPostActionOverlay: View {
                 )
             }
             .frame(width: 260)
-            .background(.regularMaterial)
+            .background(Color(uiColor: .systemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .shadow(color: .black.opacity(0.12), radius: 22, y: 8)
             .padding(.horizontal, 28)
+            .scaleEffect(isPresented ? 1 : 0.96)
+            .opacity(isPresented ? 1 : 0)
         }
         .accessibilityAddTraits(.isModal)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.16)) {
+                isPresented = true
+            }
+        }
     }
 
     private func actionButton(
@@ -143,12 +154,9 @@ private struct ProfileActivityPostActionOverlay: View {
         action: ProfileActivityPostAction
     ) -> some View {
         Button(role: role) {
-            // Remove the fixed overlay before starting navigation or another
-            // presentation. There is intentionally no dismiss animation: no
-            // transient menu snapshot remains for the profile ScrollView to
-            // move during an immediate follow-up drag.
-            onDismiss()
-            actions.perform(action)
+            dismiss {
+                actions.perform(action)
+            }
         } label: {
             Label(title, systemImage: icon)
                 .font(.system(size: 17, weight: .medium))
@@ -158,6 +166,24 @@ private struct ProfileActivityPostActionOverlay: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(role == .destructive ? Color.red : AppColors.textPrimary)
+    }
+
+    private func dismiss(then action: (() -> Void)? = nil) {
+        guard !isDismissing else { return }
+        isDismissing = true
+
+        // Keep the fixed overlay alive until its visual transition completes.
+        // This also preserves scroll locking, so an immediate follow-up drag
+        // cannot move a transient menu snapshot with the profile pager.
+        withAnimation(
+            .easeIn(duration: 0.14),
+            completionCriteria: .logicallyComplete
+        ) {
+            isPresented = false
+        } completion: {
+            onDismiss()
+            action?()
+        }
     }
 }
 
@@ -974,6 +1000,11 @@ private struct ProfileActivityPageView: View {
                         await service.loadNextPageIfNeeded(currentItem: item)
                     }
                 }
+                .transition(
+                    .opacity.combined(
+                        with: .scale(scale: 0.98, anchor: .top)
+                    )
+                )
             }
 
             if service.isLoadingNextPage {
@@ -989,6 +1020,10 @@ private struct ProfileActivityPageView: View {
                 .foregroundStyle(.red)
             }
         }
+        .animation(
+            .easeInOut(duration: 0.20),
+            value: service.items.map(\.postID)
+        )
     }
 
     private var loadTaskID: String {
