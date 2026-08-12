@@ -39,7 +39,6 @@ struct HomeView: View {
     @State private var selectedProfileRoute: HomeProfileRoute?
     @State private var sharingPost: PostSharePayload?
     @State private var shareActionToastMessage: String?
-    @State private var isRefreshing = false
     @State private var postOpenErrorMessage: String?
     @State private var selectedFeaturedCategory: HomeFeedTab = .recommended
     @State private var selectedSecondhandCategory: SecondhandPost.Category?
@@ -86,11 +85,8 @@ struct HomeView: View {
                     }
                     .id(contentScrollResetID)
                     .refreshable {
-                        isRefreshing = true
                         await viewModel.refresh(userID: authService.currentUser?.id)
                         clearCreatedPostPromotion()
-                        try? await Task.sleep(nanoseconds: 450_000_000)
-                        isRefreshing = false
                     }
                 }
             }
@@ -123,13 +119,6 @@ struct HomeView: View {
                 }
             )
             .zIndex(100)
-        }
-        .overlay(alignment: .top) {
-            if isRefreshing {
-                HotpotSteamRefreshView()
-                    .padding(.top, 10)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
         }
         .navigationBarHidden(true)
         // 导航目标由 MainTabView 的 Home NavigationStack 承载。
@@ -772,6 +761,9 @@ struct HomeView: View {
     }
 
     private func clearCreatedPostPromotion() {
+        guard promotedCreatedPostID != nil || highlightedCreatedPostID != nil else {
+            return
+        }
         promotedCreatedPostID = nil
         highlightedCreatedPostID = nil
         createdPostHighlightToken = UUID()

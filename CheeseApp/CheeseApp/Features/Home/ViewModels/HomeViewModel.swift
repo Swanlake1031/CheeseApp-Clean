@@ -86,14 +86,30 @@ class HomeViewModel: ObservableObject {
         var recommendationSeed: UInt64 = 0xC4EE_5EED
     }
 
+    /// Loading presentation is one coherent value so initial-load transitions do
+    /// not publish three independent invalidations to the Home view hierarchy.
+    private struct HomeLoadingSnapshot: Equatable {
+        var isLoading = false
+        var isHomeFeaturedLoading = false
+        var isFollowingLoading = false
+    }
+
     // MARK: - Published 属性
 
     @Published private var contentSnapshot = HomeContentSnapshot()
-    @Published private(set) var isHomeFeaturedLoading = false
-    @Published private(set) var isFollowingLoading = false
+    @Published private var loadingSnapshot = HomeLoadingSnapshot()
 
-    /// 加载状态
-    @Published var isLoading = false
+    var isHomeFeaturedLoading: Bool {
+        loadingSnapshot.isHomeFeaturedLoading
+    }
+
+    var isFollowingLoading: Bool {
+        loadingSnapshot.isFollowingLoading
+    }
+
+    var isLoading: Bool {
+        loadingSnapshot.isLoading
+    }
 
     var featuredSecondhandCards: [HomeCardItem] {
         contentSnapshot.featuredSecondhandCards
@@ -321,9 +337,7 @@ class HomeViewModel: ObservableObject {
         contentSnapshot = HomeContentSnapshot()
         pendingLikePostIDs = []
         pendingFavoritePostIDs = []
-        isHomeFeaturedLoading = false
-        isFollowingLoading = false
-        isLoading = false
+        loadingSnapshot = HomeLoadingSnapshot()
         followingRequestGeneration &+= 1
     }
 
@@ -343,11 +357,11 @@ class HomeViewModel: ObservableObject {
         followingRequestGeneration &+= 1
         let requestGeneration = followingRequestGeneration
         let requestScopeKey = accountScopeKey
-        isFollowingLoading = true
+        loadingSnapshot.isFollowingLoading = true
         defer {
             if requestGeneration == followingRequestGeneration,
                requestScopeKey == accountScopeKey {
-                isFollowingLoading = false
+                loadingSnapshot.isFollowingLoading = false
             }
         }
 
@@ -477,6 +491,10 @@ class HomeViewModel: ObservableObject {
         return now.timeIntervalSince(lastSuccessfulRefreshAt) >= cacheLifetime
     }
 
+    static func shouldPublishInitialLoading(hasResolvedData: Bool) -> Bool {
+        !hasResolvedData
+    }
+
     private func establishAccountScope(for userID: UUID?) {
         let newScopeKey = userID?.uuidString ?? "signed-out"
         guard accountScopeKey != newScopeKey else { return }
@@ -488,15 +506,21 @@ class HomeViewModel: ObservableObject {
         followingRequestGeneration &+= 1
         let requestGeneration = followingRequestGeneration
         let requestScopeKey = accountScopeKey
-        isLoading = true
-        isHomeFeaturedLoading = true
-        isFollowingLoading = true
+        let shouldPublishInitialLoading = Self.shouldPublishInitialLoading(
+            hasResolvedData: hasResolvedInitialData
+        )
+        if shouldPublishInitialLoading {
+            loadingSnapshot = HomeLoadingSnapshot(
+                isLoading: true,
+                isHomeFeaturedLoading: true,
+                isFollowingLoading: true
+            )
+        }
         defer {
-            if requestGeneration == followingRequestGeneration,
+            if shouldPublishInitialLoading,
+               requestGeneration == followingRequestGeneration,
                requestScopeKey == accountScopeKey {
-                isLoading = false
-                isHomeFeaturedLoading = false
-                isFollowingLoading = false
+                loadingSnapshot = HomeLoadingSnapshot()
             }
         }
 
@@ -591,8 +615,12 @@ class HomeViewModel: ObservableObject {
         nextSnapshot.hasResolvedInitialForumLoad = true
         nextSnapshot.hasResolvedInitialHomeFeaturedLoad = true
         nextSnapshot.hasResolvedInitialFollowingLoad = true
-        interactionStore.merge(interactionUpdates)
-        contentSnapshot = nextSnapshot
+        var commitTransaction = Transaction()
+        commitTransaction.disablesAnimations = true
+        withTransaction(commitTransaction) {
+            interactionStore.merge(interactionUpdates)
+            contentSnapshot = nextSnapshot
+        }
         return true
     }
 

@@ -43,6 +43,16 @@ final class HomeFeedServiceTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testBackgroundHomeRefreshDoesNotRepublishInitialLoadingState() {
+        XCTAssertTrue(
+            HomeViewModel.shouldPublishInitialLoading(hasResolvedData: false)
+        )
+        XCTAssertFalse(
+            HomeViewModel.shouldPublishInitialLoading(hasResolvedData: true)
+        )
+    }
+
     func testFreshLifecycleCacheSkipsForegroundRefresh() {
         let refreshedAt = Date(timeIntervalSince1970: 20_000)
 
