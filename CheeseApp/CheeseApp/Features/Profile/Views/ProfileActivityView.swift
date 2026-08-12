@@ -71,6 +71,7 @@ private struct ProfileActivityPageHeightPreferenceKey: PreferenceKey {
 struct ProfileActivityPostActions: Identifiable {
     let item: ProfileActivityItem
     let isPrivate: Bool
+    let sourceFrame: CGRect
     let perform: (ProfileActivityPostAction) -> Void
 
     var id: UUID { item.postID }
@@ -90,60 +91,72 @@ private struct ProfileActivityPostActionOverlay: View {
     @State private var isDismissing = false
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(isPresented ? 0.12 : 0)
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    dismiss()
-                }
+        GeometryReader { proxy in
+            let placement = menuPlacement(in: proxy)
 
-            VStack(spacing: 0) {
-                if !actions.isPrivate {
-                    actionButton(
-                        title: "私密",
-                        icon: "lock.fill",
-                        action: .makePrivate
+            ZStack {
+                Color.black.opacity(isPresented ? 0.12 : 0)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        dismiss()
+                    }
+
+                menuContent
+                    .frame(width: menuWidth)
+                    .background(Color(uiColor: .systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .shadow(color: .black.opacity(0.12), radius: 22, y: 8)
+                    .position(placement.position)
+                    .scaleEffect(
+                        isPresented ? 1 : 0.68,
+                        anchor: placement.anchor
                     )
-                }
-
-                actionButton(
-                    title: "编辑",
-                    icon: "square.and.pencil",
-                    action: .edit
-                )
-
-                if !actions.isPrivate {
-                    actionButton(
-                        title: "分享",
-                        icon: "square.and.arrow.up",
-                        action: .share
-                    )
-                }
-
-                Divider()
-                    .padding(.horizontal, 18)
-
-                actionButton(
-                    title: "删除",
-                    icon: "trash",
-                    role: .destructive,
-                    action: .delete
-                )
+                    .opacity(isPresented ? 1 : 0)
             }
-            .frame(width: 260)
-            .background(Color(uiColor: .systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: .black.opacity(0.12), radius: 22, y: 8)
-            .padding(.horizontal, 28)
-            .scaleEffect(isPresented ? 1 : 0.96)
-            .opacity(isPresented ? 1 : 0)
         }
         .accessibilityAddTraits(.isModal)
         .onAppear {
-            withAnimation(.easeOut(duration: 0.16)) {
+            withAnimation(.easeOut(duration: 0.18)) {
                 isPresented = true
             }
+        }
+    }
+
+    @ViewBuilder
+    private var menuContent: some View {
+        VStack(spacing: 0) {
+            if !actions.isPrivate {
+                actionButton(
+                    title: "私密",
+                    icon: "lock.fill",
+                    action: .makePrivate
+                )
+            }
+
+            actionButton(
+                title: "编辑",
+                icon: "square.and.pencil",
+                action: .edit
+            )
+
+            if !actions.isPrivate {
+                actionButton(
+                    title: "分享",
+                    icon: "square.and.arrow.up",
+                    action: .share
+                )
+            }
+
+            Divider()
+                .padding(.horizontal, 18)
+
+            actionButton(
+                title: "删除",
+                icon: "trash",
+                role: .destructive,
+                action: .delete
+            )
         }
     }
 
@@ -184,6 +197,85 @@ private struct ProfileActivityPostActionOverlay: View {
             onDismiss()
             action?()
         }
+    }
+
+    private var menuWidth: CGFloat { 260 }
+
+    private var menuHeight: CGFloat {
+        actions.isPrivate ? 109 : 217
+    }
+
+    private func menuPlacement(
+        in proxy: GeometryProxy
+    ) -> (position: CGPoint, anchor: UnitPoint) {
+        let globalOverlayFrame = proxy.frame(in: .global)
+        let sourceFrame = actions.sourceFrame.offsetBy(
+            dx: -globalOverlayFrame.minX,
+            dy: -globalOverlayFrame.minY
+        )
+        let horizontalMargin: CGFloat = 16
+        let verticalMargin: CGFloat = 12
+        let menuGap: CGFloat = 8
+        let halfWidth = menuWidth / 2
+        let halfHeight = menuHeight / 2
+
+        guard actions.sourceFrame.width > 0,
+              actions.sourceFrame.height > 0
+        else {
+            return (
+                CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2),
+                .center
+            )
+        }
+
+        let unclampedX = sourceFrame.maxX - halfWidth
+        let x = min(
+            max(unclampedX, horizontalMargin + halfWidth),
+            proxy.size.width - horizontalMargin - halfWidth
+        )
+        let hasRoomAbove = sourceFrame.minY - menuGap >= menuHeight + verticalMargin
+        let unclampedY = hasRoomAbove
+            ? sourceFrame.minY - menuGap - halfHeight
+            : sourceFrame.maxY + menuGap + halfHeight
+        let y = min(
+            max(unclampedY, verticalMargin + halfHeight),
+            proxy.size.height - verticalMargin - halfHeight
+        )
+        let menuMinX = x - halfWidth
+        let sourceAnchorX = min(
+            max((sourceFrame.midX - menuMinX) / menuWidth, 0),
+            1
+        )
+
+        return (
+            CGPoint(x: x, y: y),
+            UnitPoint(x: sourceAnchorX, y: hasRoomAbove ? 1 : 0)
+        )
+    }
+}
+
+private final class ProfileActivityActionSource {
+    weak var view: UIView?
+
+    @MainActor
+    func frameInWindow() -> CGRect {
+        guard let view, let window = view.window else { return .zero }
+        return view.convert(view.bounds, to: window)
+    }
+}
+
+private struct ProfileActivityActionSourceReader: UIViewRepresentable {
+    let source: ProfileActivityActionSource
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(frame: .zero)
+        view.isUserInteractionEnabled = false
+        source.view = view
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        source.view = uiView
     }
 }
 
@@ -420,10 +512,11 @@ struct ProfileActivityView: View {
                 Task { await setPostPrivacy(item, hidden: hidden) }
             },
             onShare: share,
-            onShowActions: { item, isPrivate in
+            onShowActions: { item, isPrivate, sourceFrame in
                 let actions = ProfileActivityPostActions(
                     item: item,
                     isPrivate: isPrivate,
+                    sourceFrame: sourceFrame,
                     perform: { action in
                         performPostAction(action, for: item)
                     }
@@ -766,7 +859,7 @@ private struct ProfileActivityPageView: View {
     let onOpen: (ProfileActivityItem) -> Void
     let onSetPrivacy: (ProfileActivityItem, Bool) -> Void
     let onShare: (ProfileActivityItem) -> Void
-    let onShowActions: (ProfileActivityItem, Bool) -> Void
+    let onShowActions: (ProfileActivityItem, Bool, CGRect) -> Void
     let onSelectPublishedKind: (PostKind?) -> Void
 
     @StateObject private var service: ProfileActivityService
@@ -788,7 +881,7 @@ private struct ProfileActivityPageView: View {
         onOpen: @escaping (ProfileActivityItem) -> Void,
         onSetPrivacy: @escaping (ProfileActivityItem, Bool) -> Void,
         onShare: @escaping (ProfileActivityItem) -> Void,
-        onShowActions: @escaping (ProfileActivityItem, Bool) -> Void,
+        onShowActions: @escaping (ProfileActivityItem, Bool, CGRect) -> Void,
         onSelectPublishedKind: @escaping (PostKind?) -> Void
     ) {
         self.kind = kind
@@ -983,8 +1076,8 @@ private struct ProfileActivityPageView: View {
                         onSetPrivacy(item, hidden)
                     },
                     onShare: { onShare(item) },
-                    onShowActions: { isPrivate in
-                        onShowActions(item, isPrivate)
+                    onShowActions: { isPrivate, sourceFrame in
+                        onShowActions(item, isPrivate, sourceFrame)
                     },
                     onToggleReaction: { currentlyActive in
                         Task {
@@ -1075,8 +1168,9 @@ private struct ProfileActivityRow: View {
     let onOpen: () -> Void
     let onSetPrivacy: (Bool) -> Void
     let onShare: () -> Void
-    let onShowActions: (Bool) -> Void
+    let onShowActions: (Bool, CGRect) -> Void
     let onToggleReaction: (Bool) -> Void
+    @State private var actionSource = ProfileActivityActionSource()
 
     var body: some View {
         VStack(spacing: 10) {
@@ -1177,7 +1271,7 @@ private struct ProfileActivityRow: View {
                     }
 
                     Button {
-                        onShowActions(isPrivate)
+                        onShowActions(isPrivate, actionSource.frameInWindow())
                     } label: {
                         HStack(spacing: 5) {
                             if isUpdatingPrivacy || isEditing || isDeleting {
@@ -1197,6 +1291,9 @@ private struct ProfileActivityRow: View {
                     .buttonStyle(.plain)
                     .disabled(isPublishedActionDisabled)
                     .accessibilityLabel("帖子操作")
+                    .background {
+                        ProfileActivityActionSourceReader(source: actionSource)
+                    }
                 }
             } else if activityKind == .liked || activityKind == .favorited {
                 HStack {
