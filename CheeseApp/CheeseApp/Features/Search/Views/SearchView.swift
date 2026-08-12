@@ -181,8 +181,8 @@ struct SearchView: View {
             CheeseSearchTextField(
                 text: $searchText,
                 placeholder: L10n.tr(
-                    "Search posts, people, or UID...",
-                    "搜索帖子、用户或 UID..."
+                    "Search posts, people, or Cheese ID...",
+                    "搜索帖子、用户或奶酪 ID..."
                 ),
                 fontSize: 16,
                 isFirstResponder: $isSearchFieldFocused,
@@ -1214,7 +1214,10 @@ struct SearchProfileCard: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(AppColors.textPrimary)
 
-                        Text("UID: \(profile.publicID)")
+                        Text(
+                            L10n.tr("Cheese ID", "奶酪 ID")
+                                + ": \(profile.publicID)"
+                        )
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
                             .foregroundStyle(AppColors.textMuted)
 

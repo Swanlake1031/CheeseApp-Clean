@@ -3,12 +3,12 @@ import XCTest
 @testable import CheeseApp
 
 final class SearchProfileResultTests: XCTestCase {
-    func testUIDBadgeDisplaysAndCopiesPublicID() {
+    func testCheeseIDBadgeDisplaysAndCopiesPublicID() {
         let publicID = "58310427"
 
         XCTAssertEqual(
             ProfileUIDPresentation.badgeText(for: publicID),
-            "UID: 58310427"
+            L10n.tr("Cheese ID: 58310427", "奶酪 ID: 58310427")
         )
         XCTAssertEqual(
             ProfileUIDPresentation.clipboardText(for: publicID),

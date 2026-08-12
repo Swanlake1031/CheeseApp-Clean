@@ -421,8 +421,8 @@ struct UserPostsView: View {
                     ProfileUIDBadge(publicID: publicID) {
                         ShareFeedbackPresenter.show(
                             L10n.tr(
-                                "UID copied. Paste it into Search to find this profile.",
-                                "UID 已复制，可粘贴到搜索中查找该用户"
+                                "Cheese ID copied. Paste it into Search to find this profile.",
+                                "奶酪 ID 已复制，可粘贴到搜索中查找该用户"
                             )
                         ) {
                             uidCopyFeedbackMessage = $0

@@ -363,8 +363,8 @@ struct ProfileView: View {
     private func showUIDCopiedFeedback() {
         ShareFeedbackPresenter.show(
             L10n.tr(
-                "UID copied. Paste it into Search to find this profile.",
-                "UID 已复制，可粘贴到搜索中查找该用户"
+                "Cheese ID copied. Paste it into Search to find this profile.",
+                "奶酪 ID 已复制，可粘贴到搜索中查找该用户"
             )
         ) {
             uidCopyFeedbackMessage = $0
@@ -379,7 +379,7 @@ enum ProfileUIDPresentation {
     }
 
     static func badgeText(for publicID: String) -> String {
-        "UID: \(clipboardText(for: publicID))"
+        L10n.tr("Cheese ID", "奶酪 ID") + ": \(clipboardText(for: publicID))"
     }
 }
 
@@ -413,8 +413,11 @@ struct ProfileUIDBadge: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("UID \(ProfileUIDPresentation.clipboardText(for: publicID))")
-        .accessibilityHint(L10n.tr("Copies UID", "点击复制 UID"))
+        .accessibilityLabel(
+            L10n.tr("Cheese ID", "奶酪 ID")
+                + " \(ProfileUIDPresentation.clipboardText(for: publicID))"
+        )
+        .accessibilityHint(L10n.tr("Copies Cheese ID", "点击复制奶酪 ID"))
     }
 }
 
