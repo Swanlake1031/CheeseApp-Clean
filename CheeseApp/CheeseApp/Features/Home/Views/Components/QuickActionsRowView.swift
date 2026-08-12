@@ -412,12 +412,9 @@ struct HomeNavigationDrawerView: View {
                     }
                 }
                 .padding(.bottom, 6)
-                .transition(.move(edge: .top))
+                .transition(.identity)
             }
         }
-        // The moving child must stay inside the section while its layout
-        // collapses, otherwise its icons briefly draw through the header.
-        .clipped()
     }
 
     private var secondhandNavigationSection: some View {
@@ -498,10 +495,9 @@ struct HomeNavigationDrawerView: View {
                     }
                 }
                 .padding(.bottom, 6)
-                .transition(.move(edge: .top))
+                .transition(.identity)
             }
         }
-        .clipped()
     }
 
     private func navigationRow(
