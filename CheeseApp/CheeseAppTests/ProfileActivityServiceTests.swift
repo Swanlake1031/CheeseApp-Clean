@@ -3,10 +3,10 @@ import XCTest
 
 @MainActor
 final class ProfileActivityServiceTests: XCTestCase {
-    func testProfileTabsExcludeCommentsAndPlacePrivateContentThird() {
+    func testProfileTabsPlacePrivateContentAfterPublished() {
         XCTAssertEqual(
             ProfileActivityKind.allCases,
-            [.published, .liked, .privateContent, .favorited]
+            [.published, .privateContent, .liked, .favorited]
         )
     }
 

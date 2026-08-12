@@ -3,8 +3,8 @@ import Supabase
 
 enum ProfileActivityKind: String, CaseIterable, Identifiable {
     case published
-    case liked
     case privateContent = "private_content"
+    case liked
     case favorited
 
     var id: String { rawValue }
