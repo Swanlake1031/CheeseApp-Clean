@@ -204,6 +204,7 @@ struct ProfileActivityView: View {
     private let externalRefreshGeneration: Int
     private let minimumEmbeddedPagerHeight: CGFloat
     private let onPresentPostActions: ((ProfileActivityPostActions) -> Void)?
+    private let onPresentShare: ((PostSharePayload) -> Void)?
 
     init(
         initialKind: ProfileActivityKind = .published,
@@ -213,7 +214,8 @@ struct ProfileActivityView: View {
         pageTitle: String? = nil,
         externalRefreshGeneration: Int = 0,
         minimumEmbeddedPagerHeight: CGFloat = 220,
-        onPresentPostActions: ((ProfileActivityPostActions) -> Void)? = nil
+        onPresentPostActions: ((ProfileActivityPostActions) -> Void)? = nil,
+        onPresentShare: ((PostSharePayload) -> Void)? = nil
     ) {
         _selectedKind = State(initialValue: initialKind)
         _selectedPublishedKind = State(initialValue: nil)
@@ -224,6 +226,7 @@ struct ProfileActivityView: View {
         self.externalRefreshGeneration = externalRefreshGeneration
         self.minimumEmbeddedPagerHeight = minimumEmbeddedPagerHeight
         self.onPresentPostActions = onPresentPostActions
+        self.onPresentShare = onPresentShare
     }
 
     var body: some View {
@@ -664,7 +667,7 @@ struct ProfileActivityView: View {
 
     private func share(_ item: ProfileActivityItem) {
         guard let kind = item.kind else { return }
-        sharingPost = PostSharePayload(
+        let payload = PostSharePayload(
             kind: kind,
             postId: item.postID,
             title: item.postTitle,
@@ -672,6 +675,11 @@ struct ProfileActivityView: View {
             summary: item.postSummary,
             imageURL: item.coverImage.flatMap(URL.init(string:))
         )
+        if let onPresentShare {
+            onPresentShare(payload)
+        } else {
+            sharingPost = payload
+        }
     }
 
     private func performPostAction(

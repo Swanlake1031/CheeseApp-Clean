@@ -22,6 +22,8 @@ struct ProfileView: View {
     @State private var fallbackPublicID: String?
     @State private var uidCopyFeedbackMessage: String?
     @State private var activityPostActions: ProfileActivityPostActions?
+    @State private var activitySharingPost: PostSharePayload?
+    @State private var activityShareFeedbackMessage: String?
     @StateObject private var profileSocialService = ProfileSocialService.shared
     @StateObject private var userPostsService = UserPostsService()
 
@@ -61,6 +63,9 @@ struct ProfileView: View {
                             ),
                             onPresentPostActions: { actions in
                                 activityPostActions = actions
+                            },
+                            onPresentShare: { payload in
+                                activitySharingPost = payload
                             }
                         )
                     }
@@ -78,6 +83,11 @@ struct ProfileView: View {
             }
         }
         .profileActivityPostActionOverlay(actions: $activityPostActions)
+        .cheesePostSharePanel(item: $activitySharingPost) { message in
+            ShareFeedbackPresenter.show(message) {
+                activityShareFeedbackMessage = $0
+            }
+        }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             CheeseTabBarVisibilityController.shared.resetVisibility()
@@ -110,6 +120,7 @@ struct ProfileView: View {
             Task { await refreshProfile(force: true) }
         }
         .shareFeedbackToast(message: $uidCopyFeedbackMessage)
+        .shareFeedbackToast(message: $activityShareFeedbackMessage)
     }
 
     // MARK: - 用户信息卡片
