@@ -26,12 +26,12 @@ enum ChatInboxSectionKind: String, Hashable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    var title: String? {
         switch self {
         case .groups:
             return "群聊"
         case .directMessages:
-            return "私信"
+            return nil
         }
     }
 }
@@ -55,7 +55,7 @@ struct ChatInboxSection: Hashable, Identifiable {
     let items: [ChatInboxSectionItem]
 
     var id: ChatInboxSectionKind { kind }
-    var title: String { kind.title }
+    var title: String? { kind.title }
 }
 
 struct ChatInboxPresentationState {

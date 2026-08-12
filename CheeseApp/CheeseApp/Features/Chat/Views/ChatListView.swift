@@ -193,7 +193,7 @@ struct ChatListView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 14) {
                 if !inboxState.isSearching {
-                    inboxCategoryEntries
+                    pinnedDirectMessageCard
                         .padding(.horizontal, 16)
                 }
 
@@ -216,7 +216,7 @@ struct ChatListView: View {
                     searchEmptyState
                         .padding(.horizontal, 16)
                 } else {
-                    ForEach(inboxState.visibleSections) { section in
+                    ForEach(remainingVisibleSections) { section in
                         listSectionCard(title: section.title) {
                             sectionRows(for: section)
                         }
@@ -254,7 +254,7 @@ struct ChatListView: View {
     private var emptyState: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 18) {
-                inboxCategoryEntries
+                pinnedDirectMessageCard
 
                 Image(systemName: "bubble.left.and.bubble.right")
                     .font(.system(size: 52))
@@ -273,7 +273,7 @@ struct ChatListView: View {
         }
     }
 
-    private var inboxCategoryEntries: some View {
+    private var pinnedDirectMessageCard: some View {
         VStack(spacing: 0) {
             systemCategoryEntry(.system)
 
@@ -281,10 +281,26 @@ struct ChatListView: View {
                 .padding(.leading, 76)
 
             systemCategoryEntry(.interaction)
+
+            if let directMessageSection {
+                Divider()
+                    .padding(.leading, 84)
+
+                sectionRows(for: directMessageSection)
+            }
         }
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .cheeseCardChrome(cornerRadius: 20)
+    }
+
+    private var directMessageSection: ChatInboxSection? {
+        inboxState.visibleSections.first { $0.kind == .directMessages }
+    }
+
+    private var remainingVisibleSections: [ChatInboxSection] {
+        guard !inboxState.isSearching else { return inboxState.visibleSections }
+        return inboxState.visibleSections.filter { $0.kind != .directMessages }
     }
 
     private func systemCategoryEntry(_ category: SystemMessageCategory) -> some View {
@@ -442,12 +458,14 @@ struct ChatListView: View {
         }
     }
 
-    private func listSectionCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(AppColors.textMuted)
-                .padding(.horizontal, 4)
+    private func listSectionCard<Content: View>(title: String?, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: title == nil ? 0 : 10) {
+            if let title {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(AppColors.textMuted)
+                    .padding(.horizontal, 4)
+            }
 
             VStack(spacing: 0) {
                 content()
