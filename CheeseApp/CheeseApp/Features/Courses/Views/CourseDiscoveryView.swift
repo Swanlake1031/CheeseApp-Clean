@@ -71,6 +71,9 @@ struct CourseDiscoveryView: View {
         .cheeseTabBarHidden(hidesTabBar)
         .enableSwipeBackGesture(showsBackButton)
         .onAppear {
+            if !hidesTabBar {
+                CheeseTabBarVisibilityController.shared.resetVisibility()
+            }
             Task { await state.load() }
         }
     }
