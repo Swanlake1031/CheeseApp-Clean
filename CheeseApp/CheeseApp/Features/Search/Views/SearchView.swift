@@ -68,6 +68,10 @@ struct SearchView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
+        // Keep the search timeline's geometry stable while UIKit animates the
+        // keyboard. Resizing this nested vertical/horizontal scroll hierarchy
+        // made both category rows briefly jump when the keyboard was dismissed.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .cheeseLoadingOverlay(
             isPresented: isOpeningResult,
             message: L10n.tr("Opening post...", "正在打开贴文...")
