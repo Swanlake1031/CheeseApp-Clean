@@ -432,9 +432,15 @@ struct OfficialAccountAvatar: View {
 
 struct OfficialVerificationBadge: View {
     var body: some View {
-        Text("🧀")
-            .font(.system(size: 15))
-            .frame(width: 25, height: 21)
+        HStack(spacing: 3) {
+            Text("🧀")
+                .font(.system(size: 12))
+            Text(L10n.tr("Official", "官号"))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(AppColors.textPrimary)
+        }
+            .padding(.horizontal, 7)
+            .frame(height: 22)
             .background(AppColors.accent.opacity(0.2), in: Capsule())
             .overlay {
                 Capsule()
