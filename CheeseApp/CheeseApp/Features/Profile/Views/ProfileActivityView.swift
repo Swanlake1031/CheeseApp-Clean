@@ -177,7 +177,15 @@ private struct NativeProfilePostMenuButton: UIViewRepresentable {
         }
 
         func request(_ action: ProfileActivityPostAction) {
-            pendingAction = action
+            if case .delete = action {
+                // Match ForumDetailView: request the system confirmation as
+                // soon as the destructive menu item is selected. UIKit will
+                // coordinate the menu dismissal and alert presentation.
+                pendingAction = nil
+                onAction(action)
+            } else {
+                pendingAction = action
+            }
         }
 
         func menuDidFinishDismissing() {
