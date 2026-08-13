@@ -224,20 +224,20 @@ struct SearchView: View {
 
     // MARK: - 分类筛选
     private var categoryFilter: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(SearchCategory.allCases, id: \.self) { category in
-                    SearchCategoryPill(
-                        category: category,
-                        isSelected: selectedCategory == category
-                    ) {
-                        withAnimation(.spring(response: 0.3)) {
-                            selectedCategory = category
-                        }
+        HStack(spacing: 10) {
+            ForEach(SearchCategory.allCases, id: \.self) { category in
+                SearchCategoryPill(
+                    category: category,
+                    isSelected: selectedCategory == category
+                ) {
+                    withAnimation(.spring(response: 0.3)) {
+                        selectedCategory = category
                     }
                 }
             }
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - 最近搜索
@@ -334,26 +334,26 @@ struct SearchView: View {
     }
 
     private var hotCategorySwitch: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(SearchCategory.allCases, id: \.self) { category in
-                    Button {
-                        withAnimation(.spring(response: 0.25)) {
-                            selectedHotCategory = category
-                        }
-                    } label: {
-                        Text(category.hotRankingDisplayName)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(selectedHotCategory == category ? .white : .primary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(selectedHotCategory == category ? AppColors.selectedBackground : AppColors.cardBackground)
-                            .clipShape(Capsule())
+        HStack(spacing: 8) {
+            ForEach(SearchCategory.allCases, id: \.self) { category in
+                Button {
+                    withAnimation(.spring(response: 0.25)) {
+                        selectedHotCategory = category
                     }
-                    .buttonStyle(.plain)
+                } label: {
+                    Text(category.hotRankingDisplayName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(selectedHotCategory == category ? .white : .primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(selectedHotCategory == category ? AppColors.selectedBackground : AppColors.cardBackground)
+                        .clipShape(Capsule())
                 }
+                .buttonStyle(.plain)
             }
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func landingSectionLoadingCard(minHeight: CGFloat) -> some View {
