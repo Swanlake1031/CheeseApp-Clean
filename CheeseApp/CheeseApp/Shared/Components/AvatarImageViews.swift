@@ -435,7 +435,7 @@ struct OfficialVerificationBadge: View {
         HStack(spacing: 3) {
             Text("🧀")
                 .font(.system(size: 12))
-            Text(L10n.tr("Official", "官号"))
+            Text(L10n.tr("Official", "官方帳號"))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(AppColors.textPrimary)
         }
