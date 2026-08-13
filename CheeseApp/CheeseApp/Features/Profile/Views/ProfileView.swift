@@ -21,7 +21,6 @@ struct ProfileView: View {
     @State private var myPostCount = 0
     @State private var fallbackPublicID: String?
     @State private var uidCopyFeedbackMessage: String?
-    @State private var activityPostActions: ProfileActivityPostActions?
     @State private var activitySharingPost: PostSharePayload?
     @State private var activityShareFeedbackMessage: String?
     @StateObject private var profileSocialService = ProfileSocialService.shared
@@ -61,9 +60,6 @@ struct ProfileView: View {
                                 contentProxy.size.height + 24,
                                 320
                             ),
-                            onPresentPostActions: { actions in
-                                activityPostActions = actions
-                            },
                             onPresentShare: { payload in
                                 activitySharingPost = payload
                             }
@@ -79,7 +75,6 @@ struct ProfileView: View {
                 .refreshable {
                     await refreshProfile(force: true)
                 }
-                .scrollDisabled(activityPostActions != nil)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -104,10 +99,6 @@ struct ProfileView: View {
                 .buttonStyle(.plain)
             }
         }
-        // Presentation overlays must wrap the inline top bar as well as the
-        // scrolling content. Applying them before `safeAreaInset` left the bar
-        // outside the dimming scrim and produced a hard horizontal seam.
-        .profileActivityPostActionOverlay(actions: $activityPostActions)
         .cheesePostSharePanel(item: $activitySharingPost) { message in
             ShareFeedbackPresenter.show(message) {
                 activityShareFeedbackMessage = $0

@@ -272,7 +272,6 @@ struct ForumPostCardView: View {
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
-        .tappableAvatarPreview(post.authorAvatar)
     }
 
     private func postAvatarFallback(size: CGFloat) -> some View {

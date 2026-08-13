@@ -222,9 +222,13 @@ final class CompletedSecondhandTransactionsService: ObservableObject {
                 authorId: userID,
                 postId: item.listingID
             )
-            cache.removeAll()
-            if selectedRole == .seller {
-                await select(.seller, force: true)
+
+            // A relist reverses the completed-listing surface immediately.
+            // Keep the immutable transaction row in the database, but do not
+            // let a now-active listing remain in either cached history page.
+            items.removeAll { $0.listingID == item.listingID }
+            for role in CompletedSecondhandRole.allCases {
+                cache[role]?.removeAll { $0.listingID == item.listingID }
             }
             return true
         } catch {

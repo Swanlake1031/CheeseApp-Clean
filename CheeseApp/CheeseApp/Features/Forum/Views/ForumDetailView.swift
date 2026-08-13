@@ -300,7 +300,6 @@ struct ForumDetailView: View {
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
-        .tappableAvatarPreview(post.authorAvatar)
     }
 
     private func detailAuthorAvatarFallback(size: CGFloat) -> some View {

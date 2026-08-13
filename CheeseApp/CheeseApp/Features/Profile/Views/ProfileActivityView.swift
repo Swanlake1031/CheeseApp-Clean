@@ -68,231 +68,11 @@ private struct ProfileActivityPageHeightPreferenceKey: PreferenceKey {
     }
 }
 
-struct ProfileActivityPostActions: Identifiable {
-    let item: ProfileActivityItem
-    let isPrivate: Bool
-    let sourceFrame: CGRect
-    let perform: (ProfileActivityPostAction) -> Void
-
-    var id: UUID { item.postID }
-}
-
 enum ProfileActivityPostAction {
     case makePrivate
     case edit
     case share
     case delete
-}
-
-private struct ProfileActivityPostActionOverlay: View {
-    let actions: ProfileActivityPostActions
-    let onDismiss: () -> Void
-    @State private var isPresented = false
-    @State private var isDismissing = false
-
-    var body: some View {
-        GeometryReader { proxy in
-            let placement = menuPlacement(in: proxy)
-
-            ZStack {
-                Color.black.opacity(isPresented ? 0.12 : 0)
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        dismiss()
-                    }
-
-                menuContent
-                    .frame(width: menuWidth)
-                    .background(Color(uiColor: .systemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .shadow(color: .black.opacity(0.12), radius: 22, y: 8)
-                    .position(placement.position)
-                    .scaleEffect(
-                        isPresented ? 1 : 0.68,
-                        anchor: placement.anchor
-                    )
-                    .opacity(isPresented ? 1 : 0)
-            }
-        }
-        .accessibilityAddTraits(.isModal)
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.18)) {
-                isPresented = true
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var menuContent: some View {
-        VStack(spacing: 0) {
-            if !actions.isPrivate {
-                actionButton(
-                    title: "私密",
-                    icon: "lock.fill",
-                    action: .makePrivate
-                )
-            }
-
-            actionButton(
-                title: "编辑",
-                icon: "square.and.pencil",
-                action: .edit
-            )
-
-            if !actions.isPrivate {
-                actionButton(
-                    title: "分享",
-                    icon: "square.and.arrow.up",
-                    action: .share
-                )
-            }
-
-            Divider()
-                .padding(.horizontal, 18)
-
-            actionButton(
-                title: "删除",
-                icon: "trash",
-                role: .destructive,
-                action: .delete
-            )
-        }
-    }
-
-    private func actionButton(
-        title: String,
-        icon: String,
-        role: ButtonRole? = nil,
-        action: ProfileActivityPostAction
-    ) -> some View {
-        Button(role: role) {
-            dismiss {
-                actions.perform(action)
-            }
-        } label: {
-            Label(title, systemImage: icon)
-                .font(.system(size: 17, weight: .medium))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
-                .frame(height: 54)
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(role == .destructive ? Color.red : AppColors.textPrimary)
-    }
-
-    private func dismiss(then action: (() -> Void)? = nil) {
-        guard !isDismissing else { return }
-        isDismissing = true
-
-        // Keep the fixed overlay alive until its visual transition completes.
-        // This also preserves scroll locking, so an immediate follow-up drag
-        // cannot move a transient menu snapshot with the profile pager.
-        withAnimation(
-            .easeIn(duration: 0.14),
-            completionCriteria: .logicallyComplete
-        ) {
-            isPresented = false
-        } completion: {
-            onDismiss()
-            action?()
-        }
-    }
-
-    private var menuWidth: CGFloat { 260 }
-
-    private var menuHeight: CGFloat {
-        actions.isPrivate ? 109 : 217
-    }
-
-    private func menuPlacement(
-        in proxy: GeometryProxy
-    ) -> (position: CGPoint, anchor: UnitPoint) {
-        let globalOverlayFrame = proxy.frame(in: .global)
-        let sourceFrame = actions.sourceFrame.offsetBy(
-            dx: -globalOverlayFrame.minX,
-            dy: -globalOverlayFrame.minY
-        )
-        let horizontalMargin: CGFloat = 16
-        let verticalMargin: CGFloat = 12
-        let menuGap: CGFloat = 8
-        let halfWidth = menuWidth / 2
-        let halfHeight = menuHeight / 2
-
-        guard actions.sourceFrame.width > 0,
-              actions.sourceFrame.height > 0
-        else {
-            return (
-                CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2),
-                .center
-            )
-        }
-
-        let unclampedX = sourceFrame.maxX - halfWidth
-        let x = min(
-            max(unclampedX, horizontalMargin + halfWidth),
-            proxy.size.width - horizontalMargin - halfWidth
-        )
-        let hasRoomAbove = sourceFrame.minY - menuGap >= menuHeight + verticalMargin
-        let unclampedY = hasRoomAbove
-            ? sourceFrame.minY - menuGap - halfHeight
-            : sourceFrame.maxY + menuGap + halfHeight
-        let y = min(
-            max(unclampedY, verticalMargin + halfHeight),
-            proxy.size.height - verticalMargin - halfHeight
-        )
-        let menuMinX = x - halfWidth
-        let sourceAnchorX = min(
-            max((sourceFrame.midX - menuMinX) / menuWidth, 0),
-            1
-        )
-
-        return (
-            CGPoint(x: x, y: y),
-            UnitPoint(x: sourceAnchorX, y: hasRoomAbove ? 1 : 0)
-        )
-    }
-}
-
-private final class ProfileActivityActionSource {
-    weak var view: UIView?
-
-    @MainActor
-    func frameInWindow() -> CGRect {
-        guard let view, let window = view.window else { return .zero }
-        return view.convert(view.bounds, to: window)
-    }
-}
-
-private struct ProfileActivityActionSourceReader: UIViewRepresentable {
-    let source: ProfileActivityActionSource
-
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView(frame: .zero)
-        view.isUserInteractionEnabled = false
-        source.view = view
-        return view
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {
-        source.view = uiView
-    }
-}
-
-extension View {
-    func profileActivityPostActionOverlay(
-        actions: Binding<ProfileActivityPostActions?>
-    ) -> some View {
-        overlay {
-            if let presentedActions = actions.wrappedValue {
-                ProfileActivityPostActionOverlay(
-                    actions: presentedActions,
-                    onDismiss: { actions.wrappedValue = nil }
-                )
-                .zIndex(2_000)
-            }
-        }
-    }
 }
 
 struct ProfileActivityView: View {
@@ -309,8 +89,6 @@ struct ProfileActivityView: View {
     @State private var editingRequestID: UUID?
     @State private var updatingPrivacyPostID: UUID?
     @State private var deletingPostID: UUID?
-    @State private var deletingItem: ProfileActivityItem?
-    @State private var postActions: ProfileActivityPostActions?
     @State private var sharingPost: PostSharePayload?
     @State private var shareFeedbackMessage: String?
     @State private var navigationErrorMessage: String?
@@ -321,7 +99,6 @@ struct ProfileActivityView: View {
     private let pageTitle: String?
     private let externalRefreshGeneration: Int
     private let minimumEmbeddedPagerHeight: CGFloat
-    private let onPresentPostActions: ((ProfileActivityPostActions) -> Void)?
     private let onPresentShare: ((PostSharePayload) -> Void)?
 
     init(
@@ -332,7 +109,6 @@ struct ProfileActivityView: View {
         pageTitle: String? = nil,
         externalRefreshGeneration: Int = 0,
         minimumEmbeddedPagerHeight: CGFloat = 220,
-        onPresentPostActions: ((ProfileActivityPostActions) -> Void)? = nil,
         onPresentShare: ((PostSharePayload) -> Void)? = nil
     ) {
         _selectedKind = State(initialValue: initialKind)
@@ -343,7 +119,6 @@ struct ProfileActivityView: View {
         self.pageTitle = pageTitle
         self.externalRefreshGeneration = externalRefreshGeneration
         self.minimumEmbeddedPagerHeight = minimumEmbeddedPagerHeight
-        self.onPresentPostActions = onPresentPostActions
         self.onPresentShare = onPresentShare
     }
 
@@ -378,8 +153,6 @@ struct ProfileActivityView: View {
                 shareFeedbackMessage = $0
             }
         }
-        .profileActivityPostActionOverlay(actions: $postActions)
-        .scrollDisabled(postActions != nil)
         .onChange(of: destination) { previous, current in
             guard previous != nil, current == nil else { return }
             refreshGeneration &+= 1
@@ -398,25 +171,6 @@ struct ProfileActivityView: View {
             Button("确定", role: .cancel) {}
         } message: {
             Text(navigationErrorMessage ?? "")
-        }
-        .confirmationDialog(
-            "确定删除这篇贴文？",
-            isPresented: Binding(
-                get: { deletingItem != nil },
-                set: { if !$0 { deletingItem = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("取消", role: .cancel) {
-                deletingItem = nil
-            }
-            Button("删除", role: .destructive) {
-                guard let item = deletingItem else { return }
-                deletingItem = nil
-                Task { await deletePost(item) }
-            }
-        } message: {
-            Text("删除后无法复原。")
         }
         .shareFeedbackToast(message: $shareFeedbackMessage)
     }
@@ -512,20 +266,8 @@ struct ProfileActivityView: View {
                 Task { await setPostPrivacy(item, hidden: hidden) }
             },
             onShare: share,
-            onShowActions: { item, isPrivate, sourceFrame in
-                let actions = ProfileActivityPostActions(
-                    item: item,
-                    isPrivate: isPrivate,
-                    sourceFrame: sourceFrame,
-                    perform: { action in
-                        performPostAction(action, for: item)
-                    }
-                )
-                if let onPresentPostActions {
-                    onPresentPostActions(actions)
-                } else {
-                    postActions = actions
-                }
+            onPerformAction: { action, item in
+                performPostAction(action, for: item)
             },
             onSelectPublishedKind: { kind in
                 selectPublishedPostKind(kind)
@@ -818,7 +560,7 @@ struct ProfileActivityView: View {
         case .share:
             share(item)
         case .delete:
-            deletingItem = item
+            Task { await deletePost(item) }
         }
     }
 
@@ -830,7 +572,6 @@ struct ProfileActivityView: View {
         deletingPostID = item.postID
         defer {
             deletingPostID = nil
-            deletingItem = nil
         }
 
         do {
@@ -859,7 +600,7 @@ private struct ProfileActivityPageView: View {
     let onOpen: (ProfileActivityItem) -> Void
     let onSetPrivacy: (ProfileActivityItem, Bool) -> Void
     let onShare: (ProfileActivityItem) -> Void
-    let onShowActions: (ProfileActivityItem, Bool, CGRect) -> Void
+    let onPerformAction: (ProfileActivityPostAction, ProfileActivityItem) -> Void
     let onSelectPublishedKind: (PostKind?) -> Void
 
     @StateObject private var service: ProfileActivityService
@@ -881,7 +622,7 @@ private struct ProfileActivityPageView: View {
         onOpen: @escaping (ProfileActivityItem) -> Void,
         onSetPrivacy: @escaping (ProfileActivityItem, Bool) -> Void,
         onShare: @escaping (ProfileActivityItem) -> Void,
-        onShowActions: @escaping (ProfileActivityItem, Bool, CGRect) -> Void,
+        onPerformAction: @escaping (ProfileActivityPostAction, ProfileActivityItem) -> Void,
         onSelectPublishedKind: @escaping (PostKind?) -> Void
     ) {
         self.kind = kind
@@ -898,7 +639,7 @@ private struct ProfileActivityPageView: View {
         self.onOpen = onOpen
         self.onSetPrivacy = onSetPrivacy
         self.onShare = onShare
-        self.onShowActions = onShowActions
+        self.onPerformAction = onPerformAction
         self.onSelectPublishedKind = onSelectPublishedKind
         let initialServiceKind: ProfileActivityKind = kind == .privateContent
             ? .published
@@ -1076,8 +817,8 @@ private struct ProfileActivityPageView: View {
                         onSetPrivacy(item, hidden)
                     },
                     onShare: { onShare(item) },
-                    onShowActions: { isPrivate, sourceFrame in
-                        onShowActions(item, isPrivate, sourceFrame)
+                    onPerformAction: { action in
+                        onPerformAction(action, item)
                     },
                     onToggleReaction: { currentlyActive in
                         Task {
@@ -1168,9 +909,8 @@ private struct ProfileActivityRow: View {
     let onOpen: () -> Void
     let onSetPrivacy: (Bool) -> Void
     let onShare: () -> Void
-    let onShowActions: (Bool, CGRect) -> Void
+    let onPerformAction: (ProfileActivityPostAction) -> Void
     let onToggleReaction: (Bool) -> Void
-    @State private var actionSource = ProfileActivityActionSource()
 
     var body: some View {
         VStack(spacing: 10) {
@@ -1270,19 +1010,42 @@ private struct ProfileActivityRow: View {
                         .accessibilityLabel("分享帖子")
                     }
 
-                    Button {
-                        onShowActions(isPrivate, actionSource.frameInWindow())
-                    } label: {
-                        ZStack {
-                            HStack(spacing: 5) {
-                                Text("编辑")
-                                Image(systemName: "ellipsis")
+                    Menu {
+                        if !isPrivate {
+                            Button {
+                                onPerformAction(.makePrivate)
+                            } label: {
+                                Label("私密", systemImage: "lock.fill")
                             }
-                            .opacity(isPublishedActionInProgress ? 0 : 1)
+                        }
 
-                            if isPublishedActionInProgress {
-                                ProgressView().controlSize(.small)
+                        Button {
+                            onPerformAction(.edit)
+                        } label: {
+                            Label("编辑", systemImage: "square.and.pencil")
+                        }
+
+                        if !isPrivate {
+                            Button {
+                                onPerformAction(.share)
+                            } label: {
+                                Label("分享", systemImage: "square.and.arrow.up")
                             }
+                        }
+
+                        Menu {
+                            Button(role: .destructive) {
+                                onPerformAction(.delete)
+                            } label: {
+                                Label("确认删除", systemImage: "trash.fill")
+                            }
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text("编辑")
+                            Image(systemName: "ellipsis")
                         }
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(AppColors.textPrimary)
@@ -1294,9 +1057,6 @@ private struct ProfileActivityRow: View {
                     .buttonStyle(.plain)
                     .disabled(isPublishedActionDisabled)
                     .accessibilityLabel("帖子操作")
-                    .background {
-                        ProfileActivityActionSourceReader(source: actionSource)
-                    }
                 }
             } else if activityKind == .liked || activityKind == .favorited {
                 HStack {
@@ -1357,10 +1117,6 @@ private struct ProfileActivityRow: View {
 
     private var isPublishedManagement: Bool {
         activityKind == .published || activityKind == .privateContent
-    }
-
-    private var isPublishedActionInProgress: Bool {
-        isUpdatingPrivacy || isEditing || isDeleting
     }
 
     private var isReactionActive: Bool {
@@ -1581,9 +1337,7 @@ private struct CompletedSecondhandTransactionRow: View {
     }
 
     private var statusTitle: String {
-        item.role == .seller && item.listingStatus == "active"
-            ? "已恢复上架"
-            : "交易完成"
+        "交易完成"
     }
 
     @ViewBuilder
