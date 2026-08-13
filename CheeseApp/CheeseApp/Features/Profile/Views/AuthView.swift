@@ -9,6 +9,65 @@
 import SwiftUI
 import UIKit
 
+private struct AppLaunchAnnouncement: Decodable, Identifiable, Hashable {
+    let id: UUID
+    let announcementKey: String
+    let titleEnglish: String
+    let titleChinese: String
+    let itemsEnglish: [String]
+    let itemsChinese: [String]
+
+    var localizedTitle: String {
+        AppLanguageStore.shared.current == .chinese
+            ? titleChinese
+            : titleEnglish
+    }
+
+    var localizedMessage: String {
+        let items = AppLanguageStore.shared.current == .chinese
+            ? itemsChinese
+            : itemsEnglish
+        return items.map { "• \($0)" }.joined(separator: "\n\n")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case announcementKey = "announcement_key"
+        case titleEnglish = "title_en"
+        case titleChinese = "title_zh"
+        case itemsEnglish = "items_en"
+        case itemsChinese = "items_zh"
+    }
+}
+
+@MainActor
+private enum AppLaunchAnnouncementService {
+    private static let acknowledgedKey = "acknowledged_app_launch_announcement_key"
+
+    static func currentUnacknowledged() async throws -> AppLaunchAnnouncement? {
+        let announcements: [AppLaunchAnnouncement] = try await SupabaseManager.shared
+            .database("app_announcements")
+            .select("id,announcement_key,title_en,title_zh,items_en,items_zh")
+            .order("published_at", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+
+        guard let announcement = announcements.first,
+              UserDefaults.standard.string(forKey: acknowledgedKey)
+                != announcement.announcementKey
+        else { return nil }
+        return announcement
+    }
+
+    static func acknowledge(_ announcement: AppLaunchAnnouncement) {
+        UserDefaults.standard.set(
+            announcement.announcementKey,
+            forKey: acknowledgedKey
+        )
+    }
+}
+
 struct AuthView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject private var languageStore: AppLanguageStore
@@ -20,6 +79,7 @@ struct AuthView: View {
     @State private var showPassword = false
     @State private var activeSocialProvider: SocialProvider?
     @State private var recentAccountPendingRemoval: RecentLoginAccount?
+    @State private var launchAnnouncement: AppLaunchAnnouncement?
 
     private enum SocialProvider {
         case apple
@@ -85,6 +145,24 @@ struct AuthView: View {
         } message: { account in
             Text("将从这台设备移除 \(account.displayLabel) 的最近登录记录和本地登录凭据，不会注销线上账号。")
         }
+        .alert(
+            launchAnnouncement?.localizedTitle ?? "",
+            isPresented: Binding(
+                get: { launchAnnouncement != nil },
+                set: { if !$0 { launchAnnouncement = nil } }
+            ),
+            presenting: launchAnnouncement
+        ) { announcement in
+            Button(L10n.tr("Got it", "我知道了"), role: .cancel) {
+                AppLaunchAnnouncementService.acknowledge(announcement)
+                launchAnnouncement = nil
+            }
+        } message: { announcement in
+            Text(announcement.localizedMessage)
+        }
+        .task {
+            await loadLaunchAnnouncement()
+        }
     }
 
     private var languageSwitcher: some View {
@@ -100,6 +178,15 @@ struct AuthView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 170)
+        }
+    }
+
+    private func loadLaunchAnnouncement() async {
+        do {
+            launchAnnouncement = try await AppLaunchAnnouncementService.currentUnacknowledged()
+        } catch {
+            // A launch notice is informational and must never block login when
+            // the network or announcement endpoint is unavailable.
         }
     }
     
