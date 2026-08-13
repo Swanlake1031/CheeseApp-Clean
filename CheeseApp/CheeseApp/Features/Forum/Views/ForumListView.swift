@@ -116,7 +116,7 @@ struct ForumListView: View {
             }
             .buttonStyle(.plain)
             .padding(.trailing, 20)
-            .padding(.bottom, 22)
+            .padding(.bottom, CheeseTabBarLayout.contentBottomClearance)
             .accessibilityLabel(L10n.tr("Create Forum post", "发布论坛帖子"))
         }
     }
