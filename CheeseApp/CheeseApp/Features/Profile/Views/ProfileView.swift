@@ -23,6 +23,7 @@ struct ProfileView: View {
     @State private var uidCopyFeedbackMessage: String?
     @State private var activitySharingPost: PostSharePayload?
     @State private var activityShareFeedbackMessage: String?
+    @State private var isActivityMenuPresented = false
     @StateObject private var profileSocialService = ProfileSocialService.shared
     @StateObject private var userPostsService = UserPostsService()
 
@@ -60,6 +61,9 @@ struct ProfileView: View {
                                 contentProxy.size.height + 24,
                                 320
                             ),
+                            onPostMenuPresentationChanged: { isPresented in
+                                isActivityMenuPresented = isPresented
+                            },
                             onPresentShare: { payload in
                                 activitySharingPost = payload
                             }
@@ -75,6 +79,7 @@ struct ProfileView: View {
                 .refreshable {
                     await refreshProfile(force: true)
                 }
+                .scrollDisabled(isActivityMenuPresented)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
