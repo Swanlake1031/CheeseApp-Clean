@@ -419,19 +419,11 @@ struct OfficialAccountAvatar: View {
     let size: CGFloat
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Image("CheeseAppLogo")
-                .resizable()
-                .scaledToFill()
-                .frame(width: size, height: size)
-                .clipShape(Circle())
-
-            Text("🧀")
-                .font(.system(size: size * 0.22))
-                .frame(width: size * 0.38, height: size * 0.38)
-                .background(Color.white, in: Circle())
-                .overlay { Circle().stroke(.white, lineWidth: max(size * 0.045, 1)) }
-        }
+        Image("CheeseAppLogo")
+            .resizable()
+            .scaledToFill()
+            .frame(width: size, height: size)
+            .clipShape(Circle())
         .frame(width: size, height: size)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(L10n.tr("Cheese Official avatar", "奶酪官方头像")))
@@ -441,7 +433,13 @@ struct OfficialAccountAvatar: View {
 struct OfficialVerificationBadge: View {
     var body: some View {
         Text("🧀")
-            .font(.system(size: 13))
+            .font(.system(size: 15))
+            .frame(width: 25, height: 21)
+            .background(AppColors.accent.opacity(0.2), in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(AppColors.accentStrong.opacity(0.28), lineWidth: 1)
+            }
             .accessibilityLabel(Text(L10n.tr("Verified official account", "官方认证账号")))
     }
 }
