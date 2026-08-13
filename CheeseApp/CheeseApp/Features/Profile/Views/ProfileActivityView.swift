@@ -145,21 +145,14 @@ private struct NativeProfilePostMenuButton: UIViewRepresentable {
             )
         }
 
-        let confirmDelete = UIAction(
-            title: "确认删除",
-            image: UIImage(systemName: "trash.fill"),
+        let delete = UIAction(
+            title: "删除",
+            image: UIImage(systemName: "trash"),
             attributes: .destructive
         ) { _ in
             coordinator.request(.delete)
         }
-        children.append(
-            UIMenu(
-                title: "删除",
-                image: UIImage(systemName: "trash"),
-                options: .destructive,
-                children: [confirmDelete]
-            )
-        )
+        children.append(delete)
 
         return UIMenu(children: children)
     }
@@ -238,6 +231,7 @@ struct ProfileActivityView: View {
     @State private var editingRequestID: UUID?
     @State private var updatingPrivacyPostID: UUID?
     @State private var deletingPostID: UUID?
+    @State private var pendingDeleteItem: ProfileActivityItem?
     @State private var sharingPost: PostSharePayload?
     @State private var shareFeedbackMessage: String?
     @State private var navigationErrorMessage: String?
@@ -309,6 +303,25 @@ struct ProfileActivityView: View {
         .task(id: authService.currentUser?.id) {
             cancelPendingPostActions()
             editingPost = nil
+            pendingDeleteItem = nil
+        }
+        .alert(
+            L10n.tr("Delete this post?", "确定删除这篇贴文？"),
+            isPresented: Binding(
+                get: { pendingDeleteItem != nil },
+                set: { if !$0 { pendingDeleteItem = nil } }
+            ),
+            presenting: pendingDeleteItem
+        ) { item in
+            Button(L10n.tr("Cancel", "取消"), role: .cancel) {
+                pendingDeleteItem = nil
+            }
+            Button(L10n.tr("Delete", "删除"), role: .destructive) {
+                pendingDeleteItem = nil
+                Task { await deletePost(item) }
+            }
+        } message: { _ in
+            Text(L10n.tr("This action cannot be undone.", "删除后无法复原。"))
         }
         .alert(
             "操作失败",
@@ -709,7 +722,7 @@ struct ProfileActivityView: View {
         case .share:
             share(item)
         case .delete:
-            Task { await deletePost(item) }
+            pendingDeleteItem = item
         }
     }
 
