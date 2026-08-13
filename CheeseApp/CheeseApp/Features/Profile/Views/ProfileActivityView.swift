@@ -79,13 +79,9 @@ private struct NativeProfilePostMenuButton: UIViewRepresentable {
     let isPrivate: Bool
     let isDisabled: Bool
     let onAction: (ProfileActivityPostAction) -> Void
-    let onPresentationChanged: (Bool) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(
-            onAction: onAction,
-            onPresentationChanged: onPresentationChanged
-        )
+        Coordinator(onAction: onAction)
     }
 
     func makeUIView(context: Context) -> ProfilePostMenuButton {
@@ -93,38 +89,25 @@ private struct NativeProfilePostMenuButton: UIViewRepresentable {
         button.lifecycleDelegate = context.coordinator
         button.showsMenuAsPrimaryAction = true
         button.changesSelectionAsPrimaryAction = false
+        button.backgroundColor = .clear
+        button.isOpaque = false
         button.configuration = buttonConfiguration
         button.menu = makeMenu(coordinator: context.coordinator)
+        button.accessibilityLabel = "帖子操作"
         return button
     }
 
     func updateUIView(_ button: ProfilePostMenuButton, context: Context) {
         context.coordinator.onAction = onAction
-        context.coordinator.onPresentationChanged = onPresentationChanged
         button.isEnabled = !isDisabled
         button.configuration = buttonConfiguration
         button.menu = makeMenu(coordinator: context.coordinator)
     }
 
     private var buttonConfiguration: UIButton.Configuration {
-        var configuration = UIButton.Configuration.gray()
-        configuration.title = "编辑"
-        configuration.image = UIImage(systemName: "ellipsis")
-        configuration.imagePlacement = .trailing
-        configuration.imagePadding = 5
-        configuration.cornerStyle = .capsule
-        configuration.contentInsets = NSDirectionalEdgeInsets(
-            top: 6,
-            leading: 12,
-            bottom: 6,
-            trailing: 12
-        )
-        configuration.baseForegroundColor = UIColor.label
-        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
-            var result = attributes
-            result.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
-            return result
-        }
+        var configuration = UIButton.Configuration.plain()
+        configuration.contentInsets = .zero
+        configuration.background.backgroundColor = .clear
         return configuration
     }
 
@@ -194,34 +177,19 @@ private struct NativeProfilePostMenuButton: UIViewRepresentable {
 
     final class Coordinator: NSObject, ProfilePostMenuButtonLifecycleDelegate {
         var onAction: (ProfileActivityPostAction) -> Void
-        var onPresentationChanged: (Bool) -> Void
         private var pendingAction: ProfileActivityPostAction?
-        private var isPresented = false
 
-        init(
-            onAction: @escaping (ProfileActivityPostAction) -> Void,
-            onPresentationChanged: @escaping (Bool) -> Void
-        ) {
+        init(onAction: @escaping (ProfileActivityPostAction) -> Void) {
             self.onAction = onAction
-            self.onPresentationChanged = onPresentationChanged
         }
 
         func request(_ action: ProfileActivityPostAction) {
             pendingAction = action
         }
 
-        func menuWillDisplay() {
-            guard !isPresented else { return }
-            isPresented = true
-            onPresentationChanged(true)
-        }
-
         func menuDidFinishDismissing() {
-            guard isPresented else { return }
-            isPresented = false
             let action = pendingAction
             pendingAction = nil
-            onPresentationChanged(false)
             if let action {
                 onAction(action)
             }
@@ -230,25 +198,11 @@ private struct NativeProfilePostMenuButton: UIViewRepresentable {
 }
 
 private protocol ProfilePostMenuButtonLifecycleDelegate: AnyObject {
-    func menuWillDisplay()
     func menuDidFinishDismissing()
 }
 
 private final class ProfilePostMenuButton: UIButton {
     weak var lifecycleDelegate: ProfilePostMenuButtonLifecycleDelegate?
-
-    override func contextMenuInteraction(
-        _ interaction: UIContextMenuInteraction,
-        willDisplayMenuFor configuration: UIContextMenuConfiguration,
-        animator: (any UIContextMenuInteractionAnimating)?
-    ) {
-        super.contextMenuInteraction(
-            interaction,
-            willDisplayMenuFor: configuration,
-            animator: animator
-        )
-        lifecycleDelegate?.menuWillDisplay()
-    }
 
     override func contextMenuInteraction(
         _ interaction: UIContextMenuInteraction,
@@ -286,7 +240,6 @@ struct ProfileActivityView: View {
     @State private var deletingPostID: UUID?
     @State private var sharingPost: PostSharePayload?
     @State private var shareFeedbackMessage: String?
-    @State private var isPostMenuPresented = false
     @State private var navigationErrorMessage: String?
     @State private var embeddedPageHeights: [ProfileActivityKind: CGFloat] = [:]
     private let showsKindPicker: Bool
@@ -295,7 +248,6 @@ struct ProfileActivityView: View {
     private let pageTitle: String?
     private let externalRefreshGeneration: Int
     private let minimumEmbeddedPagerHeight: CGFloat
-    private let onPostMenuPresentationChanged: (Bool) -> Void
     private let onPresentShare: ((PostSharePayload) -> Void)?
 
     init(
@@ -306,7 +258,6 @@ struct ProfileActivityView: View {
         pageTitle: String? = nil,
         externalRefreshGeneration: Int = 0,
         minimumEmbeddedPagerHeight: CGFloat = 220,
-        onPostMenuPresentationChanged: @escaping (Bool) -> Void = { _ in },
         onPresentShare: ((PostSharePayload) -> Void)? = nil
     ) {
         _selectedKind = State(initialValue: initialKind)
@@ -317,7 +268,6 @@ struct ProfileActivityView: View {
         self.pageTitle = pageTitle
         self.externalRefreshGeneration = externalRefreshGeneration
         self.minimumEmbeddedPagerHeight = minimumEmbeddedPagerHeight
-        self.onPostMenuPresentationChanged = onPostMenuPresentationChanged
         self.onPresentShare = onPresentShare
     }
 
@@ -350,13 +300,6 @@ struct ProfileActivityView: View {
         .cheesePostSharePanel(item: $sharingPost) { message in
             ShareFeedbackPresenter.show(message) {
                 shareFeedbackMessage = $0
-            }
-        }
-        .scrollDisabled(isPostMenuPresented)
-        .onDisappear {
-            if isPostMenuPresented {
-                isPostMenuPresented = false
-                onPostMenuPresentationChanged(false)
             }
         }
         .onChange(of: destination) { previous, current in
@@ -474,10 +417,6 @@ struct ProfileActivityView: View {
             onShare: share,
             onPerformAction: { action, item in
                 performPostAction(action, for: item)
-            },
-            onMenuPresentationChanged: { isPresented in
-                isPostMenuPresented = isPresented
-                onPostMenuPresentationChanged(isPresented)
             },
             onSelectPublishedKind: { kind in
                 selectPublishedPostKind(kind)
@@ -811,7 +750,6 @@ private struct ProfileActivityPageView: View {
     let onSetPrivacy: (ProfileActivityItem, Bool) -> Void
     let onShare: (ProfileActivityItem) -> Void
     let onPerformAction: (ProfileActivityPostAction, ProfileActivityItem) -> Void
-    let onMenuPresentationChanged: (Bool) -> Void
     let onSelectPublishedKind: (PostKind?) -> Void
 
     @StateObject private var service: ProfileActivityService
@@ -834,7 +772,6 @@ private struct ProfileActivityPageView: View {
         onSetPrivacy: @escaping (ProfileActivityItem, Bool) -> Void,
         onShare: @escaping (ProfileActivityItem) -> Void,
         onPerformAction: @escaping (ProfileActivityPostAction, ProfileActivityItem) -> Void,
-        onMenuPresentationChanged: @escaping (Bool) -> Void,
         onSelectPublishedKind: @escaping (PostKind?) -> Void
     ) {
         self.kind = kind
@@ -852,7 +789,6 @@ private struct ProfileActivityPageView: View {
         self.onSetPrivacy = onSetPrivacy
         self.onShare = onShare
         self.onPerformAction = onPerformAction
-        self.onMenuPresentationChanged = onMenuPresentationChanged
         self.onSelectPublishedKind = onSelectPublishedKind
         let initialServiceKind: ProfileActivityKind = kind == .privateContent
             ? .published
@@ -1033,7 +969,6 @@ private struct ProfileActivityPageView: View {
                     onPerformAction: { action in
                         onPerformAction(action, item)
                     },
-                    onMenuPresentationChanged: onMenuPresentationChanged,
                     onToggleReaction: { currentlyActive in
                         Task {
                             await service.toggleReaction(
@@ -1124,7 +1059,6 @@ private struct ProfileActivityRow: View {
     let onSetPrivacy: (Bool) -> Void
     let onShare: () -> Void
     let onPerformAction: (ProfileActivityPostAction) -> Void
-    let onMenuPresentationChanged: (Bool) -> Void
     let onToggleReaction: (Bool) -> Void
 
     var body: some View {
@@ -1225,13 +1159,26 @@ private struct ProfileActivityRow: View {
                         .accessibilityLabel("分享帖子")
                     }
 
-                    NativeProfilePostMenuButton(
-                        isPrivate: isPrivate,
-                        isDisabled: isPublishedActionDisabled,
-                        onAction: onPerformAction,
-                        onPresentationChanged: onMenuPresentationChanged
-                    )
-                    .frame(width: 82, height: 32)
+                    ZStack {
+                        HStack(spacing: 5) {
+                            Text("编辑")
+                            Image(systemName: "ellipsis")
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .frame(width: 82, height: 32)
+                        .background(Color(.systemGray6))
+                        .clipShape(Capsule())
+                        .allowsHitTesting(false)
+
+                        NativeProfilePostMenuButton(
+                            isPrivate: isPrivate,
+                            isDisabled: isPublishedActionDisabled,
+                            onAction: onPerformAction
+                        )
+                        .frame(width: 82, height: 32)
+                    }
+                    .accessibilityElement(children: .ignore)
                     .accessibilityLabel("帖子操作")
                 }
             } else if activityKind == .liked || activityKind == .favorited {
