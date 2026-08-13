@@ -420,25 +420,16 @@ struct OfficialAccountAvatar: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [AppColors.accent, AppColors.accentStrong],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay {
-                    Text("C")
-                        .font(.system(size: size * 0.46, weight: .black, design: .rounded))
-                        .foregroundStyle(AppColors.textPrimary)
-                }
+            Image("CheeseAppLogo")
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(Circle())
 
-            Image(systemName: "checkmark")
-                .font(.system(size: size * 0.19, weight: .black))
-                .foregroundStyle(.white)
-                .frame(width: size * 0.36, height: size * 0.36)
-                .background(Color.blue, in: Circle())
+            Text("🧀")
+                .font(.system(size: size * 0.22))
+                .frame(width: size * 0.38, height: size * 0.38)
+                .background(Color.white, in: Circle())
                 .overlay { Circle().stroke(.white, lineWidth: max(size * 0.045, 1)) }
         }
         .frame(width: size, height: size)
@@ -449,9 +440,8 @@ struct OfficialAccountAvatar: View {
 
 struct OfficialVerificationBadge: View {
     var body: some View {
-        Image(systemName: "checkmark.seal.fill")
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(Color.blue)
+        Text("🧀")
+            .font(.system(size: 13))
             .accessibilityLabel(Text(L10n.tr("Verified official account", "官方认证账号")))
     }
 }
