@@ -255,7 +255,8 @@ struct EditPostSheet: View {
                 condition: $secondhandCondition,
                 isNegotiable: $secondhandIsNegotiable,
                 description: $description,
-                selectedImages: $selectedImages
+                selectedImages: $selectedImages,
+                existingImageCount: existingImages.count
             )
         }
     }

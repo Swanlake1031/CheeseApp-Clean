@@ -11,6 +11,7 @@ struct SecondhandPostEditFormView: View {
     @Binding var isNegotiable: Bool
     @Binding var description: String
     @Binding var selectedImages: [UIImage]
+    let existingImageCount: Int
 
     var body: some View {
         VStack(spacing: 20) {
@@ -57,7 +58,10 @@ struct SecondhandPostEditFormView: View {
             }
 
             PostFormSection(title: "图片（可选）") {
-                PostImageSection(selectedImages: $selectedImages)
+                PostImageSection(
+                    selectedImages: $selectedImages,
+                    existingImageCount: existingImageCount
+                )
             }
         }
     }

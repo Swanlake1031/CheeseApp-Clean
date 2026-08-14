@@ -256,6 +256,7 @@ struct ForumPostEditorSurface: View {
             ImagePicker(
                 selectedImages: $selectedImages,
                 maxCount: 6,
+                existingImageCount: existingImages.count,
                 presentationStyle: .composerToolbar
             )
 

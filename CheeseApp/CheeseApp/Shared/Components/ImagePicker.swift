@@ -21,6 +21,7 @@ struct ImagePicker: View {
 
     @Binding var selectedImages: [UIImage]
     let maxCount: Int
+    let existingImageCount: Int
     let presentationStyle: PresentationStyle
     
     @State private var selectedItems: [PhotosPickerItem] = []
@@ -31,10 +32,12 @@ struct ImagePicker: View {
     init(
         selectedImages: Binding<[UIImage]>,
         maxCount: Int = 9,
+        existingImageCount: Int = 0,
         presentationStyle: PresentationStyle = .standard
     ) {
         self._selectedImages = selectedImages
         self.maxCount = maxCount
+        self.existingImageCount = max(0, existingImageCount)
         self.presentationStyle = presentationStyle
     }
     
@@ -45,7 +48,7 @@ struct ImagePicker: View {
             pickerLabel
         }
         .buttonStyle(.plain)
-        .disabled(selectedImages.count >= maxCount)
+        .disabled(totalImageCount >= maxCount)
         .confirmationDialog(
             L10n.tr("Add photos", "添加图片"),
             isPresented: $showingSourceMenu,
@@ -100,13 +103,17 @@ struct ImagePicker: View {
     }
 
     private var remainingSelectionCount: Int {
-        max(1, maxCount - selectedImages.count)
+        max(1, maxCount - totalImageCount)
     }
 
     private func appendImages(_ images: [UIImage]) {
         guard !images.isEmpty else { return }
-        let availableSlots = max(0, maxCount - selectedImages.count)
+        let availableSlots = max(0, maxCount - totalImageCount)
         selectedImages.append(contentsOf: images.prefix(availableSlots))
+    }
+
+    private var totalImageCount: Int {
+        existingImageCount + selectedImages.count
     }
 
     @ViewBuilder
@@ -125,7 +132,7 @@ struct ImagePicker: View {
 
                 Spacer(minLength: 8)
 
-                Text("\(selectedImages.count)/\(maxCount)")
+                Text("\(totalImageCount)/\(maxCount)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppColors.textMuted)
             }
@@ -137,13 +144,13 @@ struct ImagePicker: View {
 
         case .composerToolbar:
             ZStack(alignment: .topTrailing) {
-                Image(systemName: selectedImages.isEmpty ? "photo" : "photo.fill")
+                Image(systemName: totalImageCount == 0 ? "photo" : "photo.fill")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(selectedImages.isEmpty ? AppColors.textPrimary : AppColors.accentStrong)
+                    .foregroundStyle(totalImageCount == 0 ? AppColors.textPrimary : AppColors.accentStrong)
                     .frame(width: 44, height: 44)
 
-                if !selectedImages.isEmpty {
-                    Text("\(selectedImages.count)")
+                if totalImageCount > 0 {
+                    Text("\(totalImageCount)")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.white)
                         .frame(minWidth: 17, minHeight: 17)
@@ -154,7 +161,7 @@ struct ImagePicker: View {
             }
             .contentShape(Rectangle())
             .accessibilityLabel(L10n.tr("Choose Images", "选择图片"))
-            .accessibilityValue("\(selectedImages.count)/\(maxCount)")
+            .accessibilityValue("\(totalImageCount)/\(maxCount)")
         }
     }
 }

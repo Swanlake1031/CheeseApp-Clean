@@ -571,10 +571,23 @@ struct PostChipButton: View {
 
 struct PostImageSection: View {
     @Binding var selectedImages: [UIImage]
+    let existingImageCount: Int
+
+    init(
+        selectedImages: Binding<[UIImage]>,
+        existingImageCount: Int = 0
+    ) {
+        self._selectedImages = selectedImages
+        self.existingImageCount = existingImageCount
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ImagePicker(selectedImages: $selectedImages, maxCount: 6)
+            ImagePicker(
+                selectedImages: $selectedImages,
+                maxCount: 6,
+                existingImageCount: existingImageCount
+            )
 
             if !selectedImages.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
