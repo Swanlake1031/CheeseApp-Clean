@@ -24,6 +24,8 @@ struct EditPostSheet: View {
     private let isPrivate: Bool
 
     @State private var isLoadingExtraDetails = false
+    @State private var hasLoadedExtraDetails = false
+    @State private var extraDetailsErrorMessage: String?
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var showEditedToast = false
@@ -63,6 +65,15 @@ struct EditPostSheet: View {
             }
         }
         .cheeseTabBarHidden(true)
+        .enableSwipeBackGesture()
+        .overlay {
+            if !hasLoadedExtraDetails {
+                extraDetailsLoadingOverlay
+            }
+        }
+        .task {
+            await loadExtraDetailsIfNeeded()
+        }
     }
 
     private var secondhandEditor: some View {
@@ -141,9 +152,6 @@ struct EditPostSheet: View {
                 EmptyView()
             }
         }
-        .task {
-            await loadExtraDetailsIfNeeded()
-        }
     }
 
     private var forumEditor: some View {
@@ -172,8 +180,43 @@ struct EditPostSheet: View {
                 forumIsAnonymous = board.requiresAnonymousPosts
             }
         )
-        .task {
-            await loadExtraDetailsIfNeeded()
+    }
+
+    private var extraDetailsLoadingOverlay: some View {
+        ZStack {
+            AppColors.pageBackground
+                .ignoresSafeArea()
+
+            if let extraDetailsErrorMessage {
+                VStack(spacing: 14) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(.orange)
+                    Text(L10n.tr("Unable to load this post", "无法加载帖子资料"))
+                        .font(.headline)
+                    Text(extraDetailsErrorMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button(L10n.tr("Try Again", "重试")) {
+                        Task { await loadExtraDetailsIfNeeded() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(accentColor)
+                }
+                .padding(24)
+            } else {
+                ProgressView(L10n.tr("Loading post…", "正在加载帖子…"))
+                    .tint(accentColor)
+            }
+        }
+        .safeAreaInset(edge: .top) {
+            PostDetailTopBar(
+                title: L10n.tr("Edit Post", "编辑帖子"),
+                onBack: { dismiss() }
+            ) {
+                EmptyView()
+            }
         }
     }
 
@@ -187,6 +230,7 @@ struct EditPostSheet: View {
     }
 
     private var isFormValid: Bool {
+        guard hasLoadedExtraDetails else { return false }
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         switch post.kind {
         case .secondhand:
@@ -348,9 +392,10 @@ struct EditPostSheet: View {
     }
 
     private func loadExtraDetailsIfNeeded() async {
-        guard !isLoadingExtraDetails else { return }
+        guard !isLoadingExtraDetails, !hasLoadedExtraDetails else { return }
 
         isLoadingExtraDetails = true
+        extraDetailsErrorMessage = nil
         defer { isLoadingExtraDetails = false }
 
         do {
@@ -373,8 +418,10 @@ struct EditPostSheet: View {
                 forumIsAnonymous = details.isAnonymous
                 existingImages = details.images
             }
+            hasLoadedExtraDetails = true
         } catch {
-            // Keep fallback values when loading extra fields fails.
+            if error.isCancellationLike { return }
+            extraDetailsErrorMessage = error.localizedDescription
         }
     }
 

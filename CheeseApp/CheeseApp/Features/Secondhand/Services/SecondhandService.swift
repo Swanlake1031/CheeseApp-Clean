@@ -437,10 +437,12 @@ class SecondhandService: ObservableObject {
     }
 
     func fetchEditFields(postId: UUID) async throws -> SecondhandEditableFields {
-        let userID = try await AuthService.shared.requireAuthUserId()
+        _ = try await AuthService.shared.requireAuthUserId()
         let row: ProfilePostContractRow = try await supabase.client
-            .rpc("get_profile_posts", params: SecondhandProfilePostsParams(userID: userID))
-            .eq("id", value: postId.uuidString)
+            .rpc(
+                "get_my_post_edit_contract",
+                params: MyPostEditContractParams(postID: postId)
+            )
             .single()
             .execute()
             .value

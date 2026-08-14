@@ -124,6 +124,14 @@ struct ProfilePostContractRow: Decodable {
     }
 }
 
+struct MyPostEditContractParams: Encodable {
+    let postID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case postID = "p_post_id"
+    }
+}
+
 @MainActor
 final class UserPostsService: ObservableObject {
     private struct CachedSurface {
@@ -393,10 +401,12 @@ final class UserPostsService: ObservableObject {
     }
 
     func fetchForumEditFields(postId: UUID) async throws -> ForumEditableFields {
-        let userID = try await AuthService.shared.requireAuthUserId()
+        _ = try await AuthService.shared.requireAuthUserId()
         let row: ProfilePostContractRow = try await supabase.client
-            .rpc("get_profile_posts", params: ProfilePostsParams(userID: userID))
-            .eq("id", value: postId.uuidString)
+            .rpc(
+                "get_my_post_edit_contract",
+                params: MyPostEditContractParams(postID: postId)
+            )
             .single()
             .execute()
             .value
