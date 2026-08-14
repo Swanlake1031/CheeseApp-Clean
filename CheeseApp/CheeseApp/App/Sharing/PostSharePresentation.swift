@@ -150,17 +150,30 @@ private struct CheesePostSharePanelPresenter: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay {
-                if let payload = item {
-                    CheesePostShareBottomSheet(
-                        payload: payload,
-                        onDismiss: { item = nil },
-                        onSent: onSent
-                    )
-                    .transition(.opacity)
-                    .zIndex(1_000)
+                ZStack(alignment: .bottom) {
+                    if let payload = item {
+                        Color.black.opacity(0.2)
+                            .ignoresSafeArea()
+                            .contentShape(Rectangle())
+                            .onTapGesture { item = nil }
+                            .transition(.opacity)
+                            .zIndex(999)
+
+                        CheesePostShareBottomSheet(
+                            payload: payload,
+                            onDismiss: { item = nil },
+                            onSent: onSent
+                        )
+                        .transition(.move(edge: .bottom))
+                        .zIndex(1_000)
+                    }
                 }
+                .ignoresSafeArea()
             }
-            .animation(.easeOut(duration: 0.18), value: item?.id)
+            .animation(
+                .spring(response: 0.34, dampingFraction: 0.9, blendDuration: 0.08),
+                value: item?.id
+            )
             .cheeseTabBarHidden(item != nil)
     }
 }
@@ -262,11 +275,6 @@ struct CheesePostShareBottomSheet: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
-                Color.black.opacity(0.2)
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .contentShape(Rectangle())
-                    .onTapGesture { onDismiss() }
-
                 VStack(spacing: 0) {
                     ZStack {
                         Text(L10n.tr("Share to", "分享给"))
