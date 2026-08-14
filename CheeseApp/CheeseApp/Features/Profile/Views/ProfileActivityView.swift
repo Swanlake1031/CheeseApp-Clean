@@ -957,7 +957,11 @@ private struct ProfileActivityPageView: View {
         if embedsInParentScroll {
             activityRows
                 .padding(.horizontal, 12)
-                .padding(.vertical, 12)
+                .padding(.top, 12)
+                .padding(
+                    .bottom,
+                    CheeseTabBarLayout.contentBottomClearance
+                )
         } else {
             ScrollView(showsIndicators: false) {
                 activityRows

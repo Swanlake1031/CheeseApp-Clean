@@ -13,7 +13,7 @@ struct ChatFollowSearchSheet: View {
 
                 VStack(spacing: 12) {
                     ChatInboxSearchField(
-                        placeholder: "搜索名字、学校或地区",
+                        placeholder: "搜索名字、学校、地区或 UID",
                         text: Binding(
                             get: { viewModel.query },
                             set: { viewModel.updateQuery($0) }
@@ -66,7 +66,7 @@ struct ChatFollowSearchSheet: View {
             emptyPrompt(
                 icon: "person.2.wave.2",
                 title: "搜索想添加的人",
-                message: "可以按昵称、学校或地区查找，找到后可查看主页或关注。"
+                message: "可以按昵称、学校、地区或 UID 查找，找到后可查看主页或关注。"
             )
         } else if viewModel.isLoading && viewModel.results.isEmpty {
             VStack(spacing: 12) {
@@ -80,7 +80,7 @@ struct ChatFollowSearchSheet: View {
             emptyPrompt(
                 icon: "magnifyingglass",
                 title: "没有找到匹配用户",
-                message: "试试更短的关键词，或者换学校、地区相关词。"
+                message: "试试昵称、学校、地区，或输入完整 UID。"
             )
         } else {
             resultsList
