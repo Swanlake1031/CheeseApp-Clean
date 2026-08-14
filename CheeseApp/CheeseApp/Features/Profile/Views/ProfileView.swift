@@ -253,6 +253,10 @@ struct ProfileView: View {
 
     private func profileMetric(count: Int, label: String, showRedDot: Bool = false) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(label)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(AppColors.textMuted)
+
             Text("\(count)")
                 .font(.system(size: 14, weight: .bold))
                 .monospacedDigit()
@@ -265,10 +269,6 @@ struct ProfileView: View {
                             .offset(x: 6, y: -2)
                     }
                 }
-
-            Text(label)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(AppColors.textMuted)
         }
         .frame(minWidth: 62, alignment: .leading)
     }

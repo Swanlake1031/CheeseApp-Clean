@@ -581,13 +581,13 @@ struct UserPostsView: View {
 
     private func socialMetric(count: Int, label: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(label)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(AppColors.textMuted)
             Text("\(count)")
                 .font(.system(size: 14, weight: .bold))
                 .monospacedDigit()
                 .foregroundStyle(AppColors.textPrimary)
-            Text(label)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(AppColors.textMuted)
         }
         .frame(minWidth: 62, alignment: .leading)
     }
