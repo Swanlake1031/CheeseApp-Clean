@@ -150,30 +150,15 @@ private struct CheesePostSharePanelPresenter: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay {
-                ZStack(alignment: .bottom) {
-                    if let payload = item {
-                        Color.black.opacity(0.2)
-                            .ignoresSafeArea()
-                            .contentShape(Rectangle())
-                            .onTapGesture { item = nil }
-                            .transition(.opacity)
-                            .zIndex(999)
-
-                        CheesePostShareBottomSheet(
-                            payload: payload,
-                            onDismiss: { item = nil },
-                            onSent: onSent
-                        )
-                        .transition(.move(edge: .bottom))
-                        .zIndex(1_000)
-                    }
+                if let payload = item {
+                    CheesePostShareBottomSheet(
+                        payload: payload,
+                        onDismiss: { item = nil },
+                        onSent: onSent
+                    )
+                    .zIndex(1_000)
                 }
-                .ignoresSafeArea()
             }
-            .animation(
-                .spring(response: 0.34, dampingFraction: 0.9, blendDuration: 0.08),
-                value: item?.id
-            )
             .cheeseTabBarHidden(item != nil)
     }
 }
@@ -194,6 +179,14 @@ struct CheesePostShareBottomSheet: View {
     @State private var friendProfiles: [MutualFollowProfile] = []
     @State private var isLoadingFriends = false
     @State private var friendsErrorMessage: String?
+    @State private var isPanelPresented = false
+    @State private var isDismissingPanel = false
+
+    private let panelAnimation = Animation.spring(
+        response: 0.34,
+        dampingFraction: 0.9,
+        blendDuration: 0.08
+    )
 
     private var directTargets: [PostChatShareTarget] {
         var seen = Set<UUID>()
@@ -275,6 +268,11 @@ struct CheesePostShareBottomSheet: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
+                Color.black.opacity(isPanelPresented ? 0.2 : 0)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .contentShape(Rectangle())
+                    .onTapGesture { dismissPanel() }
+
                 VStack(spacing: 0) {
                     ZStack {
                         Text(L10n.tr("Share to", "分享给"))
@@ -284,7 +282,7 @@ struct CheesePostShareBottomSheet: View {
                         HStack {
                             Spacer()
                             Button {
-                                onDismiss()
+                                dismissPanel()
                             } label: {
                                 Image(systemName: "xmark")
                                     .font(.system(size: 15, weight: .semibold))
@@ -320,6 +318,7 @@ struct CheesePostShareBottomSheet: View {
                 }
                 .frame(width: geometry.size.width)
                 .frame(height: panelHeight, alignment: .top)
+                .offset(y: isPanelPresented ? 0 : panelHeight + 24)
                 .background(AppColors.pageBackground)
                 .clipShape(
                     UnevenRoundedRectangle(
@@ -348,6 +347,11 @@ struct CheesePostShareBottomSheet: View {
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .ignoresSafeArea()
+        .onAppear {
+            withAnimation(panelAnimation) {
+                isPanelPresented = true
+            }
+        }
         .task {
             await loadShareTargets()
         }
@@ -599,7 +603,7 @@ struct CheesePostShareBottomSheet: View {
             } else {
                 onSent(L10n.tr("\(targets.count) chats", "\(targets.count)个聊天"))
             }
-            onDismiss()
+            dismissPanel()
         } catch {
             sendingTargetId = nil
             showStatus(error.localizedDescription, isError: true)
@@ -615,6 +619,20 @@ struct CheesePostShareBottomSheet: View {
             withAnimation(.easeInOut(duration: 0.18)) {
                 statusMessage = nil
             }
+        }
+    }
+
+    private func dismissPanel() {
+        guard !isDismissingPanel else { return }
+        isDismissingPanel = true
+
+        withAnimation(
+            panelAnimation,
+            completionCriteria: .logicallyComplete
+        ) {
+            isPanelPresented = false
+        } completion: {
+            onDismiss()
         }
     }
 
