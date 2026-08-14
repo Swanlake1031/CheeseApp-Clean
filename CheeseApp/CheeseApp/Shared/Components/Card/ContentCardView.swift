@@ -118,6 +118,9 @@ struct ContentCardView: View {
 
                     HStack(spacing: 5) {
                         Text(footerName)
+                        if item.isAuthorMcMasterVerified {
+                            McMasterStudentBadge()
+                        }
                         if let timeText = item.timeText, !timeText.isEmpty {
                             Text("·")
                             Text(timeText)
@@ -221,10 +224,16 @@ struct ContentCardView: View {
             footerAvatar
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(footerName)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(AppColors.textPrimary)
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(footerName)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .lineLimit(1)
+
+                    if item.isAuthorMcMasterVerified {
+                        McMasterStudentBadge()
+                    }
+                }
 
                 HStack(spacing: 5) {
                     Text(item.badgeText ?? item.category.localizedTitle)

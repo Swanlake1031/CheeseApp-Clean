@@ -69,6 +69,7 @@ struct HomeCardItem: Identifiable {
     let title: String               // 主标题
     let subtitle: String            // 副标题
     let footer: CardFooterStyle     // 底部样式
+    let isAuthorMcMasterVerified: Bool
     let category: HomeCardCategory  // 所属分类
     let viewCount: Int              // 板块内排序信号
     let badgeText: String?          // 论坛板块或内容分类
@@ -98,6 +99,7 @@ struct HomeCardItem: Identifiable {
         title: String,
         subtitle: String,
         footer: CardFooterStyle = .none,
+        isAuthorMcMasterVerified: Bool = false,
         category: HomeCardCategory = .forum,
         viewCount: Int = 0,
         badgeText: String? = nil,
@@ -125,6 +127,7 @@ struct HomeCardItem: Identifiable {
         self.title = title
         self.subtitle = subtitle
         self.footer = footer
+        self.isAuthorMcMasterVerified = isAuthorMcMasterVerified
         self.category = category
         self.viewCount = max(viewCount, 0)
         self.badgeText = badgeText

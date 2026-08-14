@@ -814,6 +814,7 @@ class HomeViewModel: ObservableObject {
                     : post.userName ?? L10n.tr("Unavailable user", "用户资料不可用"),
                 avatar: avatar
             ),
+            isAuthorMcMasterVerified: post.isUserMcMasterVerified,
             category: .secondhand,
             viewCount: post.viewCount,
             priceText: formattedPrice(post.price),
@@ -839,6 +840,7 @@ class HomeViewModel: ObservableObject {
             title: item.title,
             subtitle: item.description,
             footer: .posted(name: item.seller, avatar: avatar),
+            isAuthorMcMasterVerified: !item.isAnonymous && item.isSellerMcMasterVerified,
             category: .secondhand,
             timeText: item.timeAgo,
             priceText: formattedPrice(item.price),
@@ -877,6 +879,7 @@ class HomeViewModel: ObservableObject {
             title: post.title,
             subtitle: post.content,
             footer: .posted(name: post.authorName, avatar: avatar),
+            isAuthorMcMasterVerified: !post.isAnonymous && post.isAuthorMcMasterVerified,
             category: .forum,
             viewCount: post.views,
             badgeText: badge ?? post.boardName,
