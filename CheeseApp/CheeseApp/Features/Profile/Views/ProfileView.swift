@@ -22,6 +22,7 @@ struct ProfileView: View {
     @State private var fallbackPublicID: String?
     @State private var uidCopyFeedbackMessage: String?
     @State private var activitySharingPost: PostSharePayload?
+    @State private var activityEditingPost: UserPostSummary?
     @State private var activityShareFeedbackMessage: String?
     @StateObject private var profileSocialService = ProfileSocialService.shared
     @StateObject private var userPostsService = UserPostsService()
@@ -62,6 +63,9 @@ struct ProfileView: View {
                             ),
                             onPresentShare: { payload in
                                 activitySharingPost = payload
+                            },
+                            onPresentEditor: { post in
+                                activityEditingPost = post
                             }
                         )
                     }
@@ -84,6 +88,12 @@ struct ProfileView: View {
         .sheet(isPresented: $showingEditProfile) {
             EditProfileView()
         }
+        .navigationDestination(item: $activityEditingPost) { post in
+            EditPostSheet(post: post) { payload in
+                try await userPostsService.update(payload: payload)
+                activityRefreshGeneration &+= 1
+            }
+        }
         .safeAreaInset(edge: .top) {
             CheeseInlineTopBar {
                 EmptyView()
@@ -105,6 +115,7 @@ struct ProfileView: View {
             }
         }
         .task(id: authService.currentUser?.id) {
+            activityEditingPost = nil
             await refreshProfile(force: true)
         }
         .onChange(of: isActive) { _, active in

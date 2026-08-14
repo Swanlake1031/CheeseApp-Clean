@@ -251,6 +251,7 @@ struct ProfileActivityView: View {
     private let externalRefreshGeneration: Int
     private let minimumEmbeddedPagerHeight: CGFloat
     private let onPresentShare: ((PostSharePayload) -> Void)?
+    private let onPresentEditor: ((UserPostSummary) -> Void)?
 
     init(
         initialKind: ProfileActivityKind = .published,
@@ -260,7 +261,8 @@ struct ProfileActivityView: View {
         pageTitle: String? = nil,
         externalRefreshGeneration: Int = 0,
         minimumEmbeddedPagerHeight: CGFloat = 220,
-        onPresentShare: ((PostSharePayload) -> Void)? = nil
+        onPresentShare: ((PostSharePayload) -> Void)? = nil,
+        onPresentEditor: ((UserPostSummary) -> Void)? = nil
     ) {
         _selectedKind = State(initialValue: initialKind)
         _selectedPublishedKind = State(initialValue: nil)
@@ -271,6 +273,7 @@ struct ProfileActivityView: View {
         self.externalRefreshGeneration = externalRefreshGeneration
         self.minimumEmbeddedPagerHeight = minimumEmbeddedPagerHeight
         self.onPresentShare = onPresentShare
+        self.onPresentEditor = onPresentEditor
     }
 
     var body: some View {
@@ -648,7 +651,11 @@ struct ProfileActivityView: View {
             guard editingRequestID == requestID,
                   authService.currentUser?.id == userID
             else { return }
-            editingPost = resolvedPost
+            if let onPresentEditor {
+                onPresentEditor(resolvedPost)
+            } else {
+                editingPost = resolvedPost
+            }
         } catch {
             guard editingRequestID == requestID else { return }
             if error.isCancellationLike { return }
