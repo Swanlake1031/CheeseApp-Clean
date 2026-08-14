@@ -36,6 +36,7 @@ struct MainTabView: View {
     @StateObject private var chatService = ChatService.shared
     @StateObject private var systemMessageService = SystemMessageService.shared
     @StateObject private var profileSocialService = ProfileSocialService.shared
+    @StateObject private var postShareOverlayCoordinator = CheesePostShareOverlayCoordinator.shared
 
     private var chatUnreadBadgeCount: Int {
         let directUnread = chatService.conversations.reduce(into: 0) { partial, conversation in
@@ -136,6 +137,19 @@ struct MainTabView: View {
             }
             .animation(.easeInOut(duration: 0.2), value: tabBarVisibilityController.isHidden)
             .animation(.easeInOut(duration: 0.2), value: isKeyboardVisible)
+
+            if let presentation = postShareOverlayCoordinator.presentation {
+                CheesePostShareBottomSheet(
+                    payload: presentation.payload,
+                    onDismiss: {
+                        postShareOverlayCoordinator.completeDismissal(
+                            id: presentation.id
+                        )
+                    },
+                    onSent: presentation.onSent
+                )
+                .zIndex(1_000)
+            }
         }
         .fullScreenCover(isPresented: $showCreatePost) {
             CreatePostView()

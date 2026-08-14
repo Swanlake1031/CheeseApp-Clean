@@ -143,23 +143,94 @@ extension View {
     }
 }
 
+@MainActor
+final class CheesePostShareOverlayCoordinator: ObservableObject {
+    struct Presentation {
+        let id: UUID
+        let payload: PostSharePayload
+        let onSent: (String) -> Void
+        let onDismiss: () -> Void
+    }
+
+    static let shared = CheesePostShareOverlayCoordinator()
+
+    @Published private(set) var presentation: Presentation?
+
+    private init() {}
+
+    func present(
+        id: UUID,
+        payload: PostSharePayload,
+        onSent: @escaping (String) -> Void,
+        onDismiss: @escaping () -> Void
+    ) {
+        presentation = Presentation(
+            id: id,
+            payload: payload,
+            onSent: onSent,
+            onDismiss: onDismiss
+        )
+    }
+
+    func completeDismissal(id: UUID) {
+        guard let current = presentation, current.id == id else { return }
+        presentation = nil
+        current.onDismiss()
+    }
+
+    func cancel(id: UUID) {
+        guard presentation?.id == id else { return }
+        presentation = nil
+    }
+}
+
 private struct CheesePostSharePanelPresenter: ViewModifier {
     @Binding var item: PostSharePayload?
     let onSent: (String) -> Void
+    @State private var presentationID: UUID?
 
     func body(content: Content) -> some View {
         content
-            .overlay {
-                if let payload = item {
-                    CheesePostShareBottomSheet(
-                        payload: payload,
-                        onDismiss: { item = nil },
-                        onSent: onSent
-                    )
-                    .zIndex(1_000)
+            .onAppear {
+                if let item {
+                    present(item)
                 }
             }
-            .cheeseTabBarHidden(item != nil)
+            .onChange(of: item) { _, newValue in
+                if let newValue {
+                    present(newValue)
+                } else {
+                    cancelPresentation()
+                }
+            }
+            .onDisappear {
+                cancelPresentation()
+            }
+    }
+
+    private func present(_ payload: PostSharePayload) {
+        if let presentationID {
+            CheesePostShareOverlayCoordinator.shared.cancel(id: presentationID)
+        }
+
+        let id = UUID()
+        presentationID = id
+        CheesePostShareOverlayCoordinator.shared.present(
+            id: id,
+            payload: payload,
+            onSent: onSent,
+            onDismiss: {
+                guard presentationID == id else { return }
+                presentationID = nil
+                item = nil
+            }
+        )
+    }
+
+    private func cancelPresentation() {
+        guard let presentationID else { return }
+        CheesePostShareOverlayCoordinator.shared.cancel(id: presentationID)
+        self.presentationID = nil
     }
 }
 
