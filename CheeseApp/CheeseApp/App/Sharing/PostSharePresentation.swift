@@ -318,7 +318,6 @@ struct CheesePostShareBottomSheet: View {
                 }
                 .frame(width: geometry.size.width)
                 .frame(height: panelHeight, alignment: .top)
-                .offset(y: isPanelPresented ? 0 : panelHeight + 24)
                 .background(AppColors.pageBackground)
                 .clipShape(
                     UnevenRoundedRectangle(
@@ -343,6 +342,10 @@ struct CheesePostShareBottomSheet: View {
                             .allowsHitTesting(false)
                     }
                 }
+                // Move the completed panel as one unit. If offset is applied
+                // before its background, the white shell remains stationary
+                // while the text and controls animate independently.
+                .offset(y: isPanelPresented ? 0 : panelHeight + 24)
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
