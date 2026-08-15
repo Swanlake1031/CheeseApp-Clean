@@ -127,6 +127,9 @@ struct MainTabView: View {
                         onChatReselect: {
                             chatRootResetID = UUID()
                         },
+                        onProfileReselect: {
+                            profileRootResetID = UUID()
+                        },
                         onCreateTap: {
                             showCreatePost = true
                         }
@@ -395,6 +398,7 @@ struct CustomTabBar: View {
     var onHomeReselect: () -> Void
     var onCourseReselect: () -> Void
     var onChatReselect: () -> Void
+    var onProfileReselect: () -> Void
     var onCreateTap: () -> Void
     
     var body: some View {
@@ -457,7 +461,9 @@ struct CustomTabBar: View {
                 showIndicator: true,
                 showRedDot: showProfileRedDot
             ) {
-                if selectedTab != .profile {
+                if selectedTab == .profile {
+                    onProfileReselect()
+                } else {
                     selectedTab = .profile
                 }
             }
