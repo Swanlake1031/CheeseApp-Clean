@@ -24,11 +24,8 @@ struct SettingsView: View {
     @State private var showSignOutConfirm = false
     @State private var showEditProfile = false
     @State private var isLoadingAccountIdentities = false
-    @State private var isGoogleBound = false
-    @State private var googleBindingEmail: String?
+    @State private var accountIdentityStatuses: AccountIdentityStatuses?
     @State private var isBindingGoogle = false
-    @State private var isAppleBound = false
-    @State private var appleBindingEmail: String?
     @State private var isBindingApple = false
     @State private var showAccountSwitcher = false
     @State private var showDeleteAccountConfirm = false
@@ -354,7 +351,7 @@ struct SettingsView: View {
         }
         .onOpenURL { _ in
             Task {
-                await loadAccountIdentityStatuses()
+                await loadAccountIdentityStatuses(forceRefresh: true)
                 authService.reloadSavedAccounts()
             }
         }
@@ -518,7 +515,7 @@ struct SettingsView: View {
     }
 
     private var googleBindingSubtitle: String {
-        if isLoadingAccountIdentities {
+        if isLoadingAccountIdentities && accountIdentitySnapshot == nil {
             return "正在检查绑定状态..."
         }
         if isGoogleBound {
@@ -534,7 +531,7 @@ struct SettingsView: View {
     }
 
     private var appleBindingSubtitle: String {
-        if isLoadingAccountIdentities {
+        if isLoadingAccountIdentities && accountIdentitySnapshot == nil {
             return "正在检查绑定状态..."
         }
         if isAppleBound {
@@ -555,6 +552,26 @@ struct SettingsView: View {
 
     private var isAppleBindingDisabledByRule: Bool {
         !isAppleBound && isGoogleBound
+    }
+
+    private var accountIdentitySnapshot: AccountIdentityStatuses? {
+        accountIdentityStatuses ?? authService.cachedAccountIdentityStatuses()
+    }
+
+    private var isGoogleBound: Bool {
+        accountIdentitySnapshot?.google.isLinked == true
+    }
+
+    private var googleBindingEmail: String? {
+        accountIdentitySnapshot?.google.email
+    }
+
+    private var isAppleBound: Bool {
+        accountIdentitySnapshot?.apple.isLinked == true
+    }
+
+    private var appleBindingEmail: String? {
+        accountIdentitySnapshot?.apple.email
     }
 
     private var googleBindingActionSubtitle: String {
@@ -581,6 +598,7 @@ struct SettingsView: View {
 
         do {
             try await authService.linkAccountIdentity(.google)
+            await loadAccountIdentityStatuses(forceRefresh: true)
             settingsError = nil
         } catch {
             settingsError = error.localizedDescription
@@ -599,6 +617,7 @@ struct SettingsView: View {
 
         do {
             try await authService.linkAccountIdentity(.apple)
+            await loadAccountIdentityStatuses(forceRefresh: true)
             settingsError = nil
         } catch {
             settingsError = error.localizedDescription
@@ -606,22 +625,16 @@ struct SettingsView: View {
     }
 
     @MainActor
-    private func loadAccountIdentityStatuses() async {
+    private func loadAccountIdentityStatuses(forceRefresh: Bool = false) async {
         guard !isLoadingAccountIdentities else { return }
         isLoadingAccountIdentities = true
         defer { isLoadingAccountIdentities = false }
 
         do {
-            let statuses = try await authService.accountIdentityStatuses()
-            isGoogleBound = statuses.google.isLinked
-            googleBindingEmail = statuses.google.email
-            isAppleBound = statuses.apple.isLinked
-            appleBindingEmail = statuses.apple.email
+            accountIdentityStatuses = try await authService.accountIdentityStatuses(forceRefresh: forceRefresh)
         } catch {
-            isGoogleBound = false
-            googleBindingEmail = authService.currentUser?.email
-            isAppleBound = false
-            appleBindingEmail = authService.currentUser?.email
+            // Keep the current session snapshot visible. A transient refresh failure
+            // must not replace correct provider state or reflow the settings screen.
         }
     }
 

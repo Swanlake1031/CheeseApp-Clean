@@ -106,6 +106,10 @@ class AuthService: ObservableObject {
     private var lastSuccessfulSessionValidationAt: Date?
     private var profileCompletionReturnSnapshot: SessionRecoverySnapshot?
     private let sessionValidationCacheLifetime: TimeInterval = 5 * 60
+    private var accountIdentityStatusesCache: AccountIdentityStatuses?
+    private var accountIdentityStatusesCacheUserId: UUID?
+    private var accountIdentityStatusesRefreshedAt: Date?
+    private let accountIdentityStatusesCacheLifetime: TimeInterval = 5 * 60
     
     private init() {
         // 不在 init 中自动检查，避免重复请求
@@ -457,8 +461,14 @@ class AuthService: ObservableObject {
         }
     }
 
-    func accountIdentityStatuses() async throws -> AccountIdentityStatuses {
-        let authUser = try await supabase.auth.user()
+    func cachedAccountIdentityStatuses() -> AccountIdentityStatuses? {
+        guard let authUser = supabase.auth.currentSession?.user else { return nil }
+
+        if accountIdentityStatusesCacheUserId == authUser.id,
+           let accountIdentityStatusesCache {
+            return accountIdentityStatusesCache
+        }
+
         let fallbackEmail = authUser.email ?? currentUser?.email
         let googleIdentity = authUser.identities?.first { $0.provider.lowercased() == "google" }
         let appleIdentity = authUser.identities?.first { $0.provider.lowercased() == "apple" }
@@ -473,6 +483,40 @@ class AuthService: ObservableObject {
                 email: appleIdentity?.identityData?["email"]?.stringValue ?? fallbackEmail
             )
         )
+    }
+
+    func accountIdentityStatuses(forceRefresh: Bool = false) async throws -> AccountIdentityStatuses {
+        let sessionUserId = supabase.auth.currentSession?.user.id
+        if !forceRefresh,
+           accountIdentityStatusesCacheUserId == sessionUserId,
+           let accountIdentityStatusesCache,
+           !AppLifecycleRefreshPolicy.shouldRefresh(
+                hasCachedData: true,
+                lastSuccessfulRefreshAt: accountIdentityStatusesRefreshedAt,
+                cacheLifetime: accountIdentityStatusesCacheLifetime
+           ) {
+            return accountIdentityStatusesCache
+        }
+
+        let authUser = try await supabase.auth.user()
+        let fallbackEmail = authUser.email ?? currentUser?.email
+        let googleIdentity = authUser.identities?.first { $0.provider.lowercased() == "google" }
+        let appleIdentity = authUser.identities?.first { $0.provider.lowercased() == "apple" }
+
+        let statuses = AccountIdentityStatuses(
+            google: AccountIdentityStatus(
+                isLinked: googleIdentity != nil,
+                email: googleIdentity?.identityData?["email"]?.stringValue ?? fallbackEmail
+            ),
+            apple: AccountIdentityStatus(
+                isLinked: appleIdentity != nil,
+                email: appleIdentity?.identityData?["email"]?.stringValue ?? fallbackEmail
+            )
+        )
+        accountIdentityStatusesCache = statuses
+        accountIdentityStatusesCacheUserId = authUser.id
+        accountIdentityStatusesRefreshedAt = Date()
+        return statuses
     }
 
     func linkAccountIdentity(_ provider: AccountIdentityProvider) async throws {
