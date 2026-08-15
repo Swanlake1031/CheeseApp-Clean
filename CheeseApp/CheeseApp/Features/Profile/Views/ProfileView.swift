@@ -82,9 +82,6 @@ struct ProfileView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear {
-            CheeseTabBarVisibilityController.shared.resetVisibility()
-        }
         .sheet(isPresented: $showingEditProfile) {
             EditProfileView()
         }

@@ -197,8 +197,42 @@ final class CheeseTabBarVisibilityController: ObservableObject {
         hiddenTokens.removeAll()
     }
 }
-private final class CheeseTabBarVisibilityTokenBox: ObservableObject {
-    let token = UUID()
+private final class CheeseTabBarVisibilityHostViewController: UIViewController {
+    private let token = UUID()
+    private var isParticipatingInAppearance = false
+
+    var hidesTabBar = false {
+        didSet {
+            guard isParticipatingInAppearance else { return }
+            updateVisibility()
+        }
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        isParticipatingInAppearance = true
+        updateVisibility()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        isParticipatingInAppearance = true
+        updateVisibility()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        isParticipatingInAppearance = false
+        releaseVisibility()
+    }
+
+    override func didMove(toParent parent: UIViewController?) {
+        super.didMove(toParent: parent)
+        if parent == nil {
+            isParticipatingInAppearance = false
+            releaseVisibility()
+        }
+    }
 
     deinit {
         let token = self.token
@@ -206,21 +240,43 @@ private final class CheeseTabBarVisibilityTokenBox: ObservableObject {
             CheeseTabBarVisibilityController.shared.setHidden(false, token: token)
         }
     }
+
+    private func updateVisibility() {
+        CheeseTabBarVisibilityController.shared.setHidden(hidesTabBar, token: token)
+    }
+
+    private func releaseVisibility() {
+        CheeseTabBarVisibilityController.shared.setHidden(false, token: token)
+    }
 }
+
+private struct CheeseTabBarVisibilityHost: UIViewControllerRepresentable {
+    let hidden: Bool
+
+    func makeUIViewController(context: Context) -> CheeseTabBarVisibilityHostViewController {
+        let controller = CheeseTabBarVisibilityHostViewController()
+        controller.view.isUserInteractionEnabled = false
+        controller.view.backgroundColor = .clear
+        controller.hidesTabBar = hidden
+        return controller
+    }
+
+    func updateUIViewController(
+        _ uiViewController: CheeseTabBarVisibilityHostViewController,
+        context: Context
+    ) {
+        uiViewController.hidesTabBar = hidden
+    }
+}
+
 private struct CheeseTabBarHiddenModifier: ViewModifier {
     let hidden: Bool
-    @StateObject private var tokenBox = CheeseTabBarVisibilityTokenBox()
 
     func body(content: Content) -> some View {
         content
-            .onAppear {
-                CheeseTabBarVisibilityController.shared.setHidden(hidden, token: tokenBox.token)
-            }
-            .onChange(of: hidden) { _, newValue in
-                CheeseTabBarVisibilityController.shared.setHidden(newValue, token: tokenBox.token)
-            }
-            .onDisappear {
-                CheeseTabBarVisibilityController.shared.setHidden(false, token: tokenBox.token)
+            .background {
+                CheeseTabBarVisibilityHost(hidden: hidden)
+                    .frame(width: 0, height: 0)
             }
     }
 }
