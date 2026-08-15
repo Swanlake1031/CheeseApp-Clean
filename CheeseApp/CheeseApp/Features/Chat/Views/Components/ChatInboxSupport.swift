@@ -75,10 +75,9 @@ struct ConversationSwipeActionRow: View {
     let conversation: ChatConversationPreview
     @Binding var activeSwipeConversationId: UUID?
     @Binding var isAnyRowHorizontallyDragging: Bool
-    @Binding var rowActionErrorMessage: String?
     let onOpenConversation: () -> Void
     let onOpenProfile: () -> Void
-    @StateObject private var chatService = ChatService.shared
+    let onDelete: () -> Void
 
     var body: some View {
         SwipeableConversationNavigationRow(
@@ -87,16 +86,7 @@ struct ConversationSwipeActionRow: View {
             isAnyRowHorizontallyDragging: $isAnyRowHorizontallyDragging,
             onOpenConversation: onOpenConversation,
             onOpenProfile: onOpenProfile,
-            onDelete: {
-                Task {
-                    do {
-                        try await chatService.deleteConversation(conversationId: conversation.id)
-                        rowActionErrorMessage = nil
-                    } catch {
-                        rowActionErrorMessage = error.localizedDescription
-                    }
-                }
-            }
+            onDelete: onDelete
         )
     }
 }

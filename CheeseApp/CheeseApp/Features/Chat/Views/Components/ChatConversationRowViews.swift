@@ -34,7 +34,6 @@ struct SwipeableConversationNavigationRow: View {
                 color: Color(red: 0.92, green: 0.23, blue: 0.29),
                 width: deleteActionWidth,
                 action: {
-                    closeActions(resetActive: true)
                     onDelete()
                 }
             )

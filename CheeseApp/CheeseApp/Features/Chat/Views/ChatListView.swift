@@ -20,6 +20,7 @@ struct ChatListView: View {
     @State private var activeSwipeConversationId: UUID?
     @State private var isSwipeHorizontallyDragging = false
     @State private var isSearchFieldFocused = false
+    @State private var optimisticallyDeletedConversationIds: Set<UUID> = []
 
     private var conversationDisplayNamesById: [UUID: String] {
         chatService.conversations.reduce(into: [UUID: String]()) { partialResult, preview in
@@ -30,7 +31,9 @@ struct ChatListView: View {
     private var inboxState: ChatInboxPresentationState {
         ChatInboxPresentationState(
             searchText: searchText,
-            directConversations: chatService.conversations,
+            directConversations: chatService.conversations.filter {
+                !optimisticallyDeletedConversationIds.contains($0.id)
+            },
             groupConversations: chatService.groupConversations,
             displayNamesByConversationId: conversationDisplayNamesById
         )
@@ -450,13 +453,21 @@ struct ChatListView: View {
                 conversation: conversation,
                 activeSwipeConversationId: $activeSwipeConversationId,
                 isAnyRowHorizontallyDragging: $isSwipeHorizontallyDragging,
-                rowActionErrorMessage: $rowActionErrorMessage,
                 onOpenConversation: {
                     openConversation(conversation)
                 },
                 onOpenProfile: {
                     openProfile(conversation.otherUserId)
+                },
+                onDelete: {
+                    deleteConversationOptimistically(conversation)
                 }
+            )
+            .transition(
+                .asymmetric(
+                    insertion: .opacity,
+                    removal: .opacity.combined(with: .move(edge: .leading))
+                )
             )
         }
     }
@@ -513,6 +524,32 @@ private extension ChatListView {
         activeSwipeConversationId = nil
         isSwipeHorizontallyDragging = false
         isSearchFieldFocused = false
+        optimisticallyDeletedConversationIds = []
+    }
+
+    func deleteConversationOptimistically(_ conversation: ChatConversationPreview) {
+        guard !optimisticallyDeletedConversationIds.contains(conversation.id) else { return }
+        let requestGeneration = chatService.accountGeneration
+
+        withAnimation(.easeOut(duration: 0.2)) {
+            optimisticallyDeletedConversationIds.insert(conversation.id)
+            activeSwipeConversationId = nil
+        }
+
+        Task {
+            do {
+                try await chatService.deleteConversation(conversationId: conversation.id)
+                guard chatService.accountGeneration == requestGeneration else { return }
+                rowActionErrorMessage = nil
+                optimisticallyDeletedConversationIds.remove(conversation.id)
+            } catch {
+                guard chatService.accountGeneration == requestGeneration else { return }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    _ = optimisticallyDeletedConversationIds.remove(conversation.id)
+                }
+                rowActionErrorMessage = "删除失败，已恢复该会话。\n\(error.localizedDescription)"
+            }
+        }
     }
 
     func dismissSearchKeyboard() {
