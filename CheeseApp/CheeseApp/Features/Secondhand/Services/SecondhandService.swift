@@ -802,10 +802,11 @@ class SecondhandService: ObservableObject {
     }
 
     func fetchItem(postId: UUID) async throws -> SecondhandItem {
-        let dbPost: DBSecondhandPost = try await supabase
-            .database("secondhand_posts_view")
-            .select()
-            .eq("id", value: postId.uuidString)
+        let dbPost: DBSecondhandPost = try await supabase.client
+            .rpc(
+                "get_secondhand_post_detail",
+                params: SecondhandPostIDParams(postID: postId)
+            )
             .single()
             .execute()
             .value
