@@ -445,7 +445,7 @@ struct HomeView: View {
         let cards = featuredCards(for: category)
         let loadState = featuredLoadState(for: category)
 
-        return VStack(spacing: 12) {
+        return VStack(spacing: category == .forum ? 4 : 12) {
             if category == .forum {
                 forumCategoryStrip
             } else if category == .secondhand {

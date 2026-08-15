@@ -253,7 +253,7 @@ struct ForumPostCardView: View {
             .font(.system(size: 13))
             .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 16)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .bottom) {
             Divider()

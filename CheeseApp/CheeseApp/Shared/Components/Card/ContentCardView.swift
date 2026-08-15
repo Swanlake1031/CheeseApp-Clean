@@ -357,8 +357,7 @@ private struct DiscussionFeedSurfaceModifier: ViewModifier {
     func body(content: Content) -> some View {
         if isForum {
             content
-                .padding(.horizontal, 12)
-                .padding(.vertical, 16)
+                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .overlay(alignment: .bottom) {
                     Divider()
