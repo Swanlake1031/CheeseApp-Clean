@@ -33,6 +33,7 @@ struct ForumDetailView: View {
     @State private var editingPost: UserPostSummary?
     @State private var showingDeleteConfirm = false
     @State private var deletingComment: ForumCommentItem?
+    @State private var reportingComment: ForumCommentItem?
     @State private var isRefreshing = false
     @State private var sharingPost: PostSharePayload?
     @State private var shareActionToastMessage: String?
@@ -154,6 +155,9 @@ struct ForumDetailView: View {
         .shareFeedbackToast(message: $shareActionToastMessage)
         .sheet(isPresented: $showingReportSheet) {
             ReportPostSheet(postId: post.id, postKind: .forum)
+        }
+        .sheet(item: $reportingComment) { comment in
+            ReportCommentSheet(commentId: comment.id)
         }
         .navigationDestination(item: $editingPost) { summary in
             EditPostSheet(post: summary) { payload in
@@ -567,25 +571,7 @@ struct ForumDetailView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(AppColors.textMuted)
 
-                    if canDeleteComment(comment) {
-                        Spacer()
-                        Menu {
-                            Button(role: .destructive) {
-                                requestCommentDeletion(comment)
-                            } label: {
-                                Label(L10n.tr("Delete", "删除"), systemImage: "trash")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(AppColors.textMuted)
-                                .frame(width: 22, height: 22)
-                        }
-                        .buttonStyle(.plain)
-                        .tint(AppColors.textMuted)
-                    } else {
-                        Spacer()
-                    }
+                    Spacer()
 
                     if comment.likeCount > 0 {
                         HStack(spacing: 4) {
@@ -596,6 +582,30 @@ struct ForumDetailView: View {
                         }
                         .foregroundStyle(AppColors.likeActive)
                     }
+
+                    Menu {
+                        if canDeleteComment(comment) {
+                            Button(role: .destructive) {
+                                requestCommentDeletion(comment)
+                            } label: {
+                                Label(L10n.tr("Delete", "删除"), systemImage: "trash")
+                            }
+                        } else {
+                            Button(role: .destructive) {
+                                reportingComment = comment
+                            } label: {
+                                Label(L10n.tr("Report", "举报"), systemImage: "flag")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(AppColors.textMuted)
+                            .frame(width: 30, height: 30)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .tint(AppColors.textMuted)
                 }
 
                 if let parentAuthorName, comment.parentId != nil {

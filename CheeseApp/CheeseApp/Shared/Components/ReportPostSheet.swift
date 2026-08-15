@@ -38,6 +38,23 @@ struct ReportMessageSheet: View {
     }
 }
 
+struct ReportCommentSheet: View {
+    let commentId: UUID
+
+    var body: some View {
+        ReportFormSheet(
+            heading: L10n.tr("Report Comment", "举报评论"),
+            submit: { reason, details in
+                try await CommunityService.shared.submitCommentReport(
+                    commentId: commentId,
+                    reason: reason,
+                    details: details
+                )
+            }
+        )
+    }
+}
+
 private struct ReportFormSheet: View {
     let heading: String
     let submit: (ReportReason, String?) async throws -> Void

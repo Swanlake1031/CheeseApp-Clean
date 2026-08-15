@@ -90,6 +90,50 @@ final class CommunityService {
         }
     }
 
+    func submitCommentReport(commentId: UUID, reason: ReportReason, details: String?) async throws {
+        let reporterId: UUID
+        do {
+            reporterId = try await AuthService.shared.requireAuthUserId()
+        } catch {
+            await AuthService.shared.checkSession()
+            throw NSError(
+                domain: "",
+                code: 401,
+                userInfo: [NSLocalizedDescriptionKey: L10n.tr(
+                    "Please sign in before reporting",
+                    "请先登录再举报"
+                )]
+            )
+        }
+
+        let trimmedDetails = details?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        do {
+            try await supabase
+                .database("comment_reports")
+                .insert(CommentReportInsert(
+                    commentId: commentId,
+                    reporterId: reporterId,
+                    reason: reason.rawValue,
+                    details: trimmedDetails?.isEmpty == true ? nil : trimmedDetails
+                ))
+                .execute()
+        } catch {
+            let lowered = error.localizedDescription.lowercased()
+            if lowered.contains("duplicate key") || lowered.contains("unique") {
+                throw NSError(
+                    domain: "",
+                    code: 409,
+                    userInfo: [NSLocalizedDescriptionKey: L10n.tr(
+                        "You already reported this comment",
+                        "你已经举报过这条评论"
+                    )]
+                )
+            }
+            throw error
+        }
+    }
+
     func submitMessageReport(
         target: ChatMessageReportTarget,
         reason: ReportReason,
@@ -176,6 +220,20 @@ private struct PostReportInsert: Encodable {
 
     enum CodingKeys: String, CodingKey {
         case postId = "post_id"
+        case reporterId = "reporter_id"
+        case reason
+        case details
+    }
+}
+
+private struct CommentReportInsert: Encodable {
+    let commentId: UUID
+    let reporterId: UUID
+    let reason: String
+    let details: String?
+
+    enum CodingKeys: String, CodingKey {
+        case commentId = "comment_id"
         case reporterId = "reporter_id"
         case reason
         case details
