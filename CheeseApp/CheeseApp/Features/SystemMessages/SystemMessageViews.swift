@@ -73,6 +73,17 @@ struct SystemMessageTimelineView: View {
             await viewModel.loadInitial(force: true)
             await service.refreshUnreadCount()
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: SystemMessageInboxEvents.remoteMessageAvailable
+            )
+        ) { notification in
+            let pushedCategory = SystemMessageInboxEvents.category(from: notification)
+            guard pushedCategory == nil || pushedCategory == category else { return }
+            Task {
+                await viewModel.loadInitial(force: true)
+            }
+        }
         .alert(
             "确认已售出？",
             isPresented: Binding(

@@ -185,7 +185,10 @@ struct MainTabView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task {
-                await refreshLifecycleDataIfNeeded(force: false)
+                // A Push may be delivered while the app is suspended, when the notification
+                // delegate cannot update an already-mounted inbox. Always catch up on the
+                // first active frame instead of honoring the normal five-minute cache.
+                await refreshLifecycleDataIfNeeded(force: true)
             }
         }
         .onChange(of: selectedTab) { _, newValue in

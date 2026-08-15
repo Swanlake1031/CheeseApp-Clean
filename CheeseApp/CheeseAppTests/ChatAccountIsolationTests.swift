@@ -126,6 +126,39 @@ final class ChatAccountIsolationTests: XCTestCase {
         XCTAssertEqual(service.conversationListState, .unresolved)
     }
 
+    func testRefreshRequestedWhileLoadingRunsTrailingSnapshot() async {
+        let account = UUID(uuidString: "a4100000-0000-4000-8000-000000000001")!
+        let loader = ControlledChatSnapshotLoader()
+        let service = ChatService(
+            currentUserIDProvider: { account },
+            conversationStateLoader: { userID in
+                try await loader.load(userID: userID)
+            }
+        )
+
+        service.activateAccount(account)
+        let firstRefresh = Task { @MainActor in
+            await service.refreshConversations()
+        }
+        await waitUntil { loader.requestCount(for: account) == 1 }
+
+        // This models a Push arriving while the initial/manual refresh is in flight.
+        await service.refreshConversations()
+        loader.succeed(userID: account, snapshot: .fixture(ownerName: "Old snapshot"))
+
+        await waitUntil { loader.requestCount(for: account) == 2 }
+        loader.succeed(userID: account, snapshot: .fixture(ownerName: "Push snapshot"))
+        await waitUntil {
+            service.conversations.first?.otherUserName == "Push snapshot"
+                && !service.isLoadingConversations
+        }
+        await firstRefresh.value
+
+        XCTAssertEqual(service.conversations.map(\.otherUserName), ["Push snapshot"])
+        XCTAssertEqual(loader.requestCount(for: account), 2)
+        XCTAssertNil(service.conversationErrorMessage)
+    }
+
     func testWrappedNetworkCancellationUsesActionableInboxError() async {
         let account = UUID(uuidString: "a5000000-0000-4000-8000-000000000001")!
         let service = ChatService(
@@ -260,15 +293,21 @@ private final class ControlledChatSnapshotLoader {
     private var continuations: [
         UUID: CheckedContinuation<ChatConversationRepositorySnapshot, Error>
     ] = [:]
+    private var requestCounts: [UUID: Int] = [:]
 
     func load(userID: UUID) async throws -> ChatConversationRepositorySnapshot {
-        try await withCheckedThrowingContinuation { continuation in
+        requestCounts[userID, default: 0] += 1
+        return try await withCheckedThrowingContinuation { continuation in
             continuations[userID] = continuation
         }
     }
 
     func hasRequest(for userID: UUID) -> Bool {
         continuations[userID] != nil
+    }
+
+    func requestCount(for userID: UUID) -> Int {
+        requestCounts[userID, default: 0]
     }
 
     func succeed(userID: UUID, snapshot: ChatConversationRepositorySnapshot) {

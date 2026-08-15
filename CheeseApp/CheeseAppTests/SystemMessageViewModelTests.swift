@@ -72,6 +72,38 @@ final class SystemMessageViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.hasMore)
     }
 
+    func testForcedReloadWhileLoadingRunsTrailingPage() async {
+        let account = UUID(uuidString: "a9250000-0000-4000-8000-000000000001")!
+        let loader = ControlledSystemMessageLoader()
+        let first = SystemMessageItem.fixture(index: 1)
+        let pushed = SystemMessageItem.fixture(index: 2)
+        let viewModel = SystemMessageViewModel(
+            loadPage: { cursor, limit in
+                try await loader.load(cursor: cursor, limit: limit)
+            }
+        )
+
+        viewModel.activateAccount(account)
+        let initialLoad = Task { @MainActor in
+            await viewModel.loadInitial()
+        }
+        await waitForSystemMessageCondition { loader.requestCount == 1 }
+
+        // An open timeline receives the Push refresh while its first request is pending.
+        await viewModel.loadInitial(force: true)
+        loader.succeed(page: SystemMessagePage(items: [first], nextCursor: nil))
+
+        await waitForSystemMessageCondition { loader.requestCount == 2 }
+        loader.succeed(page: SystemMessagePage(items: [pushed], nextCursor: nil))
+        await waitForSystemMessageCondition {
+            viewModel.items.map(\.id) == [pushed.id] && !viewModel.isLoading
+        }
+        await initialLoad.value
+
+        XCTAssertEqual(viewModel.items.map(\.id), [pushed.id])
+        XCTAssertEqual(loader.requestCount, 2)
+    }
+
     func testMarkReadUpdatesOnlyTheTargetMessage() async {
         let account = UUID(uuidString: "a9300000-0000-4000-8000-000000000001")!
         let first = SystemMessageItem.fixture(index: 1)
@@ -98,6 +130,7 @@ final class SystemMessageViewModelTests: XCTestCase {
 private final class ControlledSystemMessageLoader {
     private var continuation:
         CheckedContinuation<SystemMessagePage, Error>?
+    private(set) var requestCount = 0
 
     var hasRequest: Bool { continuation != nil }
 
@@ -107,6 +140,7 @@ private final class ControlledSystemMessageLoader {
     ) async throws -> SystemMessagePage {
         _ = cursor
         _ = limit
+        requestCount += 1
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
         }

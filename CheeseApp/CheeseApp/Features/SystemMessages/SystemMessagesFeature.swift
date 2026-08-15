@@ -54,6 +54,32 @@ enum SystemMessageCategory: String, Codable, CaseIterable, Hashable {
     }
 }
 
+enum SystemMessageInboxEvents {
+    static let remoteMessageAvailable = Notification.Name(
+        "cheese.system-messages.remote-message-available"
+    )
+
+    private static let categoryKey = "category"
+
+    static func postRemoteMessageAvailable(
+        category: SystemMessageCategory?,
+        center: NotificationCenter = .default
+    ) {
+        center.post(
+            name: remoteMessageAvailable,
+            object: nil,
+            userInfo: category.map { [categoryKey: $0.rawValue] }
+        )
+    }
+
+    static func category(from notification: Notification) -> SystemMessageCategory? {
+        guard let rawValue = notification.userInfo?[categoryKey] as? String else {
+            return nil
+        }
+        return SystemMessageCategory(rawValue: rawValue)
+    }
+}
+
 enum SystemMessageCTA: String, Decodable, Hashable {
     case none
     case viewPost = "view_post"
@@ -142,6 +168,8 @@ final class SystemMessageService: ObservableObject {
     private var isAccountTransitionInProgress = true
     private var unreadRefreshTask: Task<Void, Never>?
     private var unreadRefreshID: UUID?
+    private var unreadRefreshRevision: UInt64 = 0
+    private var unreadRefreshCompletedRevision: UInt64 = 0
 
     var isAccountScopeReady: Bool {
         !isAccountTransitionInProgress && stateOwnerID != nil
@@ -197,15 +225,37 @@ final class SystemMessageService: ObservableObject {
             return
         }
 
-        if let unreadRefreshTask {
-            await unreadRefreshTask.value
+        unreadRefreshRevision &+= 1
+        let requestedRevision = unreadRefreshRevision
+
+        if let activeTask = unreadRefreshTask {
+            await activeTask.value
+            if unreadRefreshCompletedRevision < requestedRevision,
+               isCurrent(generation: requestGeneration) {
+                await startUnreadRefresh(generation: requestGeneration)
+            }
             return
         }
 
+        await startUnreadRefresh(generation: requestGeneration)
+    }
+
+    private func startUnreadRefresh(generation requestGeneration: UInt64) async {
         let refreshID = UUID()
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
-            await self.performUnreadCountRefresh(generation: requestGeneration)
+            while self.isCurrent(generation: requestGeneration) {
+                let targetRevision = self.unreadRefreshRevision
+                await self.performUnreadCountRefresh(generation: requestGeneration)
+                guard self.isCurrent(generation: requestGeneration) else { return }
+                self.unreadRefreshCompletedRevision = max(
+                    self.unreadRefreshCompletedRevision,
+                    targetRevision
+                )
+                guard self.unreadRefreshCompletedRevision < self.unreadRefreshRevision else {
+                    return
+                }
+            }
         }
         unreadRefreshID = refreshID
         unreadRefreshTask = task
@@ -305,6 +355,8 @@ final class SystemMessageService: ObservableObject {
         unreadRefreshTask?.cancel()
         unreadRefreshTask = nil
         unreadRefreshID = nil
+        unreadRefreshRevision = 0
+        unreadRefreshCompletedRevision = 0
         accountGeneration &+= 1
         stateOwnerID = ownerID
         unreadCount = 0
@@ -374,6 +426,7 @@ final class SystemMessageViewModel: ObservableObject {
     private let availabilityAction: AvailabilityAction
     private var cursor: SystemMessageCursor?
     private var ownerID: UUID?
+    private var queuedForcedInitialLoad = false
 
     init(
         category: SystemMessageCategory = .system,
@@ -427,13 +480,19 @@ final class SystemMessageViewModel: ObservableObject {
         isLoadingNextPage = false
         hasMore = true
         hasResolvedInitialLoad = false
+        queuedForcedInitialLoad = false
         errorMessage = nil
         actionMessage = nil
     }
 
     func loadInitial(force: Bool = false) async {
         guard ownerID != nil else { return }
-        guard !isLoading else { return }
+        guard !isLoading else {
+            if force {
+                queuedForcedInitialLoad = true
+            }
+            return
+        }
         if hasResolvedInitialLoad && !force { return }
 
         let requestOwner = ownerID
@@ -442,6 +501,13 @@ final class SystemMessageViewModel: ObservableObject {
         defer {
             if ownerID == requestOwner {
                 isLoading = false
+                let shouldLoadAgain = queuedForcedInitialLoad
+                queuedForcedInitialLoad = false
+                if shouldLoadAgain {
+                    Task { @MainActor [weak self] in
+                        await self?.loadInitial(force: true)
+                    }
+                }
             }
         }
 

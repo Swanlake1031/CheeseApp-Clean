@@ -92,6 +92,7 @@ class ChatService: ObservableObject {
     private let injectedConversationStateLoader: ConversationStateLoader?
     private var remarksOwnerId: UUID?
     private var stateOwnerID: UUID?
+    private var conversationRefreshQueued = false
 
     private init() {
         currentUserIDProvider = {
@@ -132,6 +133,7 @@ class ChatService: ObservableObject {
         conversationRemarks = [:]
         remarksOwnerId = nil
         isLoadingConversations = false
+        conversationRefreshQueued = false
         conversationErrorMessage = nil
         hasResolvedInitialConversationLoad = false
         RemoteImageCache.shared.removeAll()
@@ -225,9 +227,16 @@ class ChatService: ObservableObject {
 
     func refreshConversations() async {
         guard !isAccountTransitionInProgress,
-              stateOwnerID != nil,
-              !isLoadingConversations
+              stateOwnerID != nil
         else { return }
+
+        guard !isLoadingConversations else {
+            // A foreground Push or lifecycle activation can arrive while a manual/initial
+            // inbox refresh is still resolving. Preserve one trailing refresh instead of
+            // dropping the newer request and leaving the visible inbox on the old snapshot.
+            conversationRefreshQueued = true
+            return
+        }
 
         let requestGeneration = accountGeneration
         isLoadingConversations = true
@@ -235,6 +244,15 @@ class ChatService: ObservableObject {
         defer {
             if accountGeneration == requestGeneration {
                 isLoadingConversations = false
+                let shouldRefreshAgain = conversationRefreshQueued
+                    && !isAccountTransitionInProgress
+                    && stateOwnerID != nil
+                conversationRefreshQueued = false
+                if shouldRefreshAgain {
+                    Task { @MainActor [weak self] in
+                        await self?.refreshConversations()
+                    }
+                }
             }
         }
 

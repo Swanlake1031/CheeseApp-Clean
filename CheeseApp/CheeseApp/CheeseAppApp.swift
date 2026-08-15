@@ -595,7 +595,10 @@ final class EngagementNotificationService: NSObject, UNUserNotificationCenterDel
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         Task { @MainActor in
-            await SystemMessageService.shared.refreshUnreadCount()
+            let target = RemoteNotificationPayloadParser.parse(
+                userInfo: notification.request.content.userInfo
+            )
+            await refreshMessageInbox(for: target)
         }
         completionHandler([.banner, .list, .sound, .badge])
     }
@@ -606,14 +609,69 @@ final class EngagementNotificationService: NSObject, UNUserNotificationCenterDel
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         Task { @MainActor in
-            await SystemMessageService.shared.refreshUnreadCount()
-            if let target = RemoteNotificationPayloadParser.parse(
+            let target = RemoteNotificationPayloadParser.parse(
                 userInfo: response.notification.request.content.userInfo
-            ) {
+            )
+            if let target {
+                // Route immediately. Inbox refreshes must not delay opening the destination
+                // after the user taps the already-visible notification banner.
                 notificationRouter.enqueue(target)
             }
+            await refreshMessageInbox(for: target)
         }
         completionHandler()
+    }
+
+    private func refreshMessageInbox(
+        for target: NotificationNavigationTarget?
+    ) async {
+        switch target {
+        case .conversation(let conversationID):
+            do {
+                _ = try await ChatService.shared.fetchConversationPreview(
+                    conversationId: conversationID
+                )
+                if ChatService.shared.isLoadingConversations {
+                    // A full snapshot that began before this Push could otherwise overwrite
+                    // the targeted newer row when it commits. Queue one catch-up snapshot.
+                    await ChatService.shared.refreshConversations()
+                }
+            } catch {
+                guard !error.isCancellationLike else { return }
+                await ChatService.shared.refreshConversations()
+            }
+
+        case .group(let groupID):
+            do {
+                _ = try await ChatService.shared.fetchGroupPreview(groupId: groupID)
+                if ChatService.shared.isLoadingConversations {
+                    await ChatService.shared.refreshConversations()
+                }
+            } catch {
+                guard !error.isCancellationLike else { return }
+                await ChatService.shared.refreshConversations()
+            }
+
+        case .systemMessages(_, let category):
+            // Let an already-open timeline start its page request immediately instead of
+            // waiting for the separate pinned-summary RPC to finish first.
+            SystemMessageInboxEvents.postRemoteMessageAvailable(category: category)
+            await SystemMessageService.shared.refreshUnreadCount()
+
+        case .post:
+            // Older engagement Push payloads route to the post directly. They still belong
+            // to the interaction timeline, so refresh both the pinned summary and any open
+            // system-message timeline.
+            SystemMessageInboxEvents.postRemoteMessageAvailable(category: nil)
+            await SystemMessageService.shared.refreshUnreadCount()
+
+        case nil:
+            SystemMessageInboxEvents.postRemoteMessageAvailable(category: nil)
+            async let chats: Void = ChatService.shared.refreshConversations()
+            async let systemMessages: Void = SystemMessageService.shared.refreshUnreadCount()
+            await chats
+            await systemMessages
+        }
     }
 
     private func requestAuthorizationIfEnabled() async {
