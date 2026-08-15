@@ -263,12 +263,13 @@ struct ChatListView: View {
                     .foregroundStyle(.secondary.opacity(0.5))
 
                 Text("还没有聊天")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
 
                 Text("可从贴文或主页发起私信，也可以用右上角创建群聊或添加好友。")
-                    .font(.system(size: 15))
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
             }
             .padding(.top, 12)
         }
@@ -345,7 +346,7 @@ struct ChatListView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(title)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(AppColors.textPrimary)
 
                     Text(preview)

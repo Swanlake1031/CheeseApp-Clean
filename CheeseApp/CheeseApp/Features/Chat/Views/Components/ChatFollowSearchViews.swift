@@ -143,13 +143,13 @@ struct GroupChatRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(group.displayName)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
 
                     Spacer()
 
                     HStack(spacing: 6) {
                         Text(formatTime(group.lastMessageAt))
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                         if group.isMuted {
                             Image(systemName: "bell.slash.fill")
@@ -160,7 +160,7 @@ struct GroupChatRow: View {
                 }
 
                 Text(group.lastMessagePreview?.isEmpty == false ? group.lastMessagePreview! : "还没有消息")
-                    .font(.system(size: 14))
+                    .font(.system(size: 13))
                     .foregroundStyle(group.unreadCount > 0 ? .primary : .secondary)
                     .lineLimit(1)
 
