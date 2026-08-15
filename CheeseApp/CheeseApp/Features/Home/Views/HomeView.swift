@@ -235,8 +235,6 @@ struct HomeView: View {
         )
 
         return VStack(alignment: .leading, spacing: 10) {
-            featuredFeedHeading
-
             ScrollView(.horizontal, showsIndicators: false) {
                 // This is a small fixed set of pages. Keeping them eagerly laid out is intentional:
                 // a lazy horizontal stack can report only the viewport height while a page's
@@ -278,19 +276,6 @@ struct HomeView: View {
             .contentShape(Rectangle())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var featuredFeedHeading: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(selectedFeaturedCategory.feedHeading)
-                .font(.system(size: 21, weight: .bold))
-                .foregroundStyle(AppColors.textPrimary)
-
-            Text(selectedFeaturedCategory.feedSubtitle)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(AppColors.textMuted)
-        }
-        .padding(.horizontal, 3)
     }
 
     private func featuredCards(for category: HomeFeedTab) -> [HomeCardItem] {
@@ -856,38 +841,6 @@ enum HomeFeedTab: CaseIterable, Hashable {
             return L10n.tr("Forum", "论坛")
         case .secondhand:
             return L10n.tr("Secondhand", "二手")
-        }
-    }
-
-    var feedHeading: String {
-        switch self {
-        case .recommended:
-            return L10n.tr("Popular now", "热门推荐")
-        case .following:
-            return L10n.tr("From people you follow", "关注动态")
-        case .secondhand:
-            return L10n.tr("Secondhand marketplace", "二手市场")
-        case .forum:
-            return L10n.tr("Campus conversations", "校园讨论")
-        }
-    }
-
-    var feedSubtitle: String {
-        switch self {
-        case .recommended:
-            return L10n.tr(
-                "A fresh mix of campus activity on every refresh",
-                "结合互动与随机权重，每次刷新都有新内容"
-            )
-        case .following:
-            return L10n.tr(
-                "The latest public posts from accounts you follow",
-                "你所关注账号发布的最新公开内容"
-            )
-        case .secondhand:
-            return L10n.tr("Useful finds from the campus community", "校园同学正在出的闲置")
-        case .forum:
-            return L10n.tr("Questions, stories and campus life", "问题、故事与校园生活")
         }
     }
 
