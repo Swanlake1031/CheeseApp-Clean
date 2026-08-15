@@ -351,10 +351,12 @@ struct ForumDetailView: View {
                             .foregroundStyle(interaction.isLiked ? AppColors.likeActive : AppColors.textMuted)
                         Text("\(interaction.likeCount)")
                             .monospacedDigit()
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(interaction.isLiked ? AppColors.likeActive : AppColors.textMuted)
                     }
                     .font(.system(size: 14, weight: .medium))
-                    .frame(width: 52, alignment: .leading)
+                    .frame(minWidth: 52, alignment: .leading)
                 }
                 .buttonStyle(.plain)
                 .disabled(isLiking)
@@ -363,19 +365,23 @@ struct ForumDetailView: View {
                     Image(systemName: "bubble.right")
                     Text("\(post.comments)")
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(AppColors.textMuted)
-                .frame(width: 52, alignment: .leading)
+                .frame(minWidth: 52, alignment: .leading)
 
                 HStack(spacing: 4) {
                     Image(systemName: "eye")
                     Text("\(post.views)")
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(AppColors.textMuted)
-                .frame(width: 52, alignment: .leading)
+                .frame(minWidth: 52, alignment: .leading)
 
                 Spacer()
 

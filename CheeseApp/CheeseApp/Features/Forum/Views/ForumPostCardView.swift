@@ -213,28 +213,34 @@ struct ForumPostCardView: View {
                                 .foregroundStyle(interaction.isLiked ? AppColors.likeActive : .secondary)
                             Text("\(interaction.likeCount)")
                                 .monospacedDigit()
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                                 .foregroundStyle(interaction.isLiked ? AppColors.likeActive : AppColors.textMuted)
                         }
                     }
                     .buttonStyle(.plain)
                 }
-                .frame(width: 52, alignment: .leading)
+                .frame(minWidth: 52, alignment: .leading)
 
                 // 评论
                 HStack(spacing: 4) {
                     Image(systemName: "bubble.right")
                     Text("\(post.comments)")
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
-                .frame(width: 52, alignment: .leading)
+                .frame(minWidth: 52, alignment: .leading)
 
                 // 浏览
                 HStack(spacing: 4) {
                     Image(systemName: "eye")
                     Text("\(post.views)")
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
-                .frame(width: 52, alignment: .leading)
+                .frame(minWidth: 52, alignment: .leading)
 
                 Spacer()
 
