@@ -340,8 +340,6 @@ struct ForumDetailView: View {
                 }
             }
 
-            Divider().overlay(AppColors.divider)
-
             HStack(spacing: 6) {
                 Button(action: {
                     Task { @MainActor in
@@ -559,7 +557,7 @@ struct ForumDetailView: View {
         return HStack(alignment: .top, spacing: 10) {
             commentAuthorAvatar(comment)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     commentAuthorName(comment)
 
@@ -601,7 +599,7 @@ struct ForumDetailView: View {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(AppColors.textMuted)
-                            .frame(width: 30, height: 30)
+                            .frame(width: 28, height: 22)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -660,13 +658,8 @@ struct ForumDetailView: View {
                 }
             }
         }
-        .padding(.vertical, 13)
+        .padding(.vertical, 8)
         .contentShape(Rectangle())
-        .overlay(alignment: .bottom) {
-            Divider()
-                .overlay(AppColors.divider)
-                .padding(.leading, 42)
-        }
         .padding(.leading, depth == 0 ? 0 : 14)
     }
 
