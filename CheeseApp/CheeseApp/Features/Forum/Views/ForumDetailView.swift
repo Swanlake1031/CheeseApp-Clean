@@ -565,10 +565,6 @@ struct ForumDetailView: View {
                         McMasterStudentBadge()
                     }
 
-                    Text(comment.timeAgo)
-                        .font(.system(size: 12))
-                        .foregroundStyle(AppColors.textMuted)
-
                     Spacer()
 
                     if comment.likeCount > 0 {
@@ -631,15 +627,10 @@ struct ForumDetailView: View {
                     commentID: comment.id
                 )
 
-                HStack {
-                    Button {
-                        beginReply(to: comment)
-                    } label: {
-                        Text("回复")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(AppColors.textMuted)
-                    }
-                    .buttonStyle(.plain)
+                HStack(spacing: 10) {
+                    Text(comment.timeAgo)
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppColors.textMuted)
 
                     if isParentComment && replyCount > 0 {
                         Button {
@@ -655,6 +646,15 @@ struct ForumDetailView: View {
                     }
 
                     Spacer()
+
+                    Button {
+                        beginReply(to: comment)
+                    } label: {
+                        Text("回复")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(AppColors.textMuted)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
