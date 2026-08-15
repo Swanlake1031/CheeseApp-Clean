@@ -91,7 +91,7 @@ struct ForumSearchView: View {
             ContentUnavailableView.search(text: trimmed)
         } else {
             ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 10) {
+                LazyVStack(spacing: 0) {
                     ForEach(results, id: \.id) { (post: ForumPostItem) in
                         Button(action: { selectedPost = post }) {
                             VStack(alignment: .leading, spacing: 7) {
@@ -115,10 +115,11 @@ struct ForumSearchView: View {
                                 .foregroundStyle(AppColors.textMuted)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(14)
-                            .background(AppColors.cardBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .cheeseCardChrome(cornerRadius: 14)
+                            .padding(.vertical, 14)
+                            .overlay(alignment: .bottom) {
+                                Divider()
+                                    .overlay(AppColors.divider)
+                            }
                         }
                         .buttonStyle(.plain)
                     }

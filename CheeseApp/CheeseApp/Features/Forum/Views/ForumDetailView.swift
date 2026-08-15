@@ -65,7 +65,7 @@ struct ForumDetailView: View {
 
             ScrollViewReader { proxy in
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 14) {
+                    VStack(spacing: 0) {
                         postHeader
                         postContent
                         commentSection
@@ -278,10 +278,8 @@ struct ForumDetailView: View {
                 }
             }
         }
-        .padding(16)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 18)
+        .padding(.top, 12)
+        .padding(.bottom, 6)
     }
 
     private func detailAuthorAvatar(size: CGFloat) -> some View {
@@ -411,10 +409,12 @@ struct ForumDetailView: View {
                     .padding(.top, 4)
             }
         }
-        .padding(16)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 18)
+        .padding(.top, 10)
+        .padding(.bottom, 16)
+        .overlay(alignment: .bottom) {
+            Divider()
+                .overlay(AppColors.divider)
+        }
     }
 
     private var commentSection: some View {
@@ -433,16 +433,14 @@ struct ForumDetailView: View {
                     .font(.system(size: 14))
                     .foregroundStyle(AppColors.textMuted)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(AppColors.cardBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.vertical, 14)
             case .error(let message):
                 ErrorView(message) {
                     Task { await reloadData() }
                 }
                 .frame(maxWidth: .infinity)
             case .loaded:
-                LazyVStack(spacing: 10) {
+                LazyVStack(spacing: 0) {
                     ForEach(threadedComments) { node in
                         let parentName = parentAuthorName(for: node.comment)
                         commentRow(node.comment, parentAuthorName: parentName, depth: node.depth, rootId: node.rootId)
@@ -451,6 +449,7 @@ struct ForumDetailView: View {
                 }
             }
         }
+        .padding(.top, 18)
         .id(commentSectionAnchorId)
     }
 
@@ -553,8 +552,6 @@ struct ForumDetailView: View {
         let isParentComment = depth == 0
         let replyCount = isParentComment ? descendantCount(forRootId: rootId) : 0
         let isCollapsed = isParentComment ? shouldCollapseReplies(forRootId: rootId) : false
-        let cardShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
-
         return HStack(alignment: .top, spacing: 10) {
             commentAuthorAvatar(comment)
 
@@ -653,14 +650,13 @@ struct ForumDetailView: View {
                 }
             }
         }
-        .padding(12)
-        .background(AppColors.cardBackground)
-        .clipShape(cardShape)
-        .overlay { cardShape.stroke(AppColors.cardBorder, lineWidth: 1) }
-        .contentShape(cardShape)
-        .shadow(color: .black.opacity(0.065), radius: 10, x: 0, y: 4)
-        // Indent the complete reply card. Applying this before clip/overlay makes
-        // only the contents move while the border still spans the parent width.
+        .padding(.vertical, 13)
+        .contentShape(Rectangle())
+        .overlay(alignment: .bottom) {
+            Divider()
+                .overlay(AppColors.divider)
+                .padding(.leading, 42)
+        }
         .padding(.leading, depth == 0 ? 0 : 14)
     }
 

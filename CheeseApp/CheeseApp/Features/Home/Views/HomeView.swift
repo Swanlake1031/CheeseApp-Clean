@@ -581,11 +581,22 @@ struct HomeView: View {
         )
         .overlay {
             if highlightedCreatedPostID == card.postId {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(AppColors.accent, lineWidth: 3)
-                    .shadow(color: AppColors.accent.opacity(0.48), radius: 10)
+                if card.category == .forum {
+                    VStack(spacing: 0) {
+                        Rectangle()
+                            .fill(AppColors.accent)
+                            .frame(height: 3)
+                        Spacer(minLength: 0)
+                    }
                     .allowsHitTesting(false)
                     .transition(.opacity)
+                } else {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(AppColors.accent, lineWidth: 3)
+                        .shadow(color: AppColors.accent.opacity(0.48), radius: 10)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
             }
         }
         .overlay(alignment: .topTrailing) {

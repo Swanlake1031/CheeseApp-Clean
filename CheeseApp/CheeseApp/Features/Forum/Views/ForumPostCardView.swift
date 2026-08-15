@@ -253,12 +253,13 @@ struct ForumPostCardView: View {
             .font(.system(size: 13))
             .foregroundStyle(.secondary)
         }
-        .padding(16)
+        .padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 20)
-        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(alignment: .bottom) {
+            Divider()
+                .overlay(AppColors.divider)
+        }
+        .contentShape(Rectangle())
         .onTapGesture { onTap?() }
     }
 

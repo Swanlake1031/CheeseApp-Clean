@@ -222,7 +222,7 @@ private struct ForumChannelPageView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 10) {
+            LazyVStack(spacing: 0) {
                 if let board {
                     ForumBoardIntroductionCard(
                         board: board,
@@ -404,11 +404,12 @@ private struct ForumBoardIntroductionCard: View {
             .foregroundStyle(AppColors.accentStrong)
             .buttonStyle(.plain)
         }
-        .padding(16)
+        .padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 18)
+        .overlay(alignment: .bottom) {
+            Divider()
+                .overlay(AppColors.divider)
+        }
         .accessibilityLabel(
             L10n.tr(
                 "\(board.name), \(board.description)",

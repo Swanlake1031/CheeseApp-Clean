@@ -68,7 +68,11 @@ struct ContentCardView: View {
 
             interactionRow
         }
-        .feedCardSurface()
+        .modifier(
+            DiscussionFeedSurfaceModifier(
+                isForum: item.category == .forum
+            )
+        )
     }
 
     private var discussionTextSummary: some View {
@@ -343,6 +347,26 @@ private extension View {
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .cheeseCardChrome(cornerRadius: 20)
+    }
+}
+
+private struct DiscussionFeedSurfaceModifier: ViewModifier {
+    let isForum: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isForum {
+            content
+                .padding(.horizontal, 12)
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .bottom) {
+                    Divider()
+                        .overlay(AppColors.divider)
+                }
+        } else {
+            content.feedCardSurface()
+        }
     }
 }
 
