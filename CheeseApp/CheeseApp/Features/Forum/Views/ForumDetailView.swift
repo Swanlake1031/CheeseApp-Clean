@@ -390,7 +390,7 @@ struct ForumDetailView: View {
                 Button {
                     Task { await toggleFavorite() }
                 } label: {
-                    Image(systemName: interaction.isFavorited ? "bookmark.fill" : "bookmark")
+                    Image(systemName: interaction.isFavorited ? "star.fill" : "star")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(interaction.isFavorited ? AppColors.accentStrong : AppColors.textMuted)
                         .frame(width: 36, height: 36)
@@ -871,7 +871,7 @@ struct ForumDetailView: View {
                     }
 
                     detailBottomAction(
-                        icon: interaction.isFavorited ? "bookmark.fill" : "bookmark",
+                        icon: interaction.isFavorited ? "star.fill" : "star",
                         isActive: interaction.isFavorited,
                         isDisabled: isTogglingFavorite
                     ) {
@@ -930,7 +930,7 @@ struct ForumDetailView: View {
         if icon.contains("heart") {
             return interaction.isLiked ? L10n.tr("Unlike", "取消点赞") : L10n.tr("Like", "点赞")
         }
-        if icon.contains("bookmark") {
+        if icon.contains("star") {
             return interaction.isFavorited ? L10n.tr("Remove bookmark", "取消收藏") : L10n.tr("Bookmark", "收藏")
         }
         return L10n.tr("Share", "分享")

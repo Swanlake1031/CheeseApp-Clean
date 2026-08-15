@@ -246,7 +246,7 @@ struct PostDetailContactBar: View {
                         ProgressView()
                             .tint(.black)
                     } else {
-                        Image(systemName: isFavorited ? "bookmark.fill" : "bookmark")
+                        Image(systemName: isFavorited ? "star.fill" : "star")
                             .font(.system(size: 14, weight: .semibold))
                     }
 

@@ -1065,7 +1065,7 @@ private struct ProfileActivityPageView: View {
         case .published: return "square.and.pencil"
         case .liked: return "heart"
         case .privateContent: return "lock.fill"
-        case .favorited: return "bookmark"
+        case .favorited: return "star"
         }
     }
 
@@ -1284,7 +1284,7 @@ private struct ProfileActivityRow: View {
         if activityKind == .liked {
             return interactionState.isLiked ? "heart.fill" : "heart"
         }
-        return interactionState.isFavorited ? "bookmark.fill" : "bookmark"
+        return interactionState.isFavorited ? "star.fill" : "star"
     }
 
     private var reactionColor: Color {

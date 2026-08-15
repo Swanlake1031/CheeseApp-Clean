@@ -285,7 +285,7 @@ struct ContentCardView: View {
 
             HStack(spacing: 12) {
                 Button(action: { onFavoriteTap?() }) {
-                    Image(systemName: interaction?.isFavorited == true ? "bookmark.fill" : "bookmark")
+                    Image(systemName: interaction?.isFavorited == true ? "star.fill" : "star")
                         .foregroundStyle(
                             interaction?.isFavorited == true
                                 ? AppColors.accentStrong

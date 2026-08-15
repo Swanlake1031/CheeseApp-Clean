@@ -345,7 +345,7 @@ struct SecondhandCardView: View {
                     Spacer(minLength: 4)
 
                     Button(action: { onFavoriteTap?() }) {
-                        Image(systemName: isFavorited ? "bookmark.fill" : "bookmark")
+                        Image(systemName: isFavorited ? "star.fill" : "star")
                             .foregroundStyle(
                                 isFavorited ? AppColors.accentStrong : AppColors.textMuted
                             )
