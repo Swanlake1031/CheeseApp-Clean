@@ -93,27 +93,6 @@ struct EditPostSheet: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
-                        Button {
-                            Task { await save() }
-                        } label: {
-                            HStack(spacing: 10) {
-                                if isSaving {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    Image(systemName: "checkmark.circle.fill")
-                                    Text(L10n.tr("Save Changes", "保存修改"))
-                                }
-                            }
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(isFormValid ? accentColor : Color.gray)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                        }
-                        .disabled(isSaving || !isFormValid)
-
                         Spacer(minLength: 40)
                     }
                     .padding()
@@ -149,9 +128,32 @@ struct EditPostSheet: View {
                 title: L10n.tr("Edit Post", "编辑帖子"),
                 onBack: { dismiss() }
             ) {
-                EmptyView()
+                secondhandSaveButton
             }
         }
+    }
+
+    private var secondhandSaveButton: some View {
+        Button {
+            Task { await save() }
+        } label: {
+            Group {
+                if isSaving {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    Text(L10n.tr("Save", "保存"))
+                        .font(.system(size: 15, weight: .bold))
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(minWidth: 62)
+            .frame(height: 40)
+            .background(isFormValid ? accentColor : Color.gray.opacity(0.38))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isSaving || !isFormValid)
     }
 
     private var forumEditor: some View {
