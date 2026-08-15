@@ -381,7 +381,7 @@ struct ChatRoomView: View {
         _ intent: SecondhandChatPurchaseIntent
     ) -> some View {
         if intent.viewerRole == .buyer {
-            Button(L10n.tr("No longer interested", "不想要了")) {
+            Button(L10n.tr("Cancel transaction", "取消交易")) {
                 viewModel.requestCancelSecondhandPurchaseIntent()
             }
             .buttonStyle(SecondhandTransactionActionButtonStyle(role: .secondary))
@@ -978,10 +978,10 @@ struct ChatRoomView: View {
             )
         case .cancelSecondhandPurchaseIntent:
             return Alert(
-                title: Text("确定取消购买意向？"),
-                message: Text("聊天记录会保留，商品仍可由其他买家购买。"),
+                title: Text("确定取消这笔交易？"),
+                message: Text("只会结束你的购买意向，聊天记录会保留，商品仍可继续出售。"),
                 primaryButton: .cancel(Text("返回")),
-                secondaryButton: .destructive(Text("不想要了")) {
+                secondaryButton: .destructive(Text("取消交易")) {
                     viewModel.confirmCancelSecondhandPurchaseIntent()
                 }
             )
