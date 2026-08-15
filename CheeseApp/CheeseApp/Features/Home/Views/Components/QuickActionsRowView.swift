@@ -35,19 +35,15 @@ struct HomeModuleGridView: View {
                         onSelect(module)
                     } label: {
                         VStack(spacing: 3) {
-                            HStack(spacing: 4) {
-                                Image(systemName: module.homeIcon)
-                                    .font(.system(size: 12, weight: .bold))
-                                Text(module.title)
-                                    .font(.system(size: 13, weight: .bold))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.75)
-                            }
-                            .foregroundStyle(
-                                selectedModule == module
-                                    ? AppColors.textPrimary
-                                    : AppColors.textMuted
-                            )
+                            Text(module.title)
+                                .font(.system(size: 13, weight: .bold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                                .foregroundStyle(
+                                    selectedModule == module
+                                        ? AppColors.textPrimary
+                                        : AppColors.textMuted
+                                )
 
                             Capsule()
                                 .fill(selectedModule == module ? AppColors.accentStrong : Color.clear)
@@ -548,21 +544,6 @@ struct HomeNavigationDrawerView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-}
-
-private extension HomeFeedTab {
-    var homeIcon: String {
-        switch self {
-        case .recommended:
-            return "sparkles"
-        case .following:
-            return "person.2.fill"
-        case .secondhand:
-            return "bag.fill"
-        case .forum:
-            return "bubble.left.and.bubble.right.fill"
-        }
     }
 }
 
