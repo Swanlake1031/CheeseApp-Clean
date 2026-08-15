@@ -188,11 +188,11 @@ struct ChatServiceRepository {
             .execute()
     }
 
-    func stopSellingSecondhandListing(listingId: UUID) async throws {
+    func cancelSellerSecondhandTransaction(intentId: UUID) async throws {
         try await supabase.client
             .rpc(
-                "stop_selling_secondhand_listing",
-                params: SecondhandListingParams(listingID: listingId)
+                "cancel_seller_secondhand_purchase_intent",
+                params: SecondhandIntentActionParams(intentID: intentId)
             )
             .execute()
     }

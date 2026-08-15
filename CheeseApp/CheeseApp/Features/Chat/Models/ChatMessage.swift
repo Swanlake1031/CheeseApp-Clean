@@ -142,7 +142,7 @@ enum SecondhandPurchaseIntentStatus: String, Codable, Hashable {
         case .buyerCancelled: return L10n.tr("Purchase intent cancelled", "购买意向已取消")
         case .completed: return L10n.tr("Transaction completed", "交易已完成")
         case .listingSold: return L10n.tr("This item has been sold", "该商品已售出")
-        case .sellerStopped: return L10n.tr("Seller stopped selling", "卖家已停止出售")
+        case .sellerStopped: return L10n.tr("Transaction cancelled", "交易已取消")
         }
     }
 

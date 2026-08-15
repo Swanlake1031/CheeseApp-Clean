@@ -604,6 +604,39 @@ final class ChatRoomViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.activeSecondhandPurchaseIntent)
     }
 
+    func testSellerCancellationOnlyEndsCurrentTransaction() async {
+        let sellerID = UUID()
+        let conversation = ChatConversationPreview.fixture()
+        let intent = SecondhandChatPurchaseIntent.fixture(
+            conversationID: conversation.id,
+            sellerID: sellerID,
+            buyerID: conversation.otherUserId,
+            role: .seller
+        )
+        let transactionService = SecondhandTransactionServiceStub(intent: intent)
+        let viewModel = makeViewModel(
+            conversation,
+            senderID: sellerID,
+            recorder: ChatRoomSendRecorder(
+                conversationID: conversation.id,
+                senderID: sellerID
+            ),
+            chatService: ChatRoomServiceStub(),
+            transactionService: transactionService
+        )
+
+        await viewModel.bootstrap(currentUserID: sellerID)
+        viewModel.requestCancelSellerSecondhandTransaction()
+        XCTAssertEqual(viewModel.alertDestination, .cancelSellerSecondhandTransaction)
+        viewModel.confirmCancelSellerSecondhandTransaction()
+
+        await waitUntil {
+            viewModel.secondhandPurchaseIntent?.status == .sellerStopped
+        }
+        XCTAssertEqual(transactionService.cancelledSellerIntentIDs, [intent.id])
+        XCTAssertNil(viewModel.activeSecondhandPurchaseIntent)
+    }
+
     func testSellerWithMultipleActiveBuyersMustSelectBeforeCompletion() async {
         let sellerID = UUID()
         let conversation = ChatConversationPreview.fixture()
@@ -801,6 +834,7 @@ private final class SecondhandTransactionServiceStub: SecondhandChatTransactionS
     private let buyers: [SecondhandActiveBuyer]
     private(set) var cancelAttempts = 0
     private(set) var completedBuyerIDs: [UUID] = []
+    private(set) var cancelledSellerIntentIDs: [UUID] = []
 
     init(
         intent: SecondhandChatPurchaseIntent?,
@@ -836,7 +870,8 @@ private final class SecondhandTransactionServiceStub: SecondhandChatTransactionS
         )
     }
 
-    func stopSellingSecondhandListing(listingId: UUID) async throws {
+    func cancelSellerSecondhandTransaction(intentId: UUID) async throws {
+        cancelledSellerIntentIDs.append(intentId)
         guard let current = intent else { return }
         intent = current.replacing(status: .sellerStopped)
     }

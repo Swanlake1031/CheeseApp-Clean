@@ -528,8 +528,8 @@ class ChatService: ObservableObject {
         )
     }
 
-    func stopSellingSecondhandListing(listingId: UUID) async throws {
-        try await repository.stopSellingSecondhandListing(listingId: listingId)
+    func cancelSellerSecondhandTransaction(intentId: UUID) async throws {
+        try await repository.cancelSellerSecondhandTransaction(intentId: intentId)
     }
 
     func sendSharedPostCardMessage(

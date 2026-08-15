@@ -48,7 +48,7 @@ enum ChatRoomAlertDestination: Identifiable, Equatable {
     case deleteMessage(UUID, forEveryone: Bool)
     case cancelSecondhandPurchaseIntent
     case completeSecondhandSale(UUID)
-    case stopSellingSecondhandListing
+    case cancelSellerSecondhandTransaction
 
     var id: String {
         switch self {
@@ -61,8 +61,8 @@ enum ChatRoomAlertDestination: Identifiable, Equatable {
             return "cancel-secondhand-purchase-intent"
         case .completeSecondhandSale(let buyerID):
             return "complete-secondhand-sale:\(buyerID.uuidString)"
-        case .stopSellingSecondhandListing:
-            return "stop-selling-secondhand-listing"
+        case .cancelSellerSecondhandTransaction:
+            return "cancel-seller-secondhand-transaction"
         }
     }
 }
@@ -289,12 +289,12 @@ final class ChatRoomViewModel: ObservableObject {
         }
     }
 
-    func requestStopSellingSecondhandListing() {
+    func requestCancelSellerSecondhandTransaction() {
         guard secondhandPurchaseIntent?.status == .active,
               secondhandPurchaseIntent?.viewerRole == .seller,
               !isApplyingSecondhandTransactionAction
         else { return }
-        alertDestination = .stopSellingSecondhandListing
+        alertDestination = .cancelSellerSecondhandTransaction
     }
 
     func confirmCancelSecondhandPurchaseIntent() {
@@ -331,7 +331,7 @@ final class ChatRoomViewModel: ObservableObject {
         }
     }
 
-    func confirmStopSellingSecondhandListing() {
+    func confirmCancelSellerSecondhandTransaction() {
         guard let intent = secondhandPurchaseIntent,
               intent.status == .active,
               intent.viewerRole == .seller,
@@ -340,12 +340,7 @@ final class ChatRoomViewModel: ObservableObject {
         alertDestination = nil
         performSecondhandTransactionAction {
             try await secondhandTransactionService
-                .stopSellingSecondhandListing(listingId: intent.listingId)
-            PostFeatureEvents.postDidChange(
-                kind: .secondhand,
-                authorId: intent.sellerId,
-                postId: intent.listingId
-            )
+                .cancelSellerSecondhandTransaction(intentId: intent.id)
         }
     }
 

@@ -393,8 +393,8 @@ struct ChatRoomView: View {
                 }
                 .buttonStyle(SecondhandTransactionActionButtonStyle(role: .primary))
 
-                Button(L10n.tr("Stop selling", "不想卖了")) {
-                    viewModel.requestStopSellingSecondhandListing()
+                Button(L10n.tr("Cancel transaction", "取消交易")) {
+                    viewModel.requestCancelSellerSecondhandTransaction()
                 }
                 .buttonStyle(SecondhandTransactionActionButtonStyle(role: .secondary))
             }
@@ -994,13 +994,13 @@ struct ChatRoomView: View {
                     viewModel.confirmCompleteSecondhandSale(buyerID: buyerID)
                 }
             )
-        case .stopSellingSecondhandListing:
+        case .cancelSellerSecondhandTransaction:
             return Alert(
-                title: Text("确定不再出售该商品？"),
-                message: Text("商品不会被标记为已售出，所有买家的购买意向将结束。"),
+                title: Text("确定取消这笔交易？"),
+                message: Text("只会结束你和当前买家的交易，商品会继续公开出售。"),
                 primaryButton: .cancel(Text("返回")),
-                secondaryButton: .destructive(Text("停止出售")) {
-                    viewModel.confirmStopSellingSecondhandListing()
+                secondaryButton: .destructive(Text("取消交易")) {
+                    viewModel.confirmCancelSellerSecondhandTransaction()
                 }
             )
         }

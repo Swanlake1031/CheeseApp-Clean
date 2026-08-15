@@ -42,7 +42,7 @@ protocol SecondhandChatTransactionServicing: AnyObject {
     ) async throws -> [SecondhandActiveBuyer]
     func cancelSecondhandPurchaseIntent(intentId: UUID) async throws
     func completeSecondhandSale(listingId: UUID, buyerId: UUID) async throws
-    func stopSellingSecondhandListing(listingId: UUID) async throws
+    func cancelSellerSecondhandTransaction(intentId: UUID) async throws
 }
 
 extension ChatService: SecondhandChatTransactionServicing {}
