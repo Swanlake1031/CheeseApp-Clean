@@ -112,8 +112,10 @@ struct ProfileView: View {
             }
         }
         .task(id: authService.currentUser?.id) {
-            activityEditingPost = nil
             await refreshProfile(force: true)
+        }
+        .onChange(of: authService.currentUser?.id) { _, _ in
+            activityEditingPost = nil
         }
         .onChange(of: isActive) { _, active in
             guard active else { return }

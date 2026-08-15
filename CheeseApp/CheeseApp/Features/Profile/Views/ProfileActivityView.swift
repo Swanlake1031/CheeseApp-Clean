@@ -311,7 +311,7 @@ struct ProfileActivityView: View {
             guard previous != nil, current == nil else { return }
             refreshGeneration &+= 1
         }
-        .task(id: authService.currentUser?.id) {
+        .onChange(of: authService.currentUser?.id) { _, _ in
             cancelPendingPostActions()
             editingPost = nil
             pendingDeleteItem = nil
