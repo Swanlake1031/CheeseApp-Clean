@@ -191,10 +191,9 @@ struct ChatListView: View {
 
     private var conversationListContent: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 14) {
+            VStack(spacing: 0) {
                 if !inboxState.isSearching {
                     pinnedDirectMessageCard
-                        .padding(.horizontal, 16)
                 }
 
                 if inboxState.isSearching {
@@ -210,6 +209,7 @@ struct ChatListView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
                 }
 
                 if inboxState.showsSearchEmptyState {
@@ -217,10 +217,9 @@ struct ChatListView: View {
                         .padding(.horizontal, 16)
                 } else {
                     ForEach(remainingVisibleSections) { section in
-                        listSectionCard(title: section.title) {
+                        flatListSection(title: section.title) {
                             sectionRows(for: section)
                         }
-                        .padding(.horizontal, 16)
                     }
                 }
 
@@ -236,7 +235,7 @@ struct ChatListView: View {
 
                 Spacer(minLength: 120)
             }
-            .padding(.top, 10)
+            .padding(.top, 4)
         }
         .scrollDismissesKeyboard(.interactively)
         .scrollDisabled(isSwipeHorizontallyDragging)
@@ -268,7 +267,6 @@ struct ChatListView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
-            .padding(.horizontal, 16)
             .padding(.top, 12)
         }
     }
@@ -289,9 +287,6 @@ struct ChatListView: View {
                 sectionRows(for: directMessageSection)
             }
         }
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 20)
     }
 
     private var directMessageSection: ChatInboxSection? {
@@ -466,21 +461,20 @@ struct ChatListView: View {
         }
     }
 
-    private func listSectionCard<Content: View>(title: String?, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: title == nil ? 0 : 10) {
+    private func flatListSection<Content: View>(title: String?, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
             if let title {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(AppColors.textMuted)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 18)
+                    .padding(.bottom, 8)
             }
 
             VStack(spacing: 0) {
                 content()
             }
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .cheeseCardChrome(cornerRadius: 20)
         }
     }
 
