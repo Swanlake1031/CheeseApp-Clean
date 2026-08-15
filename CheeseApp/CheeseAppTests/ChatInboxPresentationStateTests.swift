@@ -22,7 +22,7 @@ final class ChatInboxPresentationStateTests: XCTestCase {
 
         XCTAssertEqual(state.visibleSections.map(\.kind), [.groups, .directMessages])
         XCTAssertEqual(state.visibleItemCount, 2)
-        XCTAssertEqual(ChatInboxSectionKind.groups.title, "群聊")
+        XCTAssertNil(ChatInboxSectionKind.groups.title)
         XCTAssertNil(ChatInboxSectionKind.directMessages.title)
     }
 

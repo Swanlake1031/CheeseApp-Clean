@@ -27,12 +27,7 @@ enum ChatInboxSectionKind: String, Hashable, Identifiable {
     var id: String { rawValue }
 
     var title: String? {
-        switch self {
-        case .groups:
-            return "群聊"
-        case .directMessages:
-            return nil
-        }
+        nil
     }
 }
 
