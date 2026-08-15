@@ -255,23 +255,8 @@ struct ChatListView: View {
 
     private var emptyState: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 18) {
-                pinnedDirectMessageCard
-
-                Image(systemName: "bubble.left.and.bubble.right")
-                    .font(.system(size: 52))
-                    .foregroundStyle(.secondary.opacity(0.5))
-
-                Text("还没有聊天")
-                    .font(.system(size: 17, weight: .semibold))
-
-                Text("可从贴文或主页发起私信，也可以用右上角创建群聊或添加好友。")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-            }
-            .padding(.top, 12)
+            pinnedDirectMessageCard
+                .padding(.top, 12)
         }
     }
 
