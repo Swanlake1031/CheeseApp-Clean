@@ -75,6 +75,7 @@
 		PACTVWBLD1 /* ProfileActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PACTVWFILE1 /* ProfileActivityView.swift */; };
 		0E2 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E2 /* AuthView.swift */; };
 		IMGCH02 /* CachedRemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMGCH01 /* CachedRemoteImage.swift */; };
+		FMEDBLD1 /* FeedMediaLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = FMEDFILE1 /* FeedMediaLayout.swift */; };
 		AVCRP02 /* AvatarImageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AVCRP01 /* AvatarImageViews.swift */; };
 		0F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1F0 /* Assets.xcassets */; };
 		200A /* PostKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200 /* PostKind.swift */; };
@@ -144,6 +145,7 @@
 		TSTBLD16 /* SystemMessageViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE16 /* SystemMessageViewModelTests.swift */; };
 		TSTBLD17 /* MentionTextLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE17 /* MentionTextLogicTests.swift */; };
 		TSTBLD18 /* ProfileActivityServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE18 /* ProfileActivityServiceTests.swift */; };
+		TSTBLD19 /* FeedMediaLayoutEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE19 /* FeedMediaLayoutEngineTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -229,6 +231,7 @@
 		PACTVWFILE1 /* ProfileActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityView.swift; sourceTree = "<group>"; };
 		1E2 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
 		IMGCH01 /* CachedRemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedRemoteImage.swift; sourceTree = "<group>"; };
+		FMEDFILE1 /* FeedMediaLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedMediaLayout.swift; sourceTree = "<group>"; };
 		AVCRP01 /* AvatarImageViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarImageViews.swift; sourceTree = "<group>"; };
 		1F0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		200 /* PostKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostKind.swift; sourceTree = "<group>"; };
@@ -291,6 +294,7 @@
 		TSTFILE16 /* SystemMessageViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMessageViewModelTests.swift; sourceTree = "<group>"; };
 		TSTFILE17 /* MentionTextLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionTextLogicTests.swift; sourceTree = "<group>"; };
 		TSTFILE18 /* ProfileActivityServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityServiceTests.swift; sourceTree = "<group>"; };
+		TSTFILE19 /* FeedMediaLayoutEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedMediaLayoutEngineTests.swift; sourceTree = "<group>"; };
 		TSTPROD01 /* CheeseAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CheeseAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -504,6 +508,7 @@
 				162 /* ErrorView.swift */,
 				163 /* ImagePicker.swift */,
 				IMGCH01 /* CachedRemoteImage.swift */,
+				FMEDFILE1 /* FeedMediaLayout.swift */,
 				AVCRP01 /* AvatarImageViews.swift */,
 				204 /* ReportPostSheet.swift */,
 				20A /* PostEditorComponents.swift */,
@@ -919,6 +924,7 @@
 				TSTFILE16 /* SystemMessageViewModelTests.swift */,
 				TSTFILE17 /* MentionTextLogicTests.swift */,
 				TSTFILE18 /* ProfileActivityServiceTests.swift */,
+				TSTFILE19 /* FeedMediaLayoutEngineTests.swift */,
 			);
 			path = CheeseAppTests;
 			sourceTree = "<group>";
@@ -1056,6 +1062,7 @@
 				062 /* ErrorView.swift in Sources */,
 				063 /* ImagePicker.swift in Sources */,
 				IMGCH02 /* CachedRemoteImage.swift in Sources */,
+				FMEDBLD1 /* FeedMediaLayout.swift in Sources */,
 				AVCRP02 /* AvatarImageViews.swift in Sources */,
 				064 /* ContentCardView.swift in Sources */,
 				070 /* Colors.swift in Sources */,
@@ -1173,6 +1180,7 @@
 				TSTBLD16 /* SystemMessageViewModelTests.swift in Sources */,
 				TSTBLD17 /* MentionTextLogicTests.swift in Sources */,
 				TSTBLD18 /* ProfileActivityServiceTests.swift in Sources */,
+				TSTBLD19 /* FeedMediaLayoutEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

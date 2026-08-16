@@ -199,22 +199,28 @@ final class ProfileSocialService: ObservableObject {
         let currentUserId = try await AuthService.shared.requireAuthUserId()
         guard currentUserId != targetUserId else { return }
 
-        try await supabase
-            .database("user_follows")
-            .upsert(
-                [
-                    "follower_id": currentUserId.uuidString,
-                    "following_id": targetUserId.uuidString
-                ],
-                onConflict: "follower_id,following_id",
-                ignoreDuplicates: true
-            )
-            .execute()
-
+        let previousSummary = summaries[targetUserId]
         applyCachedFollowChange(
             targetUserId: targetUserId,
             isFollowing: true
         )
+
+        do {
+            try await supabase
+                .database("user_follows")
+                .upsert(
+                    [
+                        "follower_id": currentUserId.uuidString,
+                        "following_id": targetUserId.uuidString
+                    ],
+                    onConflict: "follower_id,following_id",
+                    ignoreDuplicates: true
+                )
+                .execute()
+        } catch {
+            restoreCachedSummary(previousSummary, for: targetUserId)
+            throw error
+        }
 
         ProfileSocialEvents.followingDidChange(
             targetUserID: targetUserId,
@@ -231,17 +237,23 @@ final class ProfileSocialService: ObservableObject {
         let currentUserId = try await AuthService.shared.requireAuthUserId()
         guard currentUserId != targetUserId else { return }
 
-        try await supabase
-            .database("user_follows")
-            .delete()
-            .eq("follower_id", value: currentUserId.uuidString)
-            .eq("following_id", value: targetUserId.uuidString)
-            .execute()
-
+        let previousSummary = summaries[targetUserId]
         applyCachedFollowChange(
             targetUserId: targetUserId,
             isFollowing: false
         )
+
+        do {
+            try await supabase
+                .database("user_follows")
+                .delete()
+                .eq("follower_id", value: currentUserId.uuidString)
+                .eq("following_id", value: targetUserId.uuidString)
+                .execute()
+        } catch {
+            restoreCachedSummary(previousSummary, for: targetUserId)
+            throw error
+        }
 
         ProfileSocialEvents.followingDidChange(
             targetUserID: targetUserId,
@@ -422,6 +434,17 @@ final class ProfileSocialService: ObservableObject {
         if let targetSummary = summaries[targetUserId] {
             summaries[targetUserId] = targetSummary
                 .applyingViewerFollowState(isFollowing)
+        }
+    }
+
+    private func restoreCachedSummary(
+        _ summary: ProfileSocialSummary?,
+        for targetUserId: UUID
+    ) {
+        if let summary {
+            summaries[targetUserId] = summary
+        } else {
+            summaries.removeValue(forKey: targetUserId)
         }
     }
 

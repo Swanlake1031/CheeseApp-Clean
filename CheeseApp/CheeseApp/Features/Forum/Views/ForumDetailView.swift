@@ -26,6 +26,7 @@ struct ForumDetailView: View {
     @State private var replyingToComment: ForumCommentItem?
     @State private var isLiking = false
     @State private var isTogglingFavorite = false
+    @State private var favoriteMutationGeneration = 0
     @State private var isSubmittingComment = false
     @State private var showingCommentComposer = false
     @State private var errorMessage: String?
@@ -40,6 +41,9 @@ struct ForumDetailView: View {
     @State private var isCommentFieldFocused = false
     @State private var collapsedRootCommentIds: Set<UUID> = []
     @State private var expandedRootCommentIds: Set<UUID> = []
+    @State private var likedCommentIds: Set<UUID> = []
+    @State private var commentLikeCountOverrides: [UUID: Int] = [:]
+    @State private var pendingCommentLikeIds: Set<UUID> = []
     @State private var suppressReplyTargetActivationForCurrentTap = false
     @State private var suppressOutsideComposerDismissForCurrentTap = false
     private let autoCollapseReplyThreshold = 3
@@ -47,7 +51,15 @@ struct ForumDetailView: View {
     private let initialCommentID: UUID?
 
     init(post: ForumPostItem, initialCommentID: UUID? = nil) {
-        _post = State(initialValue: post)
+        let entryInteraction = PostInteractionStore.shared.state(
+            for: post.id,
+            fallbackLikeCount: post.likes,
+            fallbackIsLiked: post.isLiked
+        )
+        var entryPost = post
+        entryPost.likes = entryInteraction.likeCount
+        entryPost.isLiked = entryInteraction.isLiked
+        _post = State(initialValue: entryPost)
         self.initialCommentID = initialCommentID
     }
 
@@ -89,10 +101,11 @@ struct ForumDetailView: View {
                     isRefreshing = false
                 }
                 .task(id: initialCommentID) {
-                    await service.recordView(postId: post.id)
+                    async let recordView: Void = service.recordView(postId: post.id)
                     async let favoriteState: Void = loadFavoriteState()
                     await reloadData()
                     await favoriteState
+                    await recordView
                     await scrollToInitialComment(using: proxy)
                 }
             }
@@ -359,7 +372,6 @@ struct ForumDetailView: View {
                     .frame(minWidth: 52, alignment: .leading)
                 }
                 .buttonStyle(.plain)
-                .disabled(isLiking)
 
                 HStack(spacing: 4) {
                     Image(systemName: "bubble.right")
@@ -395,8 +407,6 @@ struct ForumDetailView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .disabled(isTogglingFavorite)
-                .opacity(isTogglingFavorite ? 0.55 : 1)
                 .accessibilityLabel(
                     interaction.isFavorited
                         ? L10n.tr("Remove bookmark", "取消收藏")
@@ -443,10 +453,37 @@ struct ForumDetailView: View {
                 .frame(maxWidth: .infinity)
             case .loaded:
                 LazyVStack(spacing: 0) {
-                    ForEach(threadedComments) { node in
-                        let parentName = parentAuthorName(for: node.comment)
-                        commentRow(node.comment, parentAuthorName: parentName, depth: node.depth, rootId: node.rootId)
-                            .id(commentScrollId(for: node.comment.id))
+                    ForEach(commentThreads) { thread in
+                        let isCollapsed = shouldCollapseReplies(forRootId: thread.id)
+
+                        VStack(spacing: 0) {
+                            commentRow(
+                                thread.root,
+                                parentAuthorName: nil,
+                                depth: 0
+                            )
+                            .id(commentScrollId(for: thread.root.id))
+
+                            if !isCollapsed {
+                                ForEach(thread.replies) { reply in
+                                    commentRow(
+                                        reply,
+                                        parentAuthorName: parentAuthorName(for: reply),
+                                        depth: 1
+                                    )
+                                    .id(commentScrollId(for: reply.id))
+                                }
+                            }
+
+                            if !thread.replies.isEmpty {
+                                commentThreadToggle(
+                                    rootId: thread.id,
+                                    replyCount: thread.replies.count,
+                                    isCollapsed: isCollapsed
+                                )
+                            }
+                        }
+                        .padding(.bottom, 3)
                     }
                 }
             }
@@ -455,11 +492,10 @@ struct ForumDetailView: View {
         .id(commentSectionAnchorId)
     }
 
-    private struct ThreadedCommentNode: Identifiable {
-        let comment: ForumCommentItem
-        let depth: Int
-        let rootId: UUID
-        var id: UUID { comment.id }
+    private struct CommentThread: Identifiable {
+        let root: ForumCommentItem
+        let replies: [ForumCommentItem]
+        var id: UUID { root.id }
     }
 
     private var commentLookup: [UUID: ForumCommentItem] {
@@ -470,7 +506,7 @@ struct ForumDetailView: View {
         buildRootCommentIdMap(from: comments)
     }
 
-    private var threadedComments: [ThreadedCommentNode] {
+    private var commentThreads: [CommentThread] {
         let ordered = comments.sorted { $0.createdAt < $1.createdAt }
         guard !ordered.isEmpty else { return [] }
 
@@ -479,7 +515,7 @@ struct ForumDetailView: View {
         var rootOrder: [UUID] = []
         var seenRootIds: Set<UUID> = []
 
-        var result: [ThreadedCommentNode] = []
+        var result: [CommentThread] = []
         for comment in ordered {
             let rootId = rootMap[comment.id] ?? comment.id
             groupedByRoot[rootId, default: []].append(comment)
@@ -494,15 +530,8 @@ struct ForumDetailView: View {
                 continue
             }
 
-            result.append(ThreadedCommentNode(comment: rootComment, depth: 0, rootId: rootComment.id))
-
-            if shouldCollapseReplies(forRootId: rootComment.id, map: rootMap) {
-                continue
-            }
-
-            for reply in group where reply.id != rootComment.id {
-                result.append(ThreadedCommentNode(comment: reply, depth: 1, rootId: rootComment.id))
-            }
+            let replies = group.filter { $0.id != rootComment.id }
+            result.append(CommentThread(root: rootComment, replies: replies))
         }
 
         return result
@@ -550,102 +579,52 @@ struct ForumDetailView: View {
         return currentMap[commentId] ?? commentId
     }
 
-    private func commentRow(_ comment: ForumCommentItem, parentAuthorName: String?, depth: Int, rootId: UUID) -> some View {
-        let isParentComment = depth == 0
-        let replyCount = isParentComment ? descendantCount(forRootId: rootId) : 0
-        let isCollapsed = isParentComment ? shouldCollapseReplies(forRootId: rootId) : false
+    private func commentRow(_ comment: ForumCommentItem, parentAuthorName: String?, depth: Int) -> some View {
+        let isReply = depth > 0
+        let isLiked = likedCommentIds.contains(comment.id)
+        let likeCount = commentLikeCountOverrides[comment.id] ?? comment.likeCount
+
         return HStack(alignment: .top, spacing: 10) {
-            commentAuthorAvatar(comment)
+            commentAuthorAvatar(comment, size: isReply ? 28 : 34)
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     commentAuthorName(comment)
 
                     if comment.isAuthorMcMasterVerified {
                         McMasterStudentBadge()
                     }
-
-                    Spacer()
-
-                    if comment.likeCount > 0 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "heart.fill")
-                                .font(.system(size: 10))
-                            Text("\(comment.likeCount)")
-                                .font(.system(size: 11))
-                        }
-                        .foregroundStyle(AppColors.likeActive)
-                    }
-
-                    Menu {
-                        if canDeleteComment(comment) {
-                            Button(role: .destructive) {
-                                requestCommentDeletion(comment)
-                            } label: {
-                                Label(L10n.tr("Delete", "删除"), systemImage: "trash")
-                            }
-                        } else {
-                            Button(role: .destructive) {
-                                reportingComment = comment
-                            } label: {
-                                Label(L10n.tr("Report", "举报"), systemImage: "flag")
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(AppColors.textMuted)
-                            .frame(width: 28, height: 22)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .tint(AppColors.textMuted)
                 }
 
-                if let parentAuthorName, comment.parentId != nil {
-                    Button {
-                        focusParentComment(for: comment)
-                    } label: {
-                        Text("回复 \(parentAuthorName)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(AppColors.link)
+                Group {
+                    if let parentAuthorName, comment.parentId != nil {
+                        Text("回复 ")
+                            .foregroundColor(AppColors.textMuted)
+                        + Text("@\(parentAuthorName)：")
+                            .foregroundColor(AppColors.link)
+                        + Text(comment.content)
+                            .foregroundColor(AppColors.textPrimary)
+                    } else {
+                        Text(comment.content)
+                            .foregroundColor(AppColors.textPrimary)
                     }
-                    .buttonStyle(.plain)
                 }
-
-                Text(comment.content)
-                    .font(.system(size: 14))
-                    .foregroundStyle(AppColors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        beginReply(to: comment)
-                    }
+                .font(.system(size: 14))
+                .fixedSize(horizontal: false, vertical: true)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    beginReply(to: comment)
+                }
 
                 MentionedProfilesView(
                     postID: post.id,
                     commentID: comment.id
                 )
 
-                HStack(spacing: 10) {
+                HStack(spacing: 9) {
                     Text(comment.timeAgo)
                         .font(.system(size: 12))
                         .foregroundStyle(AppColors.textMuted)
-
-                    if isParentComment && replyCount > 0 {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                toggleRepliesCollapse(forRootId: rootId)
-                            }
-                        } label: {
-                            Text(isCollapsed ? "展开 \(replyCount) 则回复" : "收起 \(replyCount) 则回复")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(AppColors.link)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    Spacer()
 
                     Button {
                         beginReply(to: comment)
@@ -655,23 +634,96 @@ struct ForumDetailView: View {
                             .foregroundStyle(AppColors.textMuted)
                     }
                     .buttonStyle(.plain)
+
+                    Spacer(minLength: 12)
+
+                    Button {
+                        Task { await toggleCommentLike(comment) }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: isLiked ? "heart.fill" : "heart")
+                                .font(.system(size: 16, weight: .regular))
+                            if likeCount > 0 {
+                                Text("\(likeCount)")
+                                    .font(.system(size: 12))
+                            }
+                        }
+                        .foregroundStyle(isLiked ? AppColors.likeActive : AppColors.textMuted)
+                        .frame(minWidth: 32, minHeight: 28)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(pendingCommentLikeIds.contains(comment.id))
+                    .accessibilityLabel(isLiked ? L10n.tr("Unlike comment", "取消评论点赞") : L10n.tr("Like comment", "点赞评论"))
+
+                    commentActionsMenu(comment)
                 }
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, isReply ? 6 : 8)
         .contentShape(Rectangle())
-        .padding(.leading, depth == 0 ? 0 : 14)
+        .padding(.leading, isReply ? 42 : 0)
+    }
+
+    private func commentThreadToggle(rootId: UUID, replyCount: Int, isCollapsed: Bool) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                toggleRepliesCollapse(forRootId: rootId)
+            }
+        } label: {
+            HStack(spacing: 9) {
+                Capsule()
+                    .fill(AppColors.divider)
+                    .frame(width: 24, height: 1)
+
+                Text(isCollapsed ? "展开 \(replyCount) 则回复" : "收起回复")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(AppColors.textMuted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.leading, 44)
+        .padding(.top, 1)
+        .padding(.bottom, 5)
+    }
+
+    private func commentActionsMenu(_ comment: ForumCommentItem) -> some View {
+        Menu {
+            if canDeleteComment(comment) {
+                Button(role: .destructive) {
+                    requestCommentDeletion(comment)
+                } label: {
+                    Label(L10n.tr("Delete", "删除"), systemImage: "trash")
+                }
+            } else {
+                Button(role: .destructive) {
+                    reportingComment = comment
+                } label: {
+                    Label(L10n.tr("Report", "举报"), systemImage: "flag")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(AppColors.textMuted)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .tint(AppColors.textMuted)
     }
 
     @ViewBuilder
-    private func commentAuthorAvatar(_ comment: ForumCommentItem) -> some View {
+    private func commentAuthorAvatar(_ comment: ForumCommentItem, size: CGFloat) -> some View {
         if comment.isAnonymous {
-            commentAvatarView(comment)
+            commentAvatarView(comment, size: size)
         } else {
             NavigationLink {
                 UserPostsView(userId: comment.userId)
             } label: {
-                commentAvatarView(comment)
+                commentAvatarView(comment, size: size)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("查看 \(comment.authorName) 的个人资料")
@@ -700,7 +752,7 @@ struct ForumDetailView: View {
             .lineLimit(1)
     }
 
-    private func commentAvatarView(_ comment: ForumCommentItem) -> some View {
+    private func commentAvatarView(_ comment: ForumCommentItem, size: CGFloat) -> some View {
         Group {
             if comment.isAnonymous {
                 Circle()
@@ -722,7 +774,7 @@ struct ForumDetailView: View {
                 commentAvatarFallback(comment)
             }
         }
-        .frame(width: 30, height: 30)
+        .frame(width: size, height: size)
         .clipShape(Circle())
     }
 
@@ -757,31 +809,6 @@ struct ForumDetailView: View {
         expandedRootCommentIds.insert(rootId)
 
         replyingToComment = comment
-        presentCommentComposer()
-    }
-
-    private func focusParentComment(for comment: ForumCommentItem) {
-        markCurrentTapAsCommentInteraction(suppressOutsideDismiss: replyingToComment == nil)
-        guard !suppressReplyTargetActivationForCurrentTap else { return }
-        if replyingToComment != nil {
-            consumeTapToCancelActiveReply()
-            return
-        }
-
-        guard let parentId = comment.parentId else {
-            beginReply(to: comment)
-            return
-        }
-
-        guard let parentComment = commentLookup[parentId] else {
-            beginReply(to: comment)
-            return
-        }
-
-        let rootId = rootCommentId(for: parentId)
-        collapsedRootCommentIds.remove(rootId)
-        expandedRootCommentIds.insert(rootId)
-        replyingToComment = parentComment
         presentCommentComposer()
     }
 
@@ -857,16 +884,14 @@ struct ForumDetailView: View {
                     detailBottomAction(
                         icon: interaction.isLiked ? "heart.fill" : "heart",
                         count: interaction.likeCount,
-                        isActive: interaction.isLiked,
-                        isDisabled: isLiking
+                        isActive: interaction.isLiked
                     ) {
                         Task { await toggleLike() }
                     }
 
                     detailBottomAction(
                         icon: interaction.isFavorited ? "star.fill" : "star",
-                        isActive: interaction.isFavorited,
-                        isDisabled: isTogglingFavorite
+                        isActive: interaction.isFavorited
                     ) {
                         Task { await toggleFavorite() }
                     }
@@ -892,7 +917,6 @@ struct ForumDetailView: View {
         icon: String,
         count: Int? = nil,
         isActive: Bool = false,
-        isDisabled: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -914,8 +938,6 @@ struct ForumDetailView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(isDisabled)
-        .opacity(isDisabled ? 0.55 : 1)
         .accessibilityLabel(bottomActionAccessibilityLabel(for: icon))
     }
 
@@ -1116,8 +1138,13 @@ struct ForumDetailView: View {
             async let latestPostTask = service.fetchPost(postId: post.id)
             async let latestCommentsTask = service.fetchComments(postId: post.id)
             let (latestPost, latestComments) = try await (latestPostTask, latestCommentsTask)
+            let latestLikedCommentIds = await service.fetchLikedCommentIds(
+                commentIds: latestComments.map(\.id)
+            )
             post = mergedDetailPost(from: latestPost)
             comments = latestComments
+            likedCommentIds = latestLikedCommentIds
+            commentLikeCountOverrides.removeAll()
             commentLoadState = comments.isEmpty ? .empty : .loaded
             let validRootIds = Set(buildRootCommentIdMap(from: comments).values)
             collapsedRootCommentIds = collapsedRootCommentIds.intersection(validRootIds)
@@ -1164,6 +1191,10 @@ struct ForumDetailView: View {
         let previousLikes = previous.likeCount
         let optimisticLiked = !previousLiked
         let optimisticLikes = max(previousLikes + (optimisticLiked ? 1 : -1), 0)
+        guard interactionStore.beginLikeMutation(
+            postID: post.id,
+            desiredIsLiked: optimisticLiked
+        ) else { return }
         interactionStore.replace(
             postID: post.id,
             with: PostInteractionState(
@@ -1192,9 +1223,17 @@ struct ForumDetailView: View {
                 confirmed.likeCount = max(previousLikes + (committedLiked ? 1 : -1), 0)
             }
             interactionStore.replace(postID: post.id, with: confirmed)
+            interactionStore.finishLikeMutation(
+                postID: post.id,
+                committedIsLiked: committedLiked
+            )
             errorMessage = nil
         } catch {
             interactionStore.replace(postID: post.id, with: previous)
+            interactionStore.finishLikeMutation(
+                postID: post.id,
+                committedIsLiked: nil
+            )
             if isCancellation(error) { return }
             errorMessage = error.localizedDescription
         }
@@ -1202,14 +1241,17 @@ struct ForumDetailView: View {
 
     @MainActor
     private func loadFavoriteState() async {
+        let generationAtRequestStart = favoriteMutationGeneration
         let favoriteState = await service.isFavorite(postId: post.id)
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled,
+              generationAtRequestStart == favoriteMutationGeneration else { return }
         interactionStore.setFavorite(postID: post.id, isFavorited: favoriteState)
     }
 
     @MainActor
     private func toggleFavorite() async {
         guard !isTogglingFavorite else { return }
+        favoriteMutationGeneration += 1
         isTogglingFavorite = true
         defer { isTogglingFavorite = false }
 
@@ -1311,6 +1353,54 @@ struct ForumDetailView: View {
             await reloadData()
             errorMessage = nil
         } catch {
+            if isCancellation(error) { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func toggleCommentLike(_ comment: ForumCommentItem) async {
+        guard !pendingCommentLikeIds.contains(comment.id) else { return }
+
+        let wasLiked = likedCommentIds.contains(comment.id)
+        let previousCount = commentLikeCountOverrides[comment.id] ?? comment.likeCount
+        let optimisticLiked = !wasLiked
+        let optimisticCount = max(previousCount + (optimisticLiked ? 1 : -1), 0)
+
+        pendingCommentLikeIds.insert(comment.id)
+        if optimisticLiked {
+            likedCommentIds.insert(comment.id)
+        } else {
+            likedCommentIds.remove(comment.id)
+        }
+        commentLikeCountOverrides[comment.id] = optimisticCount
+
+        defer { pendingCommentLikeIds.remove(comment.id) }
+
+        do {
+            let committedLiked = try await service.toggleCommentLike(
+                commentId: comment.id,
+                currentlyLiked: wasLiked
+            )
+            if committedLiked != optimisticLiked {
+                if committedLiked {
+                    likedCommentIds.insert(comment.id)
+                } else {
+                    likedCommentIds.remove(comment.id)
+                }
+                commentLikeCountOverrides[comment.id] = max(
+                    previousCount + (committedLiked ? 1 : -1),
+                    0
+                )
+            }
+            errorMessage = nil
+        } catch {
+            if wasLiked {
+                likedCommentIds.insert(comment.id)
+            } else {
+                likedCommentIds.remove(comment.id)
+            }
+            commentLikeCountOverrides[comment.id] = previousCount
             if isCancellation(error) { return }
             errorMessage = error.localizedDescription
         }

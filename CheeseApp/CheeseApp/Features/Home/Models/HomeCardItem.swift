@@ -66,6 +66,7 @@ struct HomeCardItem: Identifiable {
     let postId: UUID?               // 关联真实帖子 ID
     let authorId: UUID?             // 关联作者 ID
     let image: ImageSource          // 卡片顶部图片
+    let images: [ImageSource]       // 信息流紧凑图组（保留 image 兼容旧调用）
     let title: String               // 主标题
     let subtitle: String            // 副标题
     let footer: CardFooterStyle     // 底部样式
@@ -76,6 +77,7 @@ struct HomeCardItem: Identifiable {
     let boardID: UUID?              // 论坛板块稳定 ID（用于直接进入板块）
     let boardIcon: String?          // 论坛板块图标
     let timeText: String?           // 发布时间
+    let createdAt: Date?            // 真实发布时间（分类页稳定排序）
     let priceText: String?          // 价格正文（不作为 tag）
     let originalPriceText: String?  // 二手原价（划线展示）
     let likeCount: Int
@@ -96,6 +98,7 @@ struct HomeCardItem: Identifiable {
         postId: UUID? = nil,
         authorId: UUID? = nil,
         image: ImageSource = .placeholder,
+        images: [ImageSource] = [],
         title: String,
         subtitle: String,
         footer: CardFooterStyle = .none,
@@ -106,6 +109,7 @@ struct HomeCardItem: Identifiable {
         boardID: UUID? = nil,
         boardIcon: String? = nil,
         timeText: String? = nil,
+        createdAt: Date? = nil,
         priceText: String? = nil,
         originalPriceText: String? = nil,
         likeCount: Int = 0,
@@ -124,6 +128,9 @@ struct HomeCardItem: Identifiable {
         self.postId = postId
         self.authorId = authorId
         self.image = image
+        self.images = images.isEmpty
+            ? (image.isPlaceholder ? [] : [image])
+            : images
         self.title = title
         self.subtitle = subtitle
         self.footer = footer
@@ -134,6 +141,7 @@ struct HomeCardItem: Identifiable {
         self.boardID = boardID
         self.boardIcon = boardIcon
         self.timeText = timeText
+        self.createdAt = createdAt
         self.priceText = priceText
         self.originalPriceText = originalPriceText
         self.likeCount = max(likeCount, 0)

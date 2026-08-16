@@ -220,6 +220,20 @@ private final class CheeseTabBarVisibilityHostViewController: UIViewController {
         updateVisibility()
     }
 
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+
+        // Release as soon as UIKit starts the pop transition. Waiting for
+        // viewDidDisappear means an interactive edge swipe has already
+        // completed before MainTabView is allowed to restore its tab bar, so
+        // the bar visibly trails the returning page. If the interactive pop
+        // is cancelled UIKit sends this controller through viewWillAppear /
+        // viewDidAppear again, which restores this token and keeps the detail
+        // screen hidden as expected.
+        isParticipatingInAppearance = false
+        releaseVisibility()
+    }
+
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         isParticipatingInAppearance = false

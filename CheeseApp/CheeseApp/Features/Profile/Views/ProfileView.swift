@@ -48,8 +48,8 @@ struct ProfileView: View {
 
             GeometryReader { contentProxy in
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        // 用户信息卡片
+                    VStack(spacing: 0) {
+                        // 用户资料使用与首页信息流一致的无框内容面。
                         userInfoCard
 
                         // 分页至少铺满一个完整可视区，避免内容较少时
@@ -239,11 +239,12 @@ struct ProfileView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(16)
+        .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 20)
+        .overlay(alignment: .bottom) {
+            Divider()
+                .overlay(AppColors.divider)
+        }
     }
 
     private func profileDetailRow(icon: String, text: String, lineLimit: Int = 1) -> some View {

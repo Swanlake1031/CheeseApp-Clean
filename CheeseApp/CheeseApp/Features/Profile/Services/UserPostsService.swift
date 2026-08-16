@@ -340,6 +340,13 @@ final class UserPostsService: ObservableObject {
                 newImages: payload.newImages
             )
         }
+
+        if let index = posts.firstIndex(where: { $0.id == payload.id }) {
+            posts[index] = posts[index].applying(payload)
+            if let loadedUserId {
+                syncCache(userId: loadedUserId)
+            }
+        }
     }
 
     func delete(postId: UUID) async throws {

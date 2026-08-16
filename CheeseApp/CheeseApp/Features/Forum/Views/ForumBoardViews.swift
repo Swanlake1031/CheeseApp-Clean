@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Board descriptions live directly in `ForumListView` when a channel is selected.
-/// Rules remain a small sheet instead of introducing another board-detail page.
+/// Independent board pages show the short description inline. The full rules
+/// remain a small sheet so opening them does not create another navigation layer.
 struct ForumBoardRulesSheet: View {
     let board: ForumBoard
 

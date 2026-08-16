@@ -405,7 +405,17 @@ struct EditPostSheet: View {
             switch post.kind {
             case .secondhand:
                 let details = try await SecondhandService.shared.fetchEditFields(postId: post.id)
-                secondhandCategory = details.category
+                guard let loadedCategory = details.category else {
+                    throw NSError(
+                        domain: "SecondhandEditing",
+                        code: 422,
+                        userInfo: [NSLocalizedDescriptionKey: L10n.tr(
+                            "This listing's category could not be loaded. Please try again.",
+                            "无法加载该商品分类，请重试。"
+                        )]
+                    )
+                }
+                secondhandCategory = loadedCategory
                 originalPriceText = details.originalPrice.map {
                     Formatters.formatCompactNumber($0)
                 } ?? ""

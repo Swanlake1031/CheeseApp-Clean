@@ -1092,6 +1092,60 @@ class ForumService: ObservableObject {
         return mapped
     }
 
+    func fetchLikedCommentIds(commentIds: [UUID]) async -> Set<UUID> {
+        guard !commentIds.isEmpty,
+              let userId = try? await AuthService.shared.requireAuthUserId()
+        else { return [] }
+
+        do {
+            let ids = commentIds.map { $0 as any PostgrestFilterValue }
+            let rows: [DBCommentLikeTargetRow] = try await supabase
+                .database("likes")
+                .select("target_id")
+                .eq("user_id", value: userId.uuidString)
+                .eq("target_type", value: "comment")
+                .`in`("target_id", values: ids)
+                .execute()
+                .value
+            return Set(rows.map(\.targetId))
+        } catch {
+            return []
+        }
+    }
+
+    func toggleCommentLike(commentId: UUID, currentlyLiked: Bool) async throws -> Bool {
+        let userId = try await AuthService.shared.requireAuthUserId()
+
+        if currentlyLiked {
+            try await supabase
+                .database("likes")
+                .delete()
+                .eq("user_id", value: userId.uuidString)
+                .eq("target_type", value: "comment")
+                .eq("target_id", value: commentId.uuidString)
+                .execute()
+            return false
+        }
+
+        do {
+            try await supabase
+                .database("likes")
+                .insert(DBCommentLikeInsert(
+                    userId: userId,
+                    targetType: "comment",
+                    targetId: commentId
+                ))
+                .execute()
+            return true
+        } catch {
+            let message = error.localizedDescription.lowercased()
+            if message.contains("duplicate key") || message.contains("unique") {
+                return true
+            }
+            throw error
+        }
+    }
+
     // MARK: - 点赞 / 取消点赞
     func toggleLike(postId: UUID, currentlyLiked: Bool) async throws -> Bool {
         let newLiked = try await PostReactionService.shared.toggle(postId: postId, currentlyLiked: currentlyLiked)
@@ -1237,7 +1291,7 @@ class ForumService: ObservableObject {
     }
 
     private func seedInteractionStates(_ items: [ForumPostItem]) {
-        PostInteractionStore.shared.merge(
+        PostInteractionStore.shared.mergeServerSnapshots(
             items.map {
                 PostInteractionStore.Update(
                     postID: $0.id,
@@ -1442,6 +1496,26 @@ struct DBCommentRow: Codable, Identifiable {
         case isAnonymous = "is_anonymous"
         case likeCount = "like_count"
         case createdAt = "created_at"
+    }
+}
+
+private struct DBCommentLikeTargetRow: Decodable {
+    let targetId: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case targetId = "target_id"
+    }
+}
+
+private struct DBCommentLikeInsert: Encodable {
+    let userId: UUID
+    let targetType: String
+    let targetId: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case targetType = "target_type"
+        case targetId = "target_id"
     }
 }
 

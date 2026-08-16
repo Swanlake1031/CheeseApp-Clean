@@ -66,6 +66,8 @@ final class PostInteractionStore: ObservableObject {
 
     private var states: [UUID: StoredState] = [:]
     private var ownerID: UUID?
+    private var pendingLikePostIDs: Set<UUID> = []
+    private var protectedLikeStates: [UUID: Bool] = [:]
 
     private init() {}
 
@@ -73,7 +75,29 @@ final class PostInteractionStore: ObservableObject {
         guard ownerID != userID else { return }
         ownerID = userID
         states.removeAll()
+        pendingLikePostIDs.removeAll()
+        protectedLikeStates.removeAll()
         revision &+= 1
+    }
+
+    /// Reserves a post-wide like mutation and protects its optimistic value from
+    /// older list/detail requests that may complete while the mutation is running.
+    func beginLikeMutation(postID: UUID, desiredIsLiked: Bool) -> Bool {
+        guard pendingLikePostIDs.insert(postID).inserted else { return false }
+        protectedLikeStates[postID] = desiredIsLiked
+        return true
+    }
+
+    /// A successful value remains protected until an authoritative snapshot
+    /// observes the same value. This prevents a request that started before the
+    /// mutation from reverting the heart after the request has completed.
+    func finishLikeMutation(postID: UUID, committedIsLiked: Bool?) {
+        pendingLikePostIDs.remove(postID)
+        if let committedIsLiked {
+            protectedLikeStates[postID] = committedIsLiked
+        } else {
+            protectedLikeStates.removeValue(forKey: postID)
+        }
     }
 
     func state(
@@ -114,6 +138,44 @@ final class PostInteractionStore: ObservableObject {
             let updated = StoredState(
                 likeCount: update.likeCount ?? previous.likeCount,
                 isLiked: update.isLiked ?? previous.isLiked,
+                isFavorited: update.isFavorited ?? previous.isFavorited
+            )
+            guard updated != previous else { continue }
+            states[update.postID] = updated
+            didChange = true
+        }
+        if didChange {
+            revision &+= 1
+        }
+    }
+
+    /// Merges server-owned snapshots without allowing an older response to
+    /// overwrite an optimistic or newly committed like mutation.
+    func mergeServerSnapshots(_ updates: [Update]) {
+        var didChange = false
+        for update in updates {
+            let previous = states[update.postID] ?? StoredState()
+            var nextLikeCount = update.likeCount ?? previous.likeCount
+            var nextIsLiked = update.isLiked ?? previous.isLiked
+
+            if let protectedIsLiked = protectedLikeStates[update.postID] {
+                if let snapshotIsLiked = update.isLiked,
+                   snapshotIsLiked == protectedIsLiked {
+                    // A matching snapshot is authoritative only after the write
+                    // itself has completed. While it is still pending, keep the
+                    // guard in place for any older request that may arrive next.
+                    if !pendingLikePostIDs.contains(update.postID) {
+                        protectedLikeStates.removeValue(forKey: update.postID)
+                    }
+                } else {
+                    nextLikeCount = previous.likeCount
+                    nextIsLiked = previous.isLiked
+                }
+            }
+
+            let updated = StoredState(
+                likeCount: nextLikeCount,
+                isLiked: nextIsLiked,
                 isFavorited: update.isFavorited ?? previous.isFavorited
             )
             guard updated != previous else { continue }

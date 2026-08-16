@@ -491,7 +491,7 @@ struct SearchView: View {
         case .secondhand:
             SecondhandListView()
         case .forum:
-            ForumListView()
+            ForumSearchView(initialBoard: nil)
         }
     }
 

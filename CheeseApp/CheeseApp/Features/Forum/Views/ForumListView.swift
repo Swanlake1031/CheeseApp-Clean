@@ -2,12 +2,12 @@
 //  ForumListView.swift
 //  CheeseApp
 //
-//  Aggregate Forum feed with reusable board navigation.
+//  Independent Forum board page.
 //
 
 import SwiftUI
 
-struct ForumListView: View {
+struct ForumBoardView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
     @StateObject private var service = ForumService.shared
@@ -15,7 +15,9 @@ struct ForumListView: View {
 
     @State private var showingCreatePost = false
     @State private var showingSearch = false
-    @State private var selectedFeedBoardID: UUID?
+    private let boardID: UUID
+
+    @State private var selectedSort: ForumPostSort = .hottest
     @State private var selectedPost: ForumPostItem?
     @State private var editingPost: UserPostSummary?
     @State private var sharingPost: PostSharePayload?
@@ -24,8 +26,8 @@ struct ForumListView: View {
     @State private var hasLoadedInitialData = false
     @State private var feedReloadGeneration = 0
 
-    init(initialBoardID: UUID? = nil) {
-        _selectedFeedBoardID = State(initialValue: initialBoardID)
+    init(boardID: UUID) {
+        self.boardID = boardID
     }
 
     var body: some View {
@@ -36,10 +38,10 @@ struct ForumListView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showingCreatePost) {
-            CreateForumView(initialBoard: selectedFeedBoard)
+            CreateForumView(initialBoard: selectedBoard)
         }
         .navigationDestination(isPresented: $showingSearch) {
-            ForumSearchView(initialBoard: selectedFeedBoard)
+            ForumSearchView(initialBoard: selectedBoard)
         }
         .navigationDestination(item: $selectedPost) { post in
             ForumDetailView(post: post)
@@ -77,30 +79,23 @@ struct ForumListView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
 
-            ExpandableCategoryPicker(
-                selection: selectedBoardBinding,
-                options: visibleBoards,
-                recommendedTitle: L10n.tr("Recommended", "推荐"),
-                accessibilityTitle: L10n.tr("Forum categories", "论坛分区"),
-                title: { $0.name },
-                icon: { $0.icon }
-            )
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
-
-            ForumChannelPageView(
-                board: selectedFeedBoard,
-                boardID: selectedFeedBoardID,
-                accountGeneration: service.accountGeneration,
-                reloadGeneration: feedReloadGeneration,
-                currentUserID: authService.currentUser?.id,
-                onOpen: { selectedPost = $0 },
-                onEdit: { editingPost = $0.editableSummary },
-                onShare: { sharingPost = $0.sharePayload },
-                onOpenBoard: { openBoard($0) },
-                onOpenRules: { rulesBoard = $0 }
-            )
-            .id(selectedFeedBoardID)
+            if let board = selectedBoard {
+                ForumChannelPageView(
+                    board: board,
+                    sort: $selectedSort,
+                    accountGeneration: service.accountGeneration,
+                    reloadGeneration: feedReloadGeneration,
+                    currentUserID: authService.currentUser?.id,
+                    onOpen: { selectedPost = $0 },
+                    onEdit: { editingPost = $0.editableSummary },
+                    onShare: { sharingPost = $0.sharePayload },
+                    onOpenRules: { rulesBoard = $0 }
+                )
+                .id(board.id)
+            } else {
+                ProgressView(L10n.tr("Loading board…", "正在载入板块…"))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .overlay(alignment: .bottomTrailing) {
             Button {
@@ -116,7 +111,10 @@ struct ForumListView: View {
             }
             .buttonStyle(.plain)
             .padding(.trailing, 20)
-            .padding(.bottom, CheeseTabBarLayout.contentBottomClearance)
+            .padding(
+                .bottom,
+                CheeseTabBarLayout.contentBottomClearance - 16
+            )
             .accessibilityLabel(L10n.tr("Create Forum post", "发布论坛帖子"))
         }
     }
@@ -128,8 +126,6 @@ struct ForumListView: View {
             }
             .buttonStyle(.plain)
 
-            Text(L10n.tr("Forum", "论坛"))
-                .font(.system(size: 25, weight: .bold))
             Spacer()
 
             Button(action: { showingSearch = true }) {
@@ -140,114 +136,94 @@ struct ForumListView: View {
         .padding(.vertical, 6)
     }
 
-    private var visibleBoards: [ForumBoard] {
-        service.boards.filter { $0.status != .archived }
-    }
-
-    private var selectedFeedBoard: ForumBoard? {
-        visibleBoards.first { $0.id == selectedFeedBoardID }
-    }
-
-    private var selectedBoardBinding: Binding<ForumBoard?> {
-        Binding(
-            get: { selectedFeedBoard },
-            set: { selectFeedBoard($0?.id) }
-        )
-    }
-
-    private func selectFeedBoard(_ boardID: UUID?) {
-        guard selectedFeedBoardID != boardID else { return }
-        withAnimation(.easeInOut(duration: 0.24)) {
-            selectedFeedBoardID = boardID
+    private var selectedBoard: ForumBoard? {
+        service.boards.first {
+            $0.id == boardID && $0.status != .archived
         }
     }
 
     private func refreshContent() async {
         await service.fetchBoards()
 
-        if let selectedFeedBoardID,
-           !visibleBoards.contains(where: { $0.id == selectedFeedBoardID }) {
-            self.selectedFeedBoardID = nil
-        }
         feedReloadGeneration &+= 1
-    }
-
-    private func openBoard(_ boardID: UUID) {
-        guard visibleBoards.contains(where: { $0.id == boardID }) else { return }
-        selectFeedBoard(boardID)
     }
 
 }
 
 private struct ForumChannelPageView: View {
-    let board: ForumBoard?
+    let board: ForumBoard
+    @Binding var sort: ForumPostSort
     let accountGeneration: UInt64
     let reloadGeneration: Int
     let currentUserID: UUID?
     let onOpen: (ForumPostItem) -> Void
     let onEdit: (ForumPostItem) -> Void
     let onShare: (ForumPostItem) -> Void
-    let onOpenBoard: (UUID) -> Void
     let onOpenRules: (ForumBoard) -> Void
 
     @StateObject private var model: ForumChannelFeedModel
     @State private var likingPostIDs: Set<UUID> = []
+    @State private var favoritingPostIDs: Set<UUID> = []
     @State private var appliedReloadGeneration = 0
 
     init(
-        board: ForumBoard?,
-        boardID: UUID? = nil,
+        board: ForumBoard,
+        sort: Binding<ForumPostSort>,
         accountGeneration: UInt64,
         reloadGeneration: Int,
         currentUserID: UUID?,
         onOpen: @escaping (ForumPostItem) -> Void,
         onEdit: @escaping (ForumPostItem) -> Void,
         onShare: @escaping (ForumPostItem) -> Void,
-        onOpenBoard: @escaping (UUID) -> Void,
         onOpenRules: @escaping (ForumBoard) -> Void
     ) {
         self.board = board
+        self._sort = sort
         self.accountGeneration = accountGeneration
         self.reloadGeneration = reloadGeneration
         self.currentUserID = currentUserID
         self.onOpen = onOpen
         self.onEdit = onEdit
         self.onShare = onShare
-        self.onOpenBoard = onOpenBoard
         self.onOpenRules = onOpenRules
         _model = StateObject(
-            wrappedValue: ForumChannelFeedModel(boardID: boardID ?? board?.id)
+            wrappedValue: ForumChannelFeedModel(boardID: board.id)
         )
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 0) {
-                if let board {
-                    ForumBoardIntroductionCard(
-                        board: board,
-                        onRulesTap: { onOpenRules(board) }
-                    )
-                }
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                ForumBoardIntroductionCard(
+                    board: board,
+                    onRulesTap: { onOpenRules(board) }
+                )
 
-                feedContent
-
-                if model.hasMore {
-                    paginationFooter
-                }
-
-                Spacer(minLength: 100)
+                ForumBoardSortPicker(selection: $sort)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 10)
+
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: 0) {
+                    feedContent
+
+                    if model.hasMore {
+                        paginationFooter
+                    }
+
+                    Spacer(minLength: 100)
+                }
+                .padding(.horizontal, 16)
+            }
+            .refreshable {
+                await model.load(
+                    generation: accountGeneration,
+                    sort: sort,
+                    force: true
+                )
+            }
         }
         .background(AppColors.pageBackground)
-        .refreshable {
-            await model.load(
-                generation: accountGeneration,
-                force: true
-            )
-        }
         .task(id: loadTaskID) {
             let shouldForce = reloadGeneration > appliedReloadGeneration
             appliedReloadGeneration = max(
@@ -256,6 +232,7 @@ private struct ForumChannelPageView: View {
             )
             await model.load(
                 generation: accountGeneration,
+                sort: sort,
                 force: shouldForce
             )
         }
@@ -274,6 +251,7 @@ private struct ForumChannelPageView: View {
                 Task {
                     await model.load(
                         generation: accountGeneration,
+                        sort: sort,
                         force: true
                     )
                 }
@@ -284,11 +262,13 @@ private struct ForumChannelPageView: View {
                 ForumPostCardView(
                     post: post,
                     isOwnPost: currentUserID == post.authorId,
+                    headerStyle: .author,
                     onTap: { onOpen(post) },
                     onLikeTap: { await toggleLike(for: post) },
+                    onFavoriteTap: { await toggleFavorite(for: post) },
                     onEditTap: { onEdit(post) },
                     onShareTap: { onShare(post) },
-                    onBoardTap: { onOpenBoard(post.boardID) }
+                    onBoardTap: nil
                 )
             }
         }
@@ -302,7 +282,8 @@ private struct ForumChannelPageView: View {
             Button(message) {
                 Task {
                     await model.loadNextPage(
-                        generation: accountGeneration
+                        generation: accountGeneration,
+                        sort: sort
                     )
                 }
             }
@@ -312,7 +293,8 @@ private struct ForumChannelPageView: View {
                 .onAppear {
                     Task {
                         await model.loadNextPage(
-                            generation: accountGeneration
+                            generation: accountGeneration,
+                            sort: sort
                         )
                     }
                 }
@@ -340,7 +322,7 @@ private struct ForumChannelPageView: View {
     }
 
     private var loadTaskID: String {
-        "\(accountGeneration):\(reloadGeneration)"
+        "\(accountGeneration):\(reloadGeneration):\(sort.rawValue)"
     }
 
     @MainActor
@@ -348,19 +330,66 @@ private struct ForumChannelPageView: View {
         guard likingPostIDs.insert(post.id).inserted else { return }
         defer { likingPostIDs.remove(post.id) }
 
-        do {
-            let interaction = PostInteractionStore.shared.state(
-                for: post.id,
-                fallbackLikeCount: post.likes,
-                fallbackIsLiked: post.isLiked
+        let store = PostInteractionStore.shared
+        let previous = store.state(
+            for: post.id,
+            fallbackLikeCount: post.likes,
+            fallbackIsLiked: post.isLiked
+        )
+        let optimisticLiked = !previous.isLiked
+        guard store.beginLikeMutation(
+            postID: post.id,
+            desiredIsLiked: optimisticLiked
+        ) else { return }
+        store.replace(
+            postID: post.id,
+            with: PostInteractionState(
+                likeCount: max(previous.likeCount + (optimisticLiked ? 1 : -1), 0),
+                isLiked: optimisticLiked,
+                isFavorited: previous.isFavorited
             )
+        )
+
+        do {
             let isLiked = try await ForumService.shared.toggleLike(
                 postId: post.id,
-                currentlyLiked: interaction.isLiked
+                currentlyLiked: previous.isLiked
             )
             model.applyLike(postID: post.id, isLiked: isLiked)
+            store.finishLikeMutation(
+                postID: post.id,
+                committedIsLiked: isLiked
+            )
         } catch {
-            // The card stays on its last confirmed state when the request fails.
+            store.replace(postID: post.id, with: previous)
+            store.finishLikeMutation(
+                postID: post.id,
+                committedIsLiked: nil
+            )
+        }
+    }
+
+    @MainActor
+    private func toggleFavorite(for post: ForumPostItem) async {
+        guard favoritingPostIDs.insert(post.id).inserted else { return }
+        defer { favoritingPostIDs.remove(post.id) }
+
+        let store = PostInteractionStore.shared
+        let previous = store.state(
+            for: post.id,
+            fallbackLikeCount: post.likes,
+            fallbackIsLiked: post.isLiked
+        )
+        store.setFavorite(postID: post.id, isFavorited: !previous.isFavorited)
+
+        do {
+            let confirmed = try await ForumService.shared.toggleFavorite(
+                postId: post.id,
+                currentlyFavorited: previous.isFavorited
+            )
+            store.setFavorite(postID: post.id, isFavorited: confirmed)
+        } catch {
+            store.replace(postID: post.id, with: previous)
         }
     }
 }
@@ -419,6 +448,64 @@ private struct ForumBoardIntroductionCard: View {
     }
 }
 
+private struct ForumBoardSortPicker: View {
+    @Binding var selection: ForumPostSort
+
+    private let options: [ForumPostSort] = [.hottest, .latest]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(options) { option in
+                Button {
+                    guard selection != option else { return }
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        selection = option
+                    }
+                } label: {
+                    VStack(spacing: 8) {
+                        Text(title(for: option))
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(
+                                selection == option
+                                    ? AppColors.textPrimary
+                                    : AppColors.textMuted
+                            )
+
+                        Capsule()
+                            .fill(
+                                selection == option
+                                    ? AppColors.accentStrong
+                                    : Color.clear
+                            )
+                            .frame(height: 3)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 14)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(
+                    selection == option ? .isSelected : []
+                )
+            }
+        }
+        .overlay(alignment: .bottom) {
+            Divider().overlay(AppColors.divider)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L10n.tr("Post sorting", "帖子排序"))
+    }
+
+    private func title(for option: ForumPostSort) -> String {
+        switch option {
+        case .hottest:
+            return L10n.tr("Popular", "热门")
+        case .latest:
+            return L10n.tr("Latest", "最新")
+        }
+    }
+}
+
 @MainActor
 private final class ForumChannelFeedModel: ObservableObject {
     @Published private(set) var posts: [ForumPostItem] = []
@@ -429,14 +516,15 @@ private final class ForumChannelFeedModel: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var pageErrorMessage: String?
 
-    let boardID: UUID?
+    let boardID: UUID
 
     private let service = ForumService.shared
     private var cursor: ForumPostPageCursor?
     private var latestRequestID: UUID?
     private var stateGeneration: UInt64?
+    private var loadedSort: ForumPostSort?
 
-    init(boardID: UUID?) {
+    init(boardID: UUID) {
         self.boardID = boardID
     }
 
@@ -449,12 +537,18 @@ private final class ForumChannelFeedModel: ObservableObject {
         )
     }
 
-    func load(generation: UInt64, force: Bool = false) async {
+    func load(
+        generation: UInt64,
+        sort: ForumPostSort,
+        force: Bool = false
+    ) async {
         guard service.isCurrentAccountRequest(generation: generation) else {
             return
         }
         resetIfAccountChanged(generation: generation)
-        guard force || !hasResolvedInitialLoad else { return }
+        guard force || loadedSort != sort || !hasResolvedInitialLoad else {
+            return
+        }
 
         let requestID = UUID()
         latestRequestID = requestID
@@ -475,18 +569,23 @@ private final class ForumChannelFeedModel: ObservableObject {
         do {
             let page = try await service.fetchPostPage(
                 boardID: boardID,
-                sort: .latest,
+                sort: sort,
                 after: nil
             )
+            let favoritePostIDs = await PostFavoriteService.shared
+                .fetchFavoritePostIds(postIds: page.items.map(\.id))
             guard latestRequestID == requestID,
                   service.isCurrentAccountRequest(generation: generation)
             else { return }
 
-            posts = boardID == nil
-                ? ForumService.spreadingBoards(in: page.items)
-                : page.items
+            mergeInteractionState(
+                for: page.items,
+                favoritePostIDs: favoritePostIDs
+            )
+            posts = page.items
             cursor = page.cursor
             hasMore = page.hasMore
+            loadedSort = sort
             hasResolvedInitialLoad = true
         } catch {
             guard latestRequestID == requestID,
@@ -502,12 +601,16 @@ private final class ForumChannelFeedModel: ObservableObject {
         }
     }
 
-    func loadNextPage(generation: UInt64) async {
+    func loadNextPage(
+        generation: UInt64,
+        sort: ForumPostSort
+    ) async {
         resetIfAccountChanged(generation: generation)
         guard hasResolvedInitialLoad,
               hasMore,
               !isLoading,
               !isLoadingNextPage,
+              loadedSort == sort,
               service.isCurrentAccountRequest(generation: generation)
         else { return }
 
@@ -524,7 +627,7 @@ private final class ForumChannelFeedModel: ObservableObject {
         do {
             let page = try await service.fetchPostPage(
                 boardID: boardID,
-                sort: .latest,
+                sort: sort,
                 after: cursor
             )
             guard latestRequestID == expectedRequestID,
@@ -533,10 +636,17 @@ private final class ForumChannelFeedModel: ObservableObject {
 
             let existingIDs = Set(posts.map(\.id))
             let newPosts = page.items.filter { !existingIDs.contains($0.id) }
-            posts.append(contentsOf: boardID == nil
-                ? ForumService.spreadingBoards(in: newPosts)
-                : newPosts
+            let favoritePostIDs = await PostFavoriteService.shared
+                .fetchFavoritePostIds(postIds: newPosts.map(\.id))
+            guard latestRequestID == expectedRequestID,
+                  service.isCurrentAccountRequest(generation: generation)
+            else { return }
+
+            mergeInteractionState(
+                for: newPosts,
+                favoritePostIDs: favoritePostIDs
             )
+            posts.append(contentsOf: newPosts)
             cursor = page.cursor ?? cursor
             hasMore = page.hasMore
         } catch {
@@ -565,9 +675,26 @@ private final class ForumChannelFeedModel: ObservableObject {
         )
     }
 
+    private func mergeInteractionState(
+        for posts: [ForumPostItem],
+        favoritePostIDs: Set<UUID>
+    ) {
+        PostInteractionStore.shared.mergeServerSnapshots(
+            posts.map { post in
+                PostInteractionStore.Update(
+                    postID: post.id,
+                    likeCount: post.likes,
+                    isLiked: post.isLiked,
+                    isFavorited: favoritePostIDs.contains(post.id)
+                )
+            }
+        )
+    }
+
     private func resetIfAccountChanged(generation: UInt64) {
         guard stateGeneration != generation else { return }
         stateGeneration = generation
+        loadedSort = nil
         latestRequestID = nil
         cursor = nil
         posts = []

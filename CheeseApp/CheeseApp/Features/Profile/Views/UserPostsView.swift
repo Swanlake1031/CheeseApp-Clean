@@ -201,7 +201,6 @@ struct UserPostsView: View {
             .navigationDestination(item: $editingPost) { post in
                 EditPostSheet(post: post) { payload in
                     try await service.update(payload: payload)
-                    await service.refreshPosts(userId: userId)
                 }
             }
             .sheet(item: $reportingPost) { post in
@@ -290,7 +289,7 @@ struct UserPostsView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 40)
         } else {
-            VStack(spacing: 14) {
+            VStack(spacing: 0) {
                 profileHeader
                 if isCurrentUser {
                     NavigationLink(destination: PrivateContentView()) {
@@ -305,14 +304,16 @@ struct UserPostsView: View {
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(AppColors.textMuted)
                         }
-                        .padding(14)
-                        .background(AppColors.cardBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .cheeseCardChrome(cornerRadius: 14)
+                        .padding(.vertical, 14)
+                        .overlay(alignment: .bottom) {
+                            Divider()
+                                .overlay(AppColors.divider)
+                        }
                     }
                     .buttonStyle(.plain)
                 }
                 categoryFilterBar
+                    .padding(.top, isCurrentUser ? 0 : 10)
                 postListSection
             }
             .padding(.horizontal, 16)
@@ -392,15 +393,17 @@ struct UserPostsView: View {
             HStack(spacing: 16) {
                 socialMetric(count: socialSummary.followerCount, label: "粉丝")
                 socialMetric(count: socialSummary.followingCount, label: "关注")
-                if socialSummary.isMutualFollow {
-                    Text("互关")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(AppColors.link)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(AppColors.link.opacity(0.12))
-                        .clipShape(Capsule())
-                }
+                Text("互关")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(AppColors.link)
+                    .frame(width: 48, height: 28)
+                    .background(AppColors.link.opacity(0.12))
+                    .clipShape(Capsule())
+                    .opacity(socialSummary.isMutualFollow ? 1 : 0)
+                    .accessibilityHidden(!socialSummary.isMutualFollow)
+                    .transaction { transaction in
+                        transaction.animation = nil
+                    }
                 Spacer()
             }
 
@@ -445,8 +448,7 @@ struct UserPostsView: View {
                         )
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(socialSummary.amFollowing ? AppColors.textPrimary : .black)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 9)
+                            .frame(width: 72, height: 36)
                             .background(socialSummary.amFollowing ? Color.white : AppColors.accent)
                             .clipShape(Capsule())
                             .overlay(
@@ -455,7 +457,7 @@ struct UserPostsView: View {
                             )
                     }
                     .buttonStyle(.plain)
-                    .disabled(isTogglingFollow || isLoadingSocialSummary)
+                    .allowsHitTesting(!isTogglingFollow && !isLoadingSocialSummary)
 
                     Button {
                         Task { await startChat() }
@@ -472,10 +474,7 @@ struct UserPostsView: View {
                 }
             }
         }
-        .padding(18)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 20)
+        .padding(.vertical, 14)
     }
 
     private func profileHighlightRow(_ item: ProfileHighlight) -> some View {
@@ -512,7 +511,7 @@ struct UserPostsView: View {
                 if visiblePosts.isEmpty {
                     emptyState
                 } else {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: 0) {
                         ForEach(visiblePosts) { post in
                             UserPostCard(
                                 post: post,
@@ -982,15 +981,29 @@ private struct UserPostCard: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 5) {
-                        Text("编辑")
-                        Image(systemName: "ellipsis")
+                    Group {
+                        if isCurrentUser {
+                            HStack(spacing: 5) {
+                                Text("编辑")
+                                Image(systemName: "ellipsis")
+                            }
+                        } else {
+                            Image(systemName: "ellipsis")
+                                .frame(width: 18, height: 18)
+                        }
                     }
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(AppColors.textPrimary)
-                    .padding(.horizontal, 10)
-                    .frame(height: 30)
-                    .background(Color(.systemGray6))
+                    .frame(
+                        width: isCurrentUser ? nil : 36,
+                        height: 30
+                    )
+                    .padding(.horizontal, isCurrentUser ? 10 : 0)
+                    .background(
+                        isCurrentUser
+                            ? Color(.systemGray6)
+                            : Color.clear
+                    )
                     .clipShape(Capsule())
                 }
             }
@@ -1025,10 +1038,11 @@ private struct UserPostCard: View {
             .contentShape(Rectangle())
             .onTapGesture(perform: onOpen)
         }
-        .padding(14)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 16)
+        .padding(.vertical, 14)
+        .overlay(alignment: .bottom) {
+            Divider()
+                .overlay(AppColors.divider)
+        }
     }
 }
 

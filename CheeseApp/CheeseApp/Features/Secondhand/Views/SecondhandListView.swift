@@ -301,8 +301,6 @@ struct SecondhandCardView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            cardImage
-
             VStack(alignment: .leading, spacing: 8) {
                 Text(item.title)
                     .font(.system(size: 14, weight: .semibold))
@@ -329,31 +327,38 @@ struct SecondhandCardView: View {
                     }
                 }
 
-                HStack(spacing: 8) {
-                    Button(action: { onAuthorTap?() }) {
-                        SecondhandSellerIdentityLabel(
-                            item: item,
-                            avatarSize: 24,
-                            showsHint: false,
-                            showsDisclosure: false
-                        )
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(onAuthorTap == nil)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+            .background(Color.white)
 
-                    Spacer(minLength: 4)
+            cardImages
 
-                    Button(action: { onFavoriteTap?() }) {
-                        Image(systemName: isFavorited ? "star.fill" : "star")
-                            .foregroundStyle(
-                                isFavorited ? AppColors.accentStrong : AppColors.textMuted
-                            )
-                            .frame(width: 28, height: 28)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(onFavoriteTap == nil)
+            HStack(spacing: 8) {
+                Button(action: { onAuthorTap?() }) {
+                    SecondhandSellerIdentityLabel(
+                        item: item,
+                        avatarSize: 24,
+                        showsHint: false,
+                        showsDisclosure: false
+                    )
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .disabled(onAuthorTap == nil)
+
+                Spacer(minLength: 4)
+
+                Button(action: { onFavoriteTap?() }) {
+                    Image(systemName: isFavorited ? "star.fill" : "star")
+                        .foregroundStyle(
+                            isFavorited ? AppColors.accentStrong : AppColors.textMuted
+                        )
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .disabled(onFavoriteTap == nil)
             }
             .padding(12)
             .background(Color.white)
@@ -365,29 +370,48 @@ struct SecondhandCardView: View {
         .onTapGesture { onOpenTap?() }
     }
 
-    private var cardImage: some View {
-        ZStack {
-            placeholderImage
+    @ViewBuilder
+    private var cardImages: some View {
+        let imageURLs = item.displayImageUrls.compactMap(URL.init(string:))
 
-            if let imageUrl = item.displayImageUrls.first, let url = URL(string: imageUrl) {
-                CachedRemoteImage(url: url, targetPixelWidth: 640) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 150)
-                        .clipped()
-                        .if(allowsImagePreview) { content in
-                            content.tappableImagePreview(item.displayImageUrls, selected: imageUrl)
+        if imageURLs.isEmpty {
+            placeholderImage
+                .frame(maxWidth: .infinity)
+                .frame(height: 150)
+                .clipped()
+        } else {
+            GeometryReader { proxy in
+                let imageWidth = imageURLs.count > 1
+                    ? max(proxy.size.width * 0.88, 1)
+                    : max(proxy.size.width, 1)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 5) {
+                        ForEach(Array(imageURLs.enumerated()), id: \.offset) { index, url in
+                            CachedRemoteImage(url: url, targetPixelWidth: 640) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            } placeholder: {
+                                placeholderImage
+                            }
+                            .frame(width: imageWidth, height: 150)
+                            .clipped()
+                            .if(allowsImagePreview) { content in
+                                content.tappableImagePreview(
+                                    item.displayImageUrls,
+                                    initialIndex: index
+                                )
+                            }
                         }
-                } placeholder: {
-                    EmptyView()
+                    }
+                    .scrollTargetLayout()
                 }
+                .scrollTargetBehavior(.viewAligned)
+                .contentMargins(.horizontal, 0, for: .scrollContent)
             }
+            .frame(height: 150)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 150)
-        .clipped()
     }
     
     private var placeholderImage: some View {
@@ -419,7 +443,7 @@ struct SecondhandCardView: View {
 }
 
 struct SecondhandDetailView: View {
-    let item: SecondhandItem
+    @State private var item: SecondhandItem
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
@@ -439,9 +463,11 @@ struct SecondhandDetailView: View {
     @State private var selectedSellerRoute: SecondhandSellerRoute?
     @State private var sharingPost: PostSharePayload?
     @State private var shareFeedbackMessage: String?
+    @State private var isDescriptionExpanded = false
+    @State private var isApplyingEdit = false
 
     init(item: SecondhandItem) {
-        self.item = item
+        _item = State(initialValue: item)
     }
 
     private var isFavorited: Bool {
@@ -457,7 +483,10 @@ struct SecondhandDetailView: View {
 
     private var contactBarTitle: String {
         if isOwnPost {
-            return L10n.tr("Your Post", "自己的帖子")
+            return L10n.tr("Edit Item", "编辑商品")
+        }
+        if item.isSold {
+            return L10n.tr("Sold", "已售出")
         }
         if hasSentContactCard {
             return L10n.tr("Already Contacted", "已发送联系")
@@ -465,20 +494,8 @@ struct SecondhandDetailView: View {
         return L10n.tr("Contact Seller", "联系卖家")
     }
 
-    private var contactBarSubtitle: String? {
-        if isOwnPost {
-            return L10n.tr(
-                "You cannot message yourself, but you can still save this post.",
-                "不能给自己发私信，但仍然可以收藏。"
-            )
-        }
-        if hasSentContactCard {
-            return L10n.tr(
-                "You already sent a contact card for this item. Each post can only be contacted once.",
-                "你已经给这条商品发过联系卡了，每个帖子只能联系一次。"
-            )
-        }
-        return nil
+    private var isContactBarDisabled: Bool {
+        isOpeningChat || (!isOwnPost && (item.isSold || hasSentContactCard))
     }
 
     private var sharePayload: PostSharePayload {
@@ -506,14 +523,25 @@ struct SecondhandDetailView: View {
                 .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 14) {
-                    headerSection
-                    mediaSection
-                    detailsSection
+                VStack(spacing: 16) {
+                    SecondhandPriceHeader(item: item)
+
+                    SecondhandDescriptionSection(
+                        item: item,
+                        isExpanded: $isDescriptionExpanded
+                    )
+
+                    SecondhandImageGallery(
+                        urlStrings: item.displayImageUrls,
+                        category: item.category
+                    )
+
+                    MentionedProfilesView(postID: item.id)
+
                     sellerSection
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 2)
                 .padding(.bottom, 120)
             }
         }
@@ -521,7 +549,7 @@ struct SecondhandDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .cheeseTabBarHidden(true)
         .safeAreaInset(edge: .top) {
-            PostDetailTopBar(title: L10n.tr("Secondhand Post", "二手贴文"), onBack: { dismiss() }) {
+            PostDetailTopBar(title: "", onBack: { dismiss() }) {
                 Button {
                     sharingPost = sharePayload
                 } label: {
@@ -561,20 +589,16 @@ struct SecondhandDetailView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            PostDetailContactBar(
+            SecondhandBottomActionBar(
                 title: contactBarTitle,
-                subtitle: contactBarSubtitle,
                 isLoading: isOpeningChat,
-                isDisabled: isOpeningChat || isOwnPost || hasSentContactCard,
-                favoriteTitle: isFavorited ? L10n.tr("Saved", "已收藏") : L10n.tr("Save", "收藏"),
+                isDisabled: isContactBarDisabled,
                 isFavorited: isFavorited,
-                isFavoriteDisabled: isOpeningChat,
+                primaryAction: handlePrimaryAction,
                 favoriteAction: {
                     Task { await toggleFavorite() }
                 }
-            ) {
-                showContactComposer = true
-            }
+            )
         }
         .sheet(isPresented: $showContactComposer) {
             PostContactComposerSheet(
@@ -602,7 +626,20 @@ struct SecondhandDetailView: View {
         }
         .navigationDestination(item: $editingPost) { post in
             EditPostSheet(post: post) { payload in
-                try await secondhandService.updatePost(payload: payload)
+                isApplyingEdit = true
+                defer { isApplyingEdit = false }
+
+                if let refreshedItem = try await secondhandService.updatePost(
+                    payload: payload,
+                    baseItem: item
+                ) {
+                    item = refreshedItem
+                } else {
+                    // The write succeeded but the immediate detail refetch was
+                    // unavailable. Preserve instant text/price feedback while
+                    // the change event refreshes the authoritative snapshot.
+                    item = item.applying(payload)
+                }
             }
         }
         .cheesePostSharePanel(item: $sharingPost) { targetName in
@@ -656,156 +693,56 @@ struct SecondhandDetailView: View {
                 isFavorited: favoriteIDs.contains(item.id)
             )
         }
+        .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { notification in
+            guard PostFeatureEvents.changedPostKind(from: notification) == .secondhand,
+                  PostFeatureEvents.changedPostId(from: notification) == item.id,
+                  !isApplyingEdit
+            else { return }
+
+            Task {
+                if let refreshedItem = try? await secondhandService.fetchItem(postId: item.id) {
+                    item = refreshedItem
+                }
+            }
+        }
+        .onReceive(secondhandService.$itemSnapshots) { snapshots in
+            guard let refreshedItem = snapshots[item.id] else { return }
+            item = refreshedItem
+        }
         .shareFeedbackToast(message: $shareFeedbackMessage)
         .enableSwipeBackGesture()
     }
 
-    private var mediaSection: some View {
-        PostImageCarousel(
-            urlStrings: item.displayImageUrls,
-            height: 240,
-            cornerRadius: 20
-        ) {
-            Group {
-                placeholderImage
-            }
-        }
-    }
-
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(item.title)
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(AppColors.textPrimary)
-                .singleLineEllipsized()
-
-            VStack(alignment: .leading, spacing: 6) {
-                if let originalPrice = item.originalPrice {
-                    HStack(spacing: 6) {
-                        Text("原价：")
-                            .foregroundStyle(AppColors.textMuted)
-                        Text(Formatters.formatUSDCompact(originalPrice))
-                            .strikethrough()
-                            .foregroundStyle(AppColors.textMuted)
-                    }
-                    .font(.system(size: 14, weight: .medium))
-                }
-
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("二手价：")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(AppColors.textMuted)
-                    Text(Formatters.formatUSDCompact(item.price))
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(AppColors.categoryColor(for: "secondhand"))
-                }
-            }
-
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 18)
-    }
-
-    private var detailsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            descriptionCardContent
-
-            HStack(spacing: 8) {
-                detailChip(item.category.displayName)
-                detailChip(item.condition)
-                detailChip(
-                    item.isNegotiable
-                    ? L10n.tr("Negotiable", "可议价")
-                    : L10n.tr("Fixed price", "不议价")
-                )
-            }
-
-            Text(item.timeAgo)
-                .font(.system(size: 13))
-                .foregroundStyle(AppColors.textMuted)
-        }
-        .padding(16)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 18)
-    }
-
-    private func detailChip(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(AppColors.textMuted)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(Color(.systemGray6))
-            .clipShape(Capsule())
-    }
-
-    private var descriptionCardContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(L10n.tr("Description", "描述"))
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(AppColors.textPrimary)
-
-            Text(item.description.isEmpty ? L10n.tr("No description", "尚无描述") : item.description)
-                .font(.system(size: 15))
-                .foregroundStyle(AppColors.textMuted)
-                .lineSpacing(4)
-                .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
-                .padding(14)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-            MentionedProfilesView(postID: item.id)
-        }
-    }
-
     private var sellerSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(L10n.tr("Seller", "卖家"))
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(AppColors.textPrimary)
-
-            Button {
-                guard item.canOpenSellerProfile else { return }
-                selectedSellerRoute = SecondhandSellerRoute(id: item.sellerId)
-            } label: {
-                SecondhandSellerIdentityLabel(
-                    item: item,
-                    avatarSize: 38,
-                    showsHint: true,
-                    showsDisclosure: item.canOpenSellerProfile
-                )
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(!item.canOpenSellerProfile)
+        Button {
+            guard item.canOpenSellerProfile else { return }
+            selectedSellerRoute = SecondhandSellerRoute(id: item.sellerId)
+        } label: {
+            SecondhandSellerIdentityLabel(
+                item: item,
+                avatarSize: 44,
+                showsHint: true,
+                showsDisclosure: item.canOpenSellerProfile
+            )
+            .padding(.vertical, 16)
+            .contentShape(Rectangle())
         }
-        .padding(16)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 18)
+        .buttonStyle(.plain)
+        .disabled(!item.canOpenSellerProfile)
+        .overlay(alignment: .top) {
+            Divider().overlay(AppColors.divider)
+        }
+        .overlay(alignment: .bottom) {
+            Divider().overlay(AppColors.divider)
+        }
     }
 
-    private var placeholderImage: some View {
-        RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        AppColors.categoryColor(for: "secondhand").opacity(0.22),
-                        AppColors.accent.opacity(0.24)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .overlay {
-                Image(systemName: "bag")
-                    .font(.system(size: 34, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
+    private func handlePrimaryAction() {
+        if isOwnPost {
+            editingPost = item.editableSummary
+        } else if !item.isSold, !hasSentContactCard {
+            showContactComposer = true
+        }
     }
 
     private func deletePost() async {
@@ -915,6 +852,485 @@ struct SecondhandDetailView: View {
         }
     }
 
+}
+
+private struct SecondhandPriceHeader: View {
+    let item: SecondhandItem
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Text(Formatters.formatUSDCompact(item.price))
+                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .foregroundStyle(AppColors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            if let originalPrice = item.originalPrice,
+               originalPrice > item.price {
+                Text(Formatters.formatUSDCompact(originalPrice))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(AppColors.textMuted)
+                    .strikethrough()
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            Text(item.isSold ? L10n.tr("Sold", "已售出") : item.condition)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(item.isSold ? Color.red : AppColors.textMuted)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(item.isSold ? Color.red.opacity(0.09) : Color.black.opacity(0.05))
+                )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct SecondhandDescriptionSection: View {
+    let item: SecondhandItem
+    @Binding var isExpanded: Bool
+
+    private var hasLongDescription: Bool {
+        item.description.count > 92 || item.description.filter(\.isNewline).count >= 3
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(item.title)
+                .font(.system(size: 23, weight: .bold))
+                .foregroundStyle(AppColors.textPrimary)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !item.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(item.description)
+                    .font(.system(size: 15))
+                    .foregroundStyle(AppColors.textMuted)
+                    .lineSpacing(4)
+                    .lineLimit(isExpanded ? nil : 3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if hasLongDescription {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            isExpanded.toggle()
+                        }
+                    } label: {
+                        Text(isExpanded ? L10n.tr("Collapse", "收起") : L10n.tr("Show more", "展开全文"))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(AppColors.accentStrong)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Label(item.category.displayName, systemImage: item.category.iconName)
+                Text("·")
+                Text(item.isNegotiable ? L10n.tr("Negotiable", "可议价") : L10n.tr("Fixed price", "一口价"))
+                Text("·")
+                Text(item.timeAgo)
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(AppColors.textMuted)
+            .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct SecondhandImageGallery: View {
+    let urlStrings: [String]
+    let category: SecondhandPost.Category
+
+    @State private var resolvedAspectRatios: [CGFloat] = []
+
+    private let gap: CGFloat = 4
+    private let tileCornerRadius: CGFloat = 8
+    private let imagePixelSize = 1_080
+
+    private var previewURLs: [String] {
+        urlStrings.filter { URL(string: $0) != nil }
+    }
+
+    private var visibleURLs: [String] {
+        Array(previewURLs.prefix(6))
+    }
+
+    private var extraImageCount: Int {
+        max(previewURLs.count - visibleURLs.count, 0)
+    }
+
+    private var aspectRatioLoadKey: String {
+        visibleURLs.joined(separator: "\u{1F}")
+    }
+
+    var body: some View {
+        Group {
+            if visibleURLs.isEmpty {
+                placeholderTile
+                    .aspectRatio(1.55, contentMode: .fit)
+            } else if resolvedAspectRatios.count == visibleURLs.count {
+                JustifiedPhotoGalleryLayout(
+                    aspectRatios: resolvedAspectRatios,
+                    spacing: gap
+                ) {
+                    ForEach(Array(visibleURLs.enumerated()), id: \.offset) { index, urlString in
+                        galleryTile(
+                            urlString: urlString,
+                            index: index,
+                            aspectRatio: resolvedAspectRatios[index],
+                            extraCount: extraCount(for: index)
+                        )
+                    }
+                }
+            } else {
+                galleryLoadingPlaceholder
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .task(id: aspectRatioLoadKey) {
+            await resolveAspectRatios()
+        }
+    }
+
+    @MainActor
+    private func resolveAspectRatios() async {
+        let requestedURLs = visibleURLs
+        guard !requestedURLs.isEmpty else {
+            resolvedAspectRatios = []
+            return
+        }
+
+        // Start every request first. The cache coalesces the matching tile load,
+        // so ratio discovery does not create a second network download.
+        let remoteURLs = requestedURLs.compactMap(URL.init(string:))
+        RemoteImageCache.shared.prefetch(
+            remoteURLs,
+            maxPixelSize: imagePixelSize,
+            limit: requestedURLs.count
+        )
+
+        var ratios: [CGFloat] = []
+        ratios.reserveCapacity(requestedURLs.count)
+
+        for urlString in requestedURLs {
+            guard !Task.isCancelled else { return }
+            guard let url = URL(string: urlString),
+                  let image = try? await RemoteImageCache.shared.image(
+                    for: url,
+                    maxPixelSize: imagePixelSize
+                  ),
+                  image.size.width > 0,
+                  image.size.height > 0
+            else {
+                ratios.append(1)
+                continue
+            }
+            ratios.append(image.size.width / image.size.height)
+        }
+
+        guard !Task.isCancelled, requestedURLs == visibleURLs else { return }
+
+        // Commit only after every image has a ratio. The gallery never builds
+        // rows from a partially loaded set and then reshuffles one tile at a time.
+        resolvedAspectRatios = ratios
+    }
+
+    private func extraCount(for visibleIndex: Int) -> Int {
+        visibleIndex == visibleURLs.count - 1 ? extraImageCount : 0
+    }
+
+    private func galleryTile(
+        urlString: String,
+        index: Int,
+        aspectRatio: CGFloat,
+        extraCount: Int
+    ) -> some View {
+        ZStack {
+            Rectangle()
+                .fill(Color.black.opacity(0.05))
+
+            if let url = URL(string: urlString) {
+                CachedRemoteImage(url: url, targetPixelWidth: imagePixelSize) { image in
+                    image
+                        .resizable()
+                        // The parent tile is calculated from this same intrinsic
+                        // ratio. `fit` therefore fills the derived frame without
+                        // cropping or manufacturing letterbox space.
+                        .aspectRatio(aspectRatio, contentMode: .fit)
+                } placeholder: {
+                    ProgressView()
+                        .tint(AppColors.textMuted)
+                }
+            }
+
+            if extraCount > 0 {
+                Color.black.opacity(0.46)
+                Text("+\(extraCount)")
+                    .font(.system(size: 27, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous))
+        .tappableImagePreview(previewURLs, initialIndex: index)
+        .accessibilityLabel(
+            extraCount > 0
+                ? L10n.tr("Open image and \(extraCount) more", "打开图片，另有 \(extraCount) 张")
+                : L10n.tr("Open image", "打开图片")
+            )
+    }
+
+    private var galleryLoadingPlaceholder: some View {
+        RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous)
+            .fill(Color.black.opacity(0.035))
+            .frame(height: 220)
+            .overlay {
+                ProgressView()
+                    .tint(AppColors.textMuted)
+            }
+    }
+
+    private var placeholderTile: some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [Color.orange.opacity(0.16), Color.yellow.opacity(0.07)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                VStack(spacing: 10) {
+                    Image(systemName: category.iconName)
+                        .font(.system(size: 34, weight: .medium))
+                    Text(L10n.tr("No item photos", "暂无商品图片"))
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundStyle(AppColors.textMuted)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous))
+    }
+}
+
+/// A compact justified-gallery layout. Row membership is chosen from the
+/// complete aspect-ratio set; no image gets to decide its own full-width frame.
+struct JustifiedPhotoGalleryLayout: Layout {
+    let aspectRatios: [CGFloat]
+    let spacing: CGFloat
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        let width = max(proposal.width ?? 320, 1)
+        let rows = JustifiedPhotoGalleryLayoutEngine.rows(
+            aspectRatios: Array(aspectRatios.prefix(subviews.count)),
+            containerWidth: width,
+            spacing: spacing
+        )
+        let height = rows.reduce(CGFloat.zero) { $0 + $1.height }
+            + spacing * CGFloat(max(rows.count - 1, 0))
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        let ratios = Array(aspectRatios.prefix(subviews.count))
+        let rows = JustifiedPhotoGalleryLayoutEngine.rows(
+            aspectRatios: ratios,
+            containerWidth: bounds.width,
+            spacing: spacing
+        )
+        var y = bounds.minY
+
+        for row in rows {
+            var x = bounds.minX
+            for (offset, itemIndex) in row.indices.enumerated() {
+                guard itemIndex < subviews.count, offset < row.widths.count else { continue }
+                let size = CGSize(width: row.widths[offset], height: row.height)
+                subviews[itemIndex].place(
+                    at: CGPoint(x: x, y: y),
+                    anchor: .topLeading,
+                    proposal: ProposedViewSize(size)
+                )
+                x += size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+}
+
+struct JustifiedPhotoGalleryRow: Equatable {
+    let indices: Range<Int>
+    let height: CGFloat
+    let widths: [CGFloat]
+}
+
+enum JustifiedPhotoGalleryLayoutEngine {
+    private static let maximumItemsPerRow = 3
+
+    static func rows(
+        aspectRatios: [CGFloat],
+        containerWidth: CGFloat,
+        spacing: CGFloat
+    ) -> [JustifiedPhotoGalleryRow] {
+        let ratios = aspectRatios.map { max($0, 0.01) }
+        guard !ratios.isEmpty, containerWidth > 0 else { return [] }
+
+        let targetHeight = min(max(containerWidth * 0.52, 150), 220)
+        var bestScore = Array(repeating: CGFloat.infinity, count: ratios.count + 1)
+        var nextBreak = Array(repeating: 0, count: ratios.count + 1)
+        bestScore[ratios.count] = 0
+
+        for start in stride(from: ratios.count - 1, through: 0, by: -1) {
+            let maximumEnd = min(start + maximumItemsPerRow, ratios.count)
+            for end in (start + 1)...maximumEnd {
+                let row = makeRow(
+                    range: start..<end,
+                    ratios: ratios,
+                    containerWidth: containerWidth,
+                    spacing: spacing
+                )
+                let score = rowPenalty(
+                    row,
+                    ratios: ratios,
+                    targetHeight: targetHeight
+                ) + bestScore[end]
+                if score < bestScore[start] {
+                    bestScore[start] = score
+                    nextBreak[start] = end
+                }
+            }
+        }
+
+        var result: [JustifiedPhotoGalleryRow] = []
+        var start = 0
+        while start < ratios.count {
+            let end = max(nextBreak[start], start + 1)
+            result.append(makeRow(
+                range: start..<end,
+                ratios: ratios,
+                containerWidth: containerWidth,
+                spacing: spacing
+            ))
+            start = end
+        }
+        return result
+    }
+
+    private static func makeRow(
+        range: Range<Int>,
+        ratios: [CGFloat],
+        containerWidth: CGFloat,
+        spacing: CGFloat
+    ) -> JustifiedPhotoGalleryRow {
+        let itemRatios = range.map { ratios[$0] }
+        let usableWidth = max(
+            containerWidth - spacing * CGFloat(max(itemRatios.count - 1, 0)),
+            1
+        )
+        let rowHeight = usableWidth / max(itemRatios.reduce(0, +), 0.01)
+        return JustifiedPhotoGalleryRow(
+            indices: range,
+            height: rowHeight,
+            widths: itemRatios.map { $0 * rowHeight }
+        )
+    }
+
+    private static func rowPenalty(
+        _ row: JustifiedPhotoGalleryRow,
+        ratios: [CGFloat],
+        targetHeight: CGFloat
+    ) -> CGFloat {
+        let normalizedHeight = max(row.height / targetHeight, 0.01)
+        var penalty = pow(log(normalizedHeight), 2) * 1.4
+
+        // Very shallow strips are hard to inspect; very tall rows recreate the
+        // original giant-portrait failure. These are soft constraints because a
+        // listing with only one extreme image still has to preserve its content.
+        if row.height < targetHeight * 0.56 {
+            penalty += pow((targetHeight * 0.56 - row.height) / targetHeight, 2) * 6
+        }
+        if row.height > targetHeight * 1.55 {
+            penalty += pow((row.height - targetHeight * 1.55) / targetHeight, 2) * 8
+        }
+
+        if row.indices.count == 1,
+           let index = row.indices.first,
+           ratios[index] < 0.9,
+           ratios.count > 1 {
+            penalty += 4
+        }
+
+        // Prefer compatible photos sharing a row when visual balance is close.
+        penalty -= CGFloat(max(row.indices.count - 1, 0)) * 0.09
+        return penalty
+    }
+}
+
+private struct SecondhandBottomActionBar: View {
+    let title: String
+    let isLoading: Bool
+    let isDisabled: Bool
+    let isFavorited: Bool
+    let primaryAction: () -> Void
+    let favoriteAction: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .overlay(AppColors.divider)
+
+            HStack(spacing: 12) {
+                Button(action: primaryAction) {
+                    HStack(spacing: 8) {
+                        if isLoading {
+                            ProgressView()
+                                .tint(isDisabled ? AppColors.textMuted : Color.black)
+                        }
+                        Text(title)
+                            .font(.system(size: 16, weight: .bold))
+                    }
+                    .foregroundStyle(isDisabled ? AppColors.textMuted : Color.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(
+                        Capsule()
+                            .fill(isDisabled ? Color.black.opacity(0.06) : AppColors.accentStrong)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isDisabled)
+
+                Button(action: favoriteAction) {
+                    Image(systemName: isFavorited ? "star.fill" : "star")
+                        .font(.system(size: 23, weight: .semibold))
+                        .foregroundStyle(isFavorited ? AppColors.accentStrong : AppColors.textPrimary)
+                        .frame(width: 50, height: 50)
+                        .background(Circle().fill(Color.black.opacity(0.06)))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isFavorited ? L10n.tr("Remove favorite", "取消收藏") : L10n.tr("Favorite", "收藏"))
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+        }
+        .background(.ultraThinMaterial)
+    }
 }
 
 extension SecondhandItem {

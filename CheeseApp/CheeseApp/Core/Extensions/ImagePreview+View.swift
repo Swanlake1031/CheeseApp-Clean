@@ -57,7 +57,7 @@ private struct TapToPreviewImageModifier: ViewModifier {
 
 private struct TapToPreviewImageGalleryModifier: ViewModifier {
     let urlStrings: [String]
-    let selectedURLString: String
+    let requestedInitialIndex: Int
     @State private var showingPreview = false
 
     private var imageURLs: [URL] {
@@ -65,7 +65,7 @@ private struct TapToPreviewImageGalleryModifier: ViewModifier {
     }
 
     private var initialIndex: Int {
-        imageURLs.firstIndex { $0.absoluteString == selectedURLString } ?? 0
+        min(max(requestedInitialIndex, 0), max(imageURLs.count - 1, 0))
     }
 
     func body(content: Content) -> some View {
@@ -145,7 +145,6 @@ private struct RemoteImageGalleryPreviewView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .scaleEffect(dismissScale)
-            .rotationEffect(.degrees(dismissRotationDegrees))
             .offset(dismissDragOffset)
             .simultaneousGesture(galleryDismissGesture)
 
@@ -201,9 +200,9 @@ private struct RemoteImageGalleryPreviewView: View {
         }
     }
 
-    /// Keeps horizontal paging available while adding the free-form dismissal
-    /// used by the single-photo viewer. At the horizontal edges an outward drag
-    /// dismisses; elsewhere horizontal drags continue to change pages.
+    /// Horizontal movement belongs exclusively to the paging `TabView`.
+    /// Keeping gallery dismissal vertical prevents the page gesture and the
+    /// dismissal gesture from translating the same content at once.
     private var galleryDismissGesture: some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { value in
@@ -236,19 +235,7 @@ private struct RemoteImageGalleryPreviewView: View {
         let horizontal = abs(translation.width)
         let vertical = abs(translation.height)
 
-        // Vertical and diagonal movement dismiss from every page. A strongly
-        // horizontal gesture remains reserved for paging unless it pulls beyond
-        // the first or last image.
-        if vertical >= horizontal * 0.55 {
-            return true
-        }
-        if currentIndex == 0, translation.width > 0 {
-            return true
-        }
-        if currentIndex == imageURLs.count - 1, translation.width < 0 {
-            return true
-        }
-        return false
+        return vertical >= max(horizontal * 0.85, 8)
     }
 
     private var isCurrentImageZoomed: Bool {
@@ -265,11 +252,6 @@ private struct RemoteImageGalleryPreviewView: View {
 
     private var dismissScale: CGFloat {
         max(0.9, 1 - dismissProgress * 0.1)
-    }
-
-    private var dismissRotationDegrees: Double {
-        let normalized = max(min(dismissDragOffset.width / 240, 1), -1)
-        return Double(normalized) * 3.4
     }
 
     private var backgroundOpacity: Double {
@@ -787,7 +769,16 @@ extension View {
         modifier(
             TapToPreviewImageGalleryModifier(
                 urlStrings: urlStrings,
-                selectedURLString: urlString
+                requestedInitialIndex: urlStrings.firstIndex(of: urlString) ?? 0
+            )
+        )
+    }
+
+    func tappableImagePreview(_ urlStrings: [String], initialIndex: Int) -> some View {
+        modifier(
+            TapToPreviewImageGalleryModifier(
+                urlStrings: urlStrings,
+                requestedInitialIndex: initialIndex
             )
         )
     }

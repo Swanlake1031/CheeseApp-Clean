@@ -67,4 +67,37 @@ struct UserPostSummary: Identifiable, Hashable {
             summary: description
         )
     }
+
+    func applying(_ payload: EditableUserPostPayload) -> UserPostSummary {
+        guard payload.id == id, payload.kind == kind else { return self }
+
+        let nextSubtitle: String
+        switch kind {
+        case .secondhand:
+            if let details = payload.secondhandDetails {
+                nextSubtitle = SecondhandPost.Condition.displayName(for: details.condition)
+            } else {
+                nextSubtitle = subtitle
+            }
+        case .forum:
+            // The board name is resolved authoritatively by the event-driven
+            // refresh. Keep the current label during the instant local commit.
+            nextSubtitle = subtitle
+        }
+
+        return UserPostSummary(
+            id: id,
+            kind: kind,
+            title: payload.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: payload.description,
+            subtitle: nextSubtitle,
+            price: payload.price,
+            createdAt: createdAt,
+            authorId: authorId,
+            authorName: authorName,
+            authorAvatarURL: authorAvatarURL,
+            isPrivate: payload.isPrivate,
+            isArchived: isArchived
+        )
+    }
 }

@@ -8,9 +8,15 @@
 
 import SwiftUI
 
+enum ForumCardHeaderStyle {
+    case board
+    case author
+}
+
 struct ContentCardView: View {
     let item: HomeCardItem
     var interaction: PostInteractionState?
+    var forumHeaderStyle: ForumCardHeaderStyle = .board
     var onTap: (() -> Void)?
     var onBoardTap: (() -> Void)?
     var onAuthorTap: (() -> Void)?
@@ -36,34 +42,27 @@ struct ContentCardView: View {
     private var discussionCard: some View {
         VStack(alignment: .leading, spacing: 13) {
             if item.category == .forum {
-                forumBoardHeader
+                switch forumHeaderStyle {
+                case .board:
+                    forumBoardHeader
+                case .author:
+                    forumAuthorHeader
+                }
             } else {
                 metadataRow
             }
 
-            if !item.image.isPlaceholder {
-                HStack(alignment: .top, spacing: 12) {
-                    discussionTextSummary
+            discussionTextSummary
 
-                    item.image.view(targetPixelWidth: 384)
-                        .frame(width: 104, height: 104)
-                        .clipped()
-                        .clipShape(
-                            RoundedRectangle(
-                                cornerRadius: 13,
-                                style: .continuous
-                            )
-                        )
-                        .overlay {
-                            RoundedRectangle(
-                                cornerRadius: 13,
-                                style: .continuous
-                            )
-                            .stroke(AppColors.cardBorder, lineWidth: 1)
-                        }
+            if !item.images.isEmpty {
+                if item.category == .forum {
+                    ForumFeedMediaView(images: item.images)
+                } else {
+                    FeedCardImageCarousel(
+                        images: item.images,
+                        height: 190
+                    )
                 }
-            } else {
-                discussionTextSummary
             }
 
             interactionRow
@@ -77,14 +76,14 @@ struct ContentCardView: View {
 
     private var discussionTextSummary: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text(item.title)
+            Text(displayTitle)
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(AppColors.textPrimary)
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            if !item.subtitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(item.subtitle)
+            if !displaySubtitle.isEmpty {
+                Text(displaySubtitle)
                     .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(AppColors.textMuted)
                     .lineLimit(3)
@@ -93,6 +92,16 @@ struct ContentCardView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Feed previews must not reserve layout rows for backend-authored leading or
+    /// trailing newlines. The detail screen still receives the unmodified content.
+    private var displayTitle: String {
+        item.title.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var displaySubtitle: String {
+        item.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var forumBoardHeader: some View {
@@ -149,6 +158,37 @@ struct ContentCardView: View {
         )
     }
 
+    /// A board page already establishes the category in its own header, so its
+    /// rows identify the author instead. Mixed feeds keep the board header.
+    private var forumAuthorHeader: some View {
+        HStack(spacing: 10) {
+            footerAvatar
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Text(footerName)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .lineLimit(1)
+
+                    if item.isAuthorMcMasterVerified {
+                        McMasterStudentBadge()
+                    }
+                }
+
+                if let timeText = item.timeText, !timeText.isEmpty {
+                    Text(timeText)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(AppColors.textMuted)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+    }
+
     private var secondhandCard: some View {
         VStack(alignment: .leading, spacing: 13) {
             Button(action: { onAuthorTap?() }) {
@@ -179,11 +219,20 @@ struct ContentCardView: View {
                 }
             }
 
-            item.image.view(targetPixelWidth: 1024)
-                .frame(maxWidth: .infinity)
-                .frame(height: 210)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+            if !displaySubtitle.isEmpty {
+                Text(displaySubtitle)
+                    .font(.system(size: 14))
+                    .foregroundStyle(AppColors.textMuted)
+                    .lineLimit(2)
+                    .lineSpacing(2)
+            }
+
+            if !item.images.isEmpty {
+                FeedCardImageCarousel(
+                    images: item.images,
+                    height: 210
+                )
+            }
 
             interactionRow
         }
@@ -336,6 +385,44 @@ struct ContentCardView: View {
         case .none:
             return L10n.tr("Campus user", "校园用户")
         }
+    }
+}
+
+/// Dcard-style inline media: media follows the text and remains an independent
+/// horizontal pager. With multiple photos the next card peeks in, making the
+/// swipe affordance visible without turning the feed row into a fixed mosaic.
+private struct FeedCardImageCarousel: View {
+    let images: [ImageSource]
+    let height: CGFloat
+
+    private let spacing: CGFloat = 6
+
+    var body: some View {
+        GeometryReader { proxy in
+            let itemWidth = images.count > 1
+                ? max(proxy.size.width * 0.88, 1)
+                : max(proxy.size.width, 1)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: spacing) {
+                    ForEach(Array(images.enumerated()), id: \.offset) { _, image in
+                        image.view(targetPixelWidth: 900)
+                            .frame(width: itemWidth, height: height)
+                            .clipped()
+                            .clipShape(
+                                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            )
+                            .scrollTransition(.interactive, axis: .horizontal) { content, phase in
+                                content.opacity(phase.isIdentity ? 1 : 0.94)
+                            }
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.viewAligned)
+            .contentMargins(.horizontal, 0, for: .scrollContent)
+        }
+        .frame(height: height)
     }
 }
 

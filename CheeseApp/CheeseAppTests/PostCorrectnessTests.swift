@@ -103,6 +103,93 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertTrue(store.state(for: secondPostID).isFavorited)
     }
 
+    func testPendingLikeMutationRejectsOlderServerSnapshot() {
+        let store = PostInteractionStore.shared
+        let accountID = UUID()
+        let postID = UUID()
+        store.activateAccount(accountID)
+        defer { store.activateAccount(nil) }
+
+        store.replace(
+            postID: postID,
+            with: PostInteractionState(
+                likeCount: 5,
+                isLiked: false,
+                isFavorited: false
+            )
+        )
+        XCTAssertTrue(store.beginLikeMutation(postID: postID, desiredIsLiked: true))
+        XCTAssertFalse(store.beginLikeMutation(postID: postID, desiredIsLiked: true))
+        store.replace(
+            postID: postID,
+            with: PostInteractionState(
+                likeCount: 6,
+                isLiked: true,
+                isFavorited: false
+            )
+        )
+
+        store.mergeServerSnapshots([
+            .init(postID: postID, likeCount: 5, isLiked: false)
+        ])
+
+        XCTAssertEqual(store.state(for: postID).likeCount, 6)
+        XCTAssertTrue(store.state(for: postID).isLiked)
+
+        // Even if one request already observes the new value, an older request
+        // arriving before the mutation finishes must not be allowed to revert it.
+        store.mergeServerSnapshots([
+            .init(postID: postID, likeCount: 6, isLiked: true)
+        ])
+        store.mergeServerSnapshots([
+            .init(postID: postID, likeCount: 5, isLiked: false)
+        ])
+
+        XCTAssertEqual(store.state(for: postID).likeCount, 6)
+        XCTAssertTrue(store.state(for: postID).isLiked)
+        store.finishLikeMutation(postID: postID, committedIsLiked: true)
+    }
+
+    func testCommittedLikeRemainsProtectedUntilServerCatchesUp() {
+        let store = PostInteractionStore.shared
+        let accountID = UUID()
+        let postID = UUID()
+        store.activateAccount(accountID)
+        defer { store.activateAccount(nil) }
+
+        store.replace(
+            postID: postID,
+            with: PostInteractionState(
+                likeCount: 10,
+                isLiked: false,
+                isFavorited: true
+            )
+        )
+        XCTAssertTrue(store.beginLikeMutation(postID: postID, desiredIsLiked: true))
+        store.replace(
+            postID: postID,
+            with: PostInteractionState(
+                likeCount: 11,
+                isLiked: true,
+                isFavorited: true
+            )
+        )
+        store.finishLikeMutation(postID: postID, committedIsLiked: true)
+
+        store.mergeServerSnapshots([
+            .init(postID: postID, likeCount: 10, isLiked: false)
+        ])
+        XCTAssertEqual(store.state(for: postID).likeCount, 11)
+        XCTAssertTrue(store.state(for: postID).isLiked)
+
+        store.mergeServerSnapshots([
+            .init(postID: postID, likeCount: 11, isLiked: true)
+        ])
+        XCTAssertEqual(store.state(for: postID).likeCount, 11)
+        XCTAssertTrue(store.state(for: postID).isLiked)
+        XCTAssertTrue(store.state(for: postID).isFavorited)
+    }
+
     func testProfileOnboardingRequiresExplicitCompletionEvenWithDefaultSchool() {
         XCTAssertTrue(
             ProfileCompletionPolicy.needsCompletion(
@@ -342,6 +429,42 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertEqual(SecondhandPost.Category(normalizing: "textbooks"), .booksAcademic)
     }
 
+    func testJustifiedGalleryPacksTwoPortraitImagesIntoOneCompactRow() throws {
+        let containerWidth: CGFloat = 343
+        let rows = JustifiedPhotoGalleryLayoutEngine.rows(
+            aspectRatios: [0.58, 0.72],
+            containerWidth: containerWidth,
+            spacing: 4
+        )
+
+        let row = try XCTUnwrap(rows.first)
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(row.indices, 0..<2)
+        XCTAssertEqual(row.widths.count, 2)
+        XCTAssertLessThan(row.height, containerWidth)
+        XCTAssertEqual(row.widths.reduce(0, +) + 4, containerWidth, accuracy: 0.01)
+        XCTAssertEqual(row.widths[0] / row.height, 0.58, accuracy: 0.001)
+        XCTAssertEqual(row.widths[1] / row.height, 0.72, accuracy: 0.001)
+    }
+
+    func testJustifiedGalleryUsesEveryImageExactlyOnceWithoutCroppingMath() {
+        let ratios: [CGFloat] = [1.6, 0.67, 0.75, 1.45, 1.0, 0.8]
+        let rows = JustifiedPhotoGalleryLayoutEngine.rows(
+            aspectRatios: ratios,
+            containerWidth: 343,
+            spacing: 4
+        )
+
+        XCTAssertEqual(rows.flatMap { Array($0.indices) }, Array(ratios.indices))
+        XCTAssertTrue(rows.allSatisfy { (1...3).contains($0.indices.count) })
+        for row in rows {
+            XCTAssertEqual(row.widths.reduce(0, +) + CGFloat(row.widths.count - 1) * 4, 343, accuracy: 0.01)
+            for (offset, index) in row.indices.enumerated() {
+                XCTAssertEqual(row.widths[offset] / row.height, ratios[index], accuracy: 0.001)
+            }
+        }
+    }
+
     func testSecondhandConditionAndStatusMappingAreStable() {
         XCTAssertEqual(SecondhandPost.Condition(normalizing: "LIKE_NEW"), .likeNew)
         XCTAssertEqual(
@@ -564,6 +687,85 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertNil(object["status"])
         XCTAssertNil(object["quantity"])
         XCTAssertNil(object["sold_count"])
+    }
+
+    func testSecondhandEditPayloadIncludesExplicitCategory() throws {
+        let payload = SecondhandService.makeDetailUpdate(
+            price: 20,
+            details: SecondhandEditableFields(
+                category: .booksAcademic,
+                condition: "good",
+                isNegotiable: true
+            )
+        )
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(payload)) as? [String: Any]
+        )
+
+        XCTAssertEqual(
+            object["category"] as? String,
+            SecondhandPost.Category.booksAcademic.rawValue
+        )
+    }
+
+    func testSecondhandEditedSnapshotUpdatesImmediatelyWithoutLosingInteractionState() {
+        let postID = UUID()
+        let sellerID = UUID()
+        let retainedImage = EditablePostImage(
+            id: UUID(),
+            url: "https://example.com/updated-image.jpg",
+            orderIndex: 0
+        )
+        let item = SecondhandItem(
+            id: postID,
+            sellerId: sellerID,
+            title: "Before",
+            price: 10,
+            originalPrice: 20,
+            isNegotiable: false,
+            category: .other,
+            condition: SecondhandPost.Condition.good.displayName,
+            seller: "Seller",
+            sellerAvatar: nil,
+            isAnonymous: false,
+            hasSellerProfile: true,
+            description: "Before description",
+            timeAgo: "1 min",
+            imageUrl: "https://example.com/old-image.jpg",
+            imageUrls: ["https://example.com/old-image.jpg"],
+            likeCount: 7,
+            isLiked: true,
+            isFavorited: true
+        )
+        let payload = EditableUserPostPayload(
+            id: postID,
+            kind: .secondhand,
+            title: "  Updated title  ",
+            description: "Updated description",
+            price: 35,
+            secondhandDetails: SecondhandEditableFields(
+                category: .booksAcademic,
+                originalPrice: 50,
+                condition: SecondhandPost.Condition.likeNew.rawValue,
+                isNegotiable: true,
+                images: [retainedImage]
+            ),
+            retainedImageIDs: [retainedImage.id]
+        )
+
+        let updated = item.applying(payload)
+
+        XCTAssertEqual(updated.title, "Updated title")
+        XCTAssertEqual(updated.description, "Updated description")
+        XCTAssertEqual(updated.price, 35)
+        XCTAssertEqual(updated.originalPrice, 50)
+        XCTAssertEqual(updated.category, .booksAcademic)
+        XCTAssertEqual(updated.condition, SecondhandPost.Condition.likeNew.displayName)
+        XCTAssertTrue(updated.isNegotiable)
+        XCTAssertEqual(updated.displayImageUrls, [retainedImage.url])
+        XCTAssertEqual(updated.likeCount, 7)
+        XCTAssertTrue(updated.isLiked)
+        XCTAssertTrue(updated.isFavorited)
     }
 
     func testAnonymousForumMappingKeepsPostContentVisible() {

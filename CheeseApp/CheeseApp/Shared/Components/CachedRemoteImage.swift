@@ -22,6 +22,7 @@ final class RemoteImageCache {
     private let responseCache: URLCache
     private let session: URLSession
     private let decodedImageCache = NSCache<NSString, UIImage>()
+    private var sourceAspectRatios: [URL: CGFloat] = [:]
     private var inFlightRequests: [RemoteImageRequestKey: Task<UIImage, Error>] = [:]
     private(set) var generation: UInt64 = 0
 
@@ -48,6 +49,7 @@ final class RemoteImageCache {
             maxPixelSize: max(maxPixelSize, 1)
         )
         if let cachedImage = decodedImageCache.object(forKey: requestKey.cacheKey) {
+            recordAspectRatio(of: cachedImage, for: url)
             return cachedImage
         }
         if let inFlightRequest = inFlightRequests[requestKey] {
@@ -67,8 +69,15 @@ final class RemoteImageCache {
         let image = try await requestTask.value
         let imageCost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
         decodedImageCache.setObject(image, forKey: requestKey.cacheKey, cost: imageCost)
+        recordAspectRatio(of: image, for: url)
         NotificationCenter.default.post(name: .remoteImageCacheDidLoad, object: url)
         return image
+    }
+
+    /// Lightweight metadata attached to the existing decoded-image cache. This
+    /// does not retain another UIImage or create a competing download pipeline.
+    func aspectRatio(for url: URL) -> CGFloat? {
+        sourceAspectRatios[url]
     }
 
     func prefetch(
@@ -184,13 +193,26 @@ final class RemoteImageCache {
         inFlightRequests.values.forEach { $0.cancel() }
         inFlightRequests.removeAll()
         decodedImageCache.removeAllObjects()
+        sourceAspectRatios.removeAll()
         responseCache.removeAllCachedResponses()
+    }
+
+    private func recordAspectRatio(of image: UIImage, for url: URL) {
+        let width = image.size.width
+        let height = image.size.height
+        guard width.isFinite,
+              height.isFinite,
+              width > 0,
+              height > 0
+        else { return }
+        sourceAspectRatios[url] = width / height
     }
 }
 
 struct CachedRemoteImage<Content: View, Placeholder: View>: View {
     let url: URL
     let targetPixelWidth: Int?
+    let onImageLoaded: ((CGSize) -> Void)?
     let content: (Image) -> Content
     let placeholder: () -> Placeholder
 
@@ -201,11 +223,13 @@ struct CachedRemoteImage<Content: View, Placeholder: View>: View {
     init(
         url: URL,
         targetPixelWidth: Int? = nil,
+        onImageLoaded: ((CGSize) -> Void)? = nil,
         @ViewBuilder content: @escaping (Image) -> Content,
         @ViewBuilder placeholder: @escaping () -> Placeholder
     ) {
         self.url = url
         self.targetPixelWidth = targetPixelWidth
+        self.onImageLoaded = onImageLoaded
         self.content = content
         self.placeholder = placeholder
     }
@@ -255,6 +279,7 @@ struct CachedRemoteImage<Content: View, Placeholder: View>: View {
                 guard !Task.isCancelled else { return }
                 loadedImage = image
                 loadedURL = url
+                onImageLoaded?(image.size)
                 return
             } catch is CancellationError {
                 return

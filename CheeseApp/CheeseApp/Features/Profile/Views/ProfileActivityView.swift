@@ -509,11 +509,6 @@ struct ProfileActivityView: View {
                 .buttonStyle(.plain)
             }
         }
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(AppColors.textMuted.opacity(0.14))
-                .frame(height: 1)
-        }
     }
 
     private func selectActivityKind(_ kind: ProfileActivityKind) {
@@ -904,10 +899,11 @@ private struct ProfileActivityPageView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(AppColors.textMuted)
             }
-            .padding(12)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .cheeseCardChrome(cornerRadius: 14)
+            .padding(.vertical, 12)
+            .overlay(alignment: .bottom) {
+                Divider()
+                    .overlay(AppColors.divider)
+            }
         }
         .buttonStyle(.plain)
     }
@@ -976,7 +972,7 @@ private struct ProfileActivityPageView: View {
     }
 
     private var activityRows: some View {
-        LazyVStack(spacing: 10) {
+        LazyVStack(spacing: 0) {
             ForEach(service.items) { item in
                 ProfileActivityRow(
                     item: item,
@@ -1231,10 +1227,11 @@ private struct ProfileActivityRow: View {
                 }
             }
         }
-        .padding(12)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 15)
+        .padding(.vertical, 12)
+        .overlay(alignment: .bottom) {
+            Divider()
+                .overlay(AppColors.divider)
+        }
     }
 
     @ViewBuilder

@@ -98,7 +98,8 @@ struct HomeView: View {
                 onPresentationChange: { showNavigationDrawer = $0 },
                 onForumTap: {
                     selectedForumBoardID = nil
-                    showForumList = true
+                    showForumList = false
+                    selectFeaturedCategory(.forum)
                 },
                 onBoardTap: { board in
                     selectedForumBoardID = board.id
@@ -127,7 +128,9 @@ struct HomeView: View {
         .navigationBarHidden(true)
         // 导航目标由 MainTabView 的 Home NavigationStack 承载。
         .navigationDestination(isPresented: $showForumList) {
-            ForumListView(initialBoardID: selectedForumBoardID)
+            if let selectedForumBoardID {
+                ForumBoardView(boardID: selectedForumBoardID)
+            }
         }
         .navigationDestination(isPresented: $showSearch) {
             SearchView(
@@ -290,10 +293,23 @@ struct HomeView: View {
             guard let selectedSecondhandCategory else {
                 return viewModel.featuredSecondhandCards
             }
-            return viewModel.featuredSecondhandCards.filter { card in
-                guard let postID = card.postId else { return false }
-                return viewModel.secondhandItem(id: postID)?.category == selectedSecondhandCategory
-            }
+            return viewModel.featuredSecondhandCards
+                .filter { card in
+                    guard let postID = card.postId else { return false }
+                    return viewModel.secondhandItem(id: postID)?.category == selectedSecondhandCategory
+                }
+                .sorted { lhs, rhs in
+                    switch (lhs.createdAt, rhs.createdAt) {
+                    case let (left?, right?) where left != right:
+                        return left > right
+                    case (.some, nil):
+                        return true
+                    case (nil, .some):
+                        return false
+                    default:
+                        return lhs.id.uuidString > rhs.id.uuidString
+                    }
+                }
         }
     }
 
@@ -786,8 +802,15 @@ struct HomeView: View {
                     "该商品暂时无法打开，请刷新后重试。"
                 )
             case .forum:
-                selectedForumBoardID = nil
-                showForumList = true
+                if let boardID = card.boardID {
+                    selectedForumBoardID = boardID
+                    showForumList = true
+                } else {
+                    postOpenErrorMessage = L10n.tr(
+                        "This post is temporarily unavailable. Please refresh and try again.",
+                        "该帖子暂时无法打开，请刷新后重试。"
+                    )
+                }
             case .course:
                 showCourseDiscovery = true
             }
@@ -807,9 +830,14 @@ struct HomeView: View {
         case .forum:
             if let post = viewModel.forumPost(id: postId) {
                 selectedForumPost = post
-            } else {
-                selectedForumBoardID = nil
+            } else if let boardID = card.boardID {
+                selectedForumBoardID = boardID
                 showForumList = true
+            } else {
+                postOpenErrorMessage = L10n.tr(
+                    "This post is temporarily unavailable. Please refresh and try again.",
+                    "该帖子暂时无法打开，请刷新后重试。"
+                )
             }
         case .course:
             showCourseDiscovery = true

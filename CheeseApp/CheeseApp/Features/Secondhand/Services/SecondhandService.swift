@@ -48,6 +48,42 @@ struct SecondhandItem: Identifiable, Hashable {
         }
         return imageUrl.map { [$0] } ?? []
     }
+
+    func applying(_ payload: EditableUserPostPayload) -> SecondhandItem {
+        guard payload.id == id,
+              payload.kind == .secondhand,
+              let details = payload.secondhandDetails,
+              let price = payload.price
+        else { return self }
+
+        let retainedImageURLs = details.images
+            .sorted { ($0.orderIndex ?? Int.max) < ($1.orderIndex ?? Int.max) }
+            .map(\.url)
+
+        return SecondhandItem(
+            id: id,
+            sellerId: sellerId,
+            title: payload.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            price: price,
+            originalPrice: details.originalPrice,
+            isNegotiable: details.isNegotiable,
+            category: details.category ?? category,
+            condition: SecondhandPost.Condition.displayName(for: details.condition),
+            seller: seller,
+            sellerAvatar: sellerAvatar,
+            isAnonymous: isAnonymous,
+            hasSellerProfile: hasSellerProfile,
+            isSellerMcMasterVerified: isSellerMcMasterVerified,
+            description: payload.description,
+            timeAgo: timeAgo,
+            imageUrl: retainedImageURLs.first,
+            imageUrls: retainedImageURLs,
+            likeCount: likeCount,
+            isLiked: isLiked,
+            isFavorited: isFavorited,
+            isSold: isSold
+        )
+    }
 }
 
 struct SecondhandCreateInput {
@@ -66,14 +102,14 @@ struct SecondhandCreateInput {
 }
 
 struct SecondhandEditableFields {
-    let category: SecondhandPost.Category
+    let category: SecondhandPost.Category?
     let originalPrice: Double?
     let condition: String
     let isNegotiable: Bool
     let images: [EditablePostImage]
 
     init(
-        category: SecondhandPost.Category = .other,
+        category: SecondhandPost.Category? = nil,
         originalPrice: Double? = nil,
         condition: String,
         isNegotiable: Bool,
@@ -230,6 +266,7 @@ class SecondhandService: ObservableObject {
     @Published private(set) var pageErrorMessage: String?
     @Published private(set) var accountGeneration: UInt64 = 0
     @Published private(set) var isAccountTransitionInProgress = false
+    @Published private(set) var itemSnapshots: [UUID: SecondhandItem] = [:]
     private var itemCursor: SecondhandPageCursor?
     private var latestItemFetchID: UUID?
     private var stateOwnerID: UUID?
@@ -267,6 +304,7 @@ class SecondhandService: ObservableObject {
         isLoadingNextPage = false
         hasMoreItems = true
         pageErrorMessage = nil
+        itemSnapshots = [:]
     }
 
     func isCurrentAccountRequest(generation: UInt64) -> Bool {
@@ -343,13 +381,27 @@ class SecondhandService: ObservableObject {
         )
     }
 
-    func updatePost(payload: EditableUserPostPayload) async throws {
+    @discardableResult
+    func updatePost(
+        payload: EditableUserPostPayload,
+        baseItem: SecondhandItem? = nil
+    ) async throws -> SecondhandItem? {
         let trimmedTitle = payload.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard payload.kind == .secondhand,
               let details = payload.secondhandDetails,
               !trimmedTitle.isEmpty
         else {
             throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "标题不能为空"])
+        }
+        guard let category = details.category else {
+            throw NSError(
+                domain: "SecondhandEditing",
+                code: 422,
+                userInfo: [NSLocalizedDescriptionKey: L10n.tr(
+                    "This listing's category could not be loaded. Please try again.",
+                    "无法加载该商品分类，请重试。"
+                )]
+            )
         }
         guard let price = payload.price, price >= 0 else {
             throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "请填写价格"])
@@ -391,7 +443,7 @@ class SecondhandService: ObservableObject {
                     isPrivate: payload.isPrivate,
                     price: price,
                     originalPrice: details.originalPrice,
-                    category: details.category.rawValue,
+                    category: category.rawValue,
                     condition: SecondhandPost.Condition(
                         normalizing: details.condition
                     ).rawValue,
@@ -405,22 +457,53 @@ class SecondhandService: ObservableObject {
                 operationID: operationID,
                 expectedCount: plans.count
                )) == true {
-                await retryPendingMediaCleanup(postID: payload.id)
-                return
-            }
-
-            if !plans.isEmpty {
+                // The RPC response was interrupted after the database commit.
+                // Continue through the normal local synchronization path.
+            } else if !plans.isEmpty {
                 let cleanupItems = (try? await abandonMediaOperation(
                     operationID: operationID,
                     reason: "publication_failed"
                 )) ?? []
                 await performMediaCleanup(cleanupItems)
+                throw error
+            } else {
+                throw error
             }
-            throw error
         }
 
-        await retryPendingMediaCleanup(postID: payload.id)
-        await fetchItems()
+        // Commit the edited fields to the current UI snapshot immediately.
+        // The authoritative read below is reconciliation work and must not
+        // keep the editor open after the mutation itself has succeeded.
+        let locallyUpdatedItem = (
+            baseItem
+                ?? itemSnapshots[payload.id]
+                ?? items.first(where: { $0.id == payload.id })
+        )?.applying(payload)
+        if let locallyUpdatedItem {
+            replaceItem(locallyUpdatedItem)
+        }
+
+        PostFeatureEvents.postDidChange(
+            kind: .secondhand,
+            authorId: actingUserID,
+            postId: payload.id
+        )
+
+        // Reconcile with server truth and clean media in the background.
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            _ = try? await self.fetchItem(postId: payload.id)
+            await self.retryPendingMediaCleanup(postID: payload.id)
+        }
+
+        return locallyUpdatedItem
+    }
+
+    private func replaceItem(_ refreshedItem: SecondhandItem) {
+        itemSnapshots[refreshedItem.id] = refreshedItem
+        if let index = items.firstIndex(where: { $0.id == refreshedItem.id }) {
+            items[index] = refreshedItem
+        }
     }
 
     static func makeDetailUpdate(
@@ -430,7 +513,7 @@ class SecondhandService: ObservableObject {
         SecondhandPostEditUpdate(
             price: price,
             originalPrice: details.originalPrice,
-            category: details.category.rawValue,
+            category: details.category?.rawValue,
             condition: SecondhandPost.Condition(normalizing: details.condition).rawValue,
             isNegotiable: details.isNegotiable
         )
@@ -447,8 +530,19 @@ class SecondhandService: ObservableObject {
             .execute()
             .value
 
+        guard let rawCategory = row.category else {
+            throw NSError(
+                domain: "SecondhandEditing",
+                code: 422,
+                userInfo: [NSLocalizedDescriptionKey: L10n.tr(
+                    "This listing's category could not be loaded. Please try again.",
+                    "无法加载该商品分类，请重试。"
+                )]
+            )
+        }
+
         return SecondhandEditableFields(
-            category: SecondhandPost.Category(normalizing: row.category ?? "other"),
+            category: SecondhandPost.Category(normalizing: rawCategory),
             originalPrice: row.originalPrice,
             condition: row.condition ?? SecondhandPost.Condition.good.rawValue,
             isNegotiable: row.isNegotiable ?? false,
@@ -817,6 +911,7 @@ class SecondhandService: ObservableObject {
             isFavorited: favoritePostIds.contains(dbPost.id)
         )
         seedInteractionStates(for: [item])
+        replaceItem(item)
         return item
     }
 
@@ -1040,7 +1135,7 @@ struct DBSecondhandImage: Codable {
 struct SecondhandPostEditUpdate: Encodable {
     let price: Double
     let originalPrice: Double?
-    let category: String
+    let category: String?
     let condition: String
     let isNegotiable: Bool
 

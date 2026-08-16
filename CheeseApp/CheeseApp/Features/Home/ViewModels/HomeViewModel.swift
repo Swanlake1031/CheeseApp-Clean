@@ -394,7 +394,7 @@ class HomeViewModel: ObservableObject {
         nextSnapshot.followedAuthorIDs = snapshot.followedAuthorIDs
         nextSnapshot.followingCards = snapshot.cards
         nextSnapshot.hasResolvedInitialFollowingLoad = true
-        interactionStore.merge(interactionUpdates)
+        interactionStore.mergeServerSnapshots(interactionUpdates)
         contentSnapshot = nextSnapshot
     }
 
@@ -411,6 +411,10 @@ class HomeViewModel: ObservableObject {
             isFavorited: false
         )
         let optimisticLiked = !previous.isLiked
+        guard interactionStore.beginLikeMutation(
+            postID: postID,
+            desiredIsLiked: optimisticLiked
+        ) else { return }
         interactionStore.replace(postID: postID, with: PostInteractionState(
             likeCount: max(previous.likeCount + (optimisticLiked ? 1 : -1), 0),
             isLiked: optimisticLiked,
@@ -430,8 +434,16 @@ class HomeViewModel: ObservableObject {
             )
             confirmed.isLiked = confirmedLiked
             interactionStore.replace(postID: postID, with: confirmed)
+            interactionStore.finishLikeMutation(
+                postID: postID,
+                committedIsLiked: confirmedLiked
+            )
         } catch {
             interactionStore.replace(postID: postID, with: previous)
+            interactionStore.finishLikeMutation(
+                postID: postID,
+                committedIsLiked: nil
+            )
             throw error
         }
     }
@@ -618,7 +630,7 @@ class HomeViewModel: ObservableObject {
         var commitTransaction = Transaction()
         commitTransaction.disablesAnimations = true
         withTransaction(commitTransaction) {
-            interactionStore.merge(interactionUpdates)
+            interactionStore.mergeServerSnapshots(interactionUpdates)
             contentSnapshot = nextSnapshot
         }
         return true
@@ -806,6 +818,9 @@ class HomeViewModel: ObservableObject {
                 }
                 return .url(url)
             }(),
+            images: post.images
+                .compactMap { URL(string: $0.url) }
+                .map(ImageSource.url),
             title: post.title,
             subtitle: "",
             footer: .posted(
@@ -817,6 +832,7 @@ class HomeViewModel: ObservableObject {
             isAuthorMcMasterVerified: post.isUserMcMasterVerified,
             category: .secondhand,
             viewCount: post.viewCount,
+            createdAt: post.createdAt,
             priceText: formattedPrice(post.price),
             originalPriceText: post.originalPrice.flatMap { price in
                 price > 0 ? formattedPrice(price) : nil
@@ -837,12 +853,16 @@ class HomeViewModel: ObservableObject {
             image: item.displayImageUrls.first
                 .flatMap(URL.init(string:))
                 .map(ImageSource.url) ?? .placeholder,
+            images: item.displayImageUrls
+                .compactMap(URL.init(string:))
+                .map(ImageSource.url),
             title: item.title,
             subtitle: item.description,
             footer: .posted(name: item.seller, avatar: avatar),
             isAuthorMcMasterVerified: !item.isAnonymous && item.isSellerMcMasterVerified,
             category: .secondhand,
             timeText: item.timeAgo,
+            createdAt: Date(),
             priceText: formattedPrice(item.price),
             originalPriceText: item.originalPrice.flatMap {
                 $0 > 0 ? formattedPrice($0) : nil
@@ -876,6 +896,9 @@ class HomeViewModel: ObservableObject {
             image: post.imageUrls.first
                 .flatMap(URL.init(string:))
                 .map(ImageSource.url) ?? .placeholder,
+            images: post.imageUrls
+                .compactMap(URL.init(string:))
+                .map(ImageSource.url),
             title: post.title,
             subtitle: post.content,
             footer: .posted(name: post.authorName, avatar: avatar),
