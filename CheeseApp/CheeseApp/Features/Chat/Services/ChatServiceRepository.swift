@@ -87,8 +87,8 @@ struct ChatServiceRepository {
         onMessage: @escaping (Message) async -> Void,
         onMessageDeleted: @escaping (UUID) async -> Void,
         onDisconnect: @escaping () -> Void
-    ) -> () -> Void {
-        observeMessageChanges(
+    ) async throws -> () -> Void {
+        try await observeMessageChanges(
             channelName: "chat-room-\(conversationId.uuidString)",
             table: Tables.messages,
             filterColumn: "conversation_id",
@@ -162,6 +162,18 @@ struct ChatServiceRepository {
             .rpc(
                 "get_secondhand_active_buyers",
                 params: SecondhandListingParams(listingID: listingId)
+            )
+            .execute()
+            .value
+    }
+
+    func fetchConversationCompletedSecondhandTransactions(
+        conversationId: UUID
+    ) async throws -> [CompletedSecondhandTransaction] {
+        try await supabase.client
+            .rpc(
+                "get_conversation_completed_secondhand_transactions",
+                params: SecondhandChatIntentParams(conversationID: conversationId)
             )
             .execute()
             .value
@@ -241,8 +253,8 @@ struct ChatServiceRepository {
         onMessage: @escaping (GroupMessage) async -> Void,
         onMessageDeleted: @escaping (UUID) async -> Void,
         onDisconnect: @escaping () -> Void
-    ) -> () -> Void {
-        observeMessageChanges(
+    ) async throws -> () -> Void {
+        try await observeMessageChanges(
             channelName: "group-chat-room-\(groupId.uuidString)",
             table: "group_messages",
             filterColumn: "group_id",
@@ -252,6 +264,35 @@ struct ChatServiceRepository {
             onMessageDeleted: onMessageDeleted,
             onDisconnect: onDisconnect
         )
+    }
+
+    func observeChatGroupMemberChanges(
+        groupId: UUID,
+        onChange: @escaping () async -> Void
+    ) -> () -> Void {
+        let channel = supabase.client.channel("group-members-\(groupId.uuidString)")
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "chat_group_members",
+            filter: .eq("group_id", value: groupId)
+        )
+        let task = Task {
+            do {
+                try await channel.subscribeWithError()
+                for await _ in changes {
+                    guard !Task.isCancelled else { break }
+                    await onChange()
+                }
+            } catch {
+                // Member display names refresh again when the room is reopened.
+            }
+        }
+
+        return { [supabase] in
+            task.cancel()
+            Task { await supabase.client.removeChannel(channel) }
+        }
     }
 
     func insertGroupMessage(
@@ -462,6 +503,54 @@ struct ChatServiceRepository {
             .value
     }
 
+    func renameChatGroup(groupId: UUID, name: String) async throws {
+        try await supabase.client
+            .rpc("rename_chat_group", params: ChatRenameGroupParams(groupID: groupId, name: name))
+            .execute()
+    }
+
+    func fetchChatGroupAnnouncement(groupId: UUID) async throws -> String? {
+        let row: ChatGroupAnnouncementRow = try await supabase
+            .database("chat_groups")
+            .select("announcement")
+            .eq("id", value: groupId.uuidString)
+            .single()
+            .execute()
+            .value
+        return row.announcement?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func updateChatGroupAnnouncement(groupId: UUID, announcement: String?) async throws {
+        try await supabase.client
+            .rpc(
+                "update_chat_group_announcement",
+                params: ChatUpdateGroupAnnouncementParams(
+                    groupID: groupId,
+                    announcement: announcement
+                )
+            )
+            .execute()
+    }
+
+    func addChatGroupMembers(groupId: UUID, memberIds: [UUID]) async throws -> Int {
+        try await supabase.client
+            .rpc(
+                "add_chat_group_members",
+                params: ChatAddGroupMembersParams(groupID: groupId, memberIDs: memberIds)
+            )
+            .execute()
+            .value
+    }
+
+    func updateMyChatGroupNickname(groupId: UUID, nickname: String?) async throws {
+        try await supabase.client
+            .rpc(
+                "update_my_chat_group_nickname",
+                params: ChatUpdateGroupNicknameParams(groupID: groupId, nickname: nickname)
+            )
+            .execute()
+    }
+
     func fetchChatGroupMembers(groupId: UUID) async throws -> [ChatGroupMemberSummary] {
         let rows: [ChatGroupMemberRpcRow] = try await supabase.client
             .rpc(
@@ -474,10 +563,11 @@ struct ChatServiceRepository {
         return rows.map {
             ChatGroupMemberSummary(
                 id: $0.userId,
-                displayName: resolvedDisplayName(fullName: $0.fullName),
+                displayName: resolvedDisplayName(fullName: $0.nickname ?? $0.fullName),
                 avatarURL: $0.avatarURL,
                 role: $0.role,
-                joinedAt: $0.joinedAt
+                joinedAt: $0.joinedAt,
+                nickname: $0.nickname
             )
         }
     }
@@ -574,7 +664,7 @@ struct ChatServiceRepository {
         onMessage: @escaping (MessageType) async -> Void,
         onMessageDeleted: @escaping (UUID) async -> Void,
         onDisconnect: @escaping () -> Void
-    ) -> () -> Void {
+    ) async throws -> () -> Void {
         let channel = supabase.client.channel(channelName)
         let changes = channel.postgresChange(
             AnyAction.self,
@@ -583,36 +673,42 @@ struct ChatServiceRepository {
             filter: .eq(filterColumn, value: roomId)
         )
 
-        let task = Task {
-            do {
-                try await channel.subscribeWithError()
+        try await channel.subscribeWithError()
 
-                for await change in changes {
-                    guard !Task.isCancelled else { break }
-                    switch change {
-                    case .insert(let insert):
-                        guard let messageID = chatMessageID(in: insert.record),
-                              let message = try? await fetchMessage(messageID)
-                        else { continue }
-                        await onMessage(message)
-                    case .update(let update):
-                        guard update.record["is_deleted"]?.boolValue == true,
-                              let messageID = chatMessageID(in: update.record)
-                        else { continue }
-                        await onMessageDeleted(messageID)
-                    case .delete(let delete):
-                        guard let messageID = chatMessageID(in: delete.oldRecord) else { continue }
-                        await onMessageDeleted(messageID)
-                    }
+        let task = Task {
+            for await change in changes {
+                guard !Task.isCancelled else { break }
+                switch change {
+                case .insert(let insert):
+                    guard let messageID = chatMessageID(in: insert.record),
+                          let message = try? await fetchMessage(messageID)
+                    else { continue }
+                    await onMessage(message)
+                case .update(let update):
+                    guard update.record["is_deleted"]?.boolValue == true,
+                          let messageID = chatMessageID(in: update.record)
+                    else { continue }
+                    await onMessageDeleted(messageID)
+                case .delete(let delete):
+                    guard let messageID = chatMessageID(in: delete.oldRecord) else { continue }
+                    await onMessageDeleted(messageID)
                 }
-            } catch {
+            }
+        }
+
+        let statusTask = Task {
+            for await status in channel.statusChange {
                 guard !Task.isCancelled else { return }
-                onDisconnect()
+                if status == .unsubscribed {
+                    onDisconnect()
+                    return
+                }
             }
         }
 
         return { [supabase] in
             task.cancel()
+            statusTask.cancel()
             Task { await supabase.client.removeChannel(channel) }
         }
     }
@@ -692,6 +788,56 @@ private struct SecondhandChatIntentParams: Encodable {
 
     enum CodingKeys: String, CodingKey {
         case conversationID = "p_conversation_id"
+    }
+}
+
+private struct ChatRenameGroupParams: Encodable {
+    let groupID: UUID
+    let name: String
+    enum CodingKeys: String, CodingKey {
+        case groupID = "p_group_id"
+        case name = "p_name"
+    }
+}
+
+private struct ChatAddGroupMembersParams: Encodable {
+    let groupID: UUID
+    let memberIDs: [UUID]
+    enum CodingKeys: String, CodingKey {
+        case groupID = "p_group_id"
+        case memberIDs = "p_member_ids"
+    }
+}
+
+private struct ChatUpdateGroupNicknameParams: Encodable {
+    let groupID: UUID
+    let nickname: String?
+
+    enum CodingKeys: String, CodingKey {
+        case groupID = "p_group_id"
+        case nickname = "p_nickname"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(groupID, forKey: .groupID)
+        if let nickname {
+            try container.encode(nickname, forKey: .nickname)
+        } else {
+            // PostgREST RPC needs an explicit JSON null to clear the nickname.
+            // Synthesized Optional encoding would omit p_nickname entirely.
+            try container.encodeNil(forKey: .nickname)
+        }
+    }
+}
+
+private struct ChatUpdateGroupAnnouncementParams: Encodable {
+    let groupID: UUID
+    let announcement: String?
+
+    enum CodingKeys: String, CodingKey {
+        case groupID = "p_group_id"
+        case announcement = "p_announcement"
     }
 }
 

@@ -21,8 +21,8 @@ enum ChatInboxRoute: Hashable, Identifiable {
 }
 
 enum ChatInboxSectionKind: String, Hashable, Identifiable {
-    case groups
-    case directMessages
+    case pinned
+    case conversations
 
     var id: String { rawValue }
 
@@ -41,6 +41,20 @@ enum ChatInboxSectionItem: Hashable, Identifiable {
             return group.id
         case .direct(let conversation):
             return conversation.id
+        }
+    }
+
+    var isPinned: Bool {
+        switch self {
+        case .group(let group): return group.isPinned
+        case .direct(let conversation): return conversation.isPinned
+        }
+    }
+
+    var lastMessageAt: Date {
+        switch self {
+        case .group(let group): return group.lastMessageAt
+        case .direct(let conversation): return conversation.lastMessageAt
         }
     }
 }
@@ -70,25 +84,18 @@ struct ChatInboxPresentationState {
     }
 
     var visibleSections: [ChatInboxSection] {
+        let items = sortedItems(matchingSearch: isSearching)
+        guard !items.isEmpty else { return [] }
+
         if isSearching {
-            return [
-                makeGroupSection(),
-                makeConversationSection(
-                    kind: .directMessages,
-                    conversations: directConversations,
-                    itemBuilder: ChatInboxSectionItem.direct
-                )
-            ].compactMap { $0 }
+            return [ChatInboxSection(kind: .conversations, items: items)]
         }
 
+        let pinned = items.filter(\.isPinned)
+        let regular = items.filter { !$0.isPinned }
         return [
-            makeGroupSection(includeAllWhenBrowsing: true),
-            makeConversationSection(
-                kind: .directMessages,
-                conversations: directConversations,
-                itemBuilder: ChatInboxSectionItem.direct,
-                includeAllWhenBrowsing: true
-            )
+            pinned.isEmpty ? nil : ChatInboxSection(kind: .pinned, items: pinned),
+            regular.isEmpty ? nil : ChatInboxSection(kind: .conversations, items: regular)
         ].compactMap { $0 }
     }
 
@@ -104,33 +111,21 @@ struct ChatInboxPresentationState {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func makeConversationSection(
-        kind: ChatInboxSectionKind,
-        conversations: [ChatConversationPreview],
-        itemBuilder: (ChatConversationPreview) -> ChatInboxSectionItem,
-        includeAllWhenBrowsing: Bool = false
-    ) -> ChatInboxSection? {
-        let items: [ChatInboxSectionItem]
-        if includeAllWhenBrowsing && !isSearching {
-            items = conversations.map(itemBuilder)
-        } else {
-            items = conversations.filter(matchesConversation).map(itemBuilder)
+    private func sortedItems(matchingSearch: Bool) -> [ChatInboxSectionItem] {
+        let directItems = directConversations
+            .filter { !matchingSearch || matchesConversation($0) }
+            .map(ChatInboxSectionItem.direct)
+        let groupItems = groupConversations
+            .filter { !matchingSearch || matchesGroup($0) }
+            .map(ChatInboxSectionItem.group)
+
+        return (directItems + groupItems).sorted { lhs, rhs in
+            if lhs.isPinned != rhs.isPinned { return lhs.isPinned && !rhs.isPinned }
+            if lhs.lastMessageAt != rhs.lastMessageAt {
+                return lhs.lastMessageAt > rhs.lastMessageAt
+            }
+            return lhs.id.uuidString > rhs.id.uuidString
         }
-
-        guard !items.isEmpty else { return nil }
-        return ChatInboxSection(kind: kind, items: items)
-    }
-
-    private func makeGroupSection(includeAllWhenBrowsing: Bool = false) -> ChatInboxSection? {
-        let items: [ChatInboxSectionItem]
-        if includeAllWhenBrowsing && !isSearching {
-            items = groupConversations.map(ChatInboxSectionItem.group)
-        } else {
-            items = groupConversations.filter(matchesGroup).map(ChatInboxSectionItem.group)
-        }
-
-        guard !items.isEmpty else { return nil }
-        return ChatInboxSection(kind: .groups, items: items)
     }
 
     private func matchesConversation(_ conversation: ChatConversationPreview) -> Bool {

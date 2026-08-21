@@ -52,20 +52,20 @@ struct UserPostsView: View {
     }
 
     let userId: UUID
-    var initialKind: PostKind? = nil
 
     @EnvironmentObject private var authService: AuthService
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var service = UserPostsService()
     @StateObject private var chatService = ChatService.shared
     @StateObject private var profileSocialService = ProfileSocialService.shared
+    @StateObject private var forumPostLoader = ProfileForumPostLoader()
+    @StateObject private var secondhandPostLoader = ProfileSecondhandPostLoader()
 
-    @State private var editingPost: UserPostSummary?
-    @State private var reportingPost: UserPostSummary?
     @State private var sharingPost: PostSharePayload?
-    @State private var deletingPost: UserPostSummary?
     @State private var selectedResolvedPost: UserPostResolvedDestination?
     @State private var activeConversation: ChatConversationPreview?
-    @State private var selectedKindFilter: PostKind?
+    @State private var selectedKindFilter: PostKind
 
     @State private var isLoadingSocialSummary = false
     @State private var hasResolvedSocialSummary = false
@@ -76,9 +76,21 @@ struct UserPostsView: View {
     @State private var blockRelation: UserBlockRelation = .none
     @State private var isRefreshingPostList = false
     @State private var categoryTransitionDirection: Int = 1
-    @State private var isOpeningPost = false
-    @State private var updatingPrivacyPostID: UUID?
     @State private var uidCopyFeedbackMessage: String?
+    @State private var hasRedirectedCurrentUser = false
+    @State private var secondhandGridWidth: CGFloat = 0
+    @State private var stopPostObservation: (() -> Void)?
+    @State private var postRefreshGeneration = 0
+
+    private let secondhandGridSpacing: CGFloat = 8
+
+    init(
+        userId: UUID,
+        initialKind: PostKind = PostKind.profileDefault
+    ) {
+        self.userId = userId
+        _selectedKindFilter = State(initialValue: initialKind)
+    }
 
     private var isCurrentUser: Bool {
         authService.currentUser?.id == userId
@@ -97,27 +109,38 @@ struct UserPostsView: View {
             && ["male", "female", "non_binary"].contains(service.profile?.gender ?? "")
     }
 
-    private var managedPosts: [UserPostSummary] {
-        guard isCurrentUser else { return service.posts }
-        return service.posts.filter { !$0.isPrivate }
-    }
-
     private var visiblePosts: [UserPostSummary] {
-        guard let selectedKindFilter else { return managedPosts }
-        return managedPosts.filter { $0.kind == selectedKindFilter }
+        return service.posts.filter { $0.kind == selectedKindFilter }
     }
 
-    private var availableKinds: [PostKind] {
-        let kinds = Set(managedPosts.map(\.kind))
-        return PostKind.allCases.filter { kinds.contains($0) }
-    }
-
-    private var postCategoryPages: [PostKind?] {
-        [nil] + availableKinds
+    private var postCategoryPages: [PostKind] {
+        PostKind.profileDisplayOrder
     }
 
     private var selectedCategoryKey: String {
-        selectedKindFilter?.rawValue ?? "all"
+        selectedKindFilter.rawValue
+    }
+
+    private var forumPostIDs: [UUID] {
+        service.posts.compactMap { post in
+            post.kind == .forum ? post.id : nil
+        }
+    }
+
+    private var forumPostsTaskID: String {
+        let postKey = forumPostIDs.map(\.uuidString).joined(separator: ",")
+        return "\(viewerScopedTaskID):\(postRefreshGeneration):\(postKey)"
+    }
+
+    private var secondhandPostIDs: [UUID] {
+        service.posts.compactMap { post in
+            post.kind == .secondhand ? post.id : nil
+        }
+    }
+
+    private var secondhandPostsTaskID: String {
+        let postKey = secondhandPostIDs.map(\.uuidString).joined(separator: ",")
+        return "\(viewerScopedTaskID):secondhand:\(postRefreshGeneration):\(postKey)"
     }
 
     private var profileHighlights: [ProfileHighlight] {
@@ -138,16 +161,9 @@ struct UserPostsView: View {
         return highlights
     }
 
-    private var screenTitle: String {
-        if isCurrentUser {
-            return "管理我的帖子"
-        }
-        return "个人主页"
-    }
-
     private var initialSurfaceState: CollectionLoadState {
         guard hasCheckedBlockState else { return .initialLoading }
-        if !isCurrentUser && isBlockedProfile { return .loaded }
+        if isBlockedProfile { return .loaded }
         guard hasResolvedSocialSummary else { return .initialLoading }
 
         switch service.surfaceLoadState {
@@ -161,12 +177,29 @@ struct UserPostsView: View {
     }
 
     var body: some View {
-        presentedScene
+        Group {
+            if isCurrentUser {
+                currentUserProfileRedirect
+            } else {
+                presentedScene
+            }
+        }
+    }
+
+    private var currentUserProfileRedirect: some View {
+        AppColors.pageBackground
+            .ignoresSafeArea()
+            .task(id: userId) {
+                guard !hasRedirectedCurrentUser else { return }
+                hasRedirectedCurrentUser = true
+                MainTabNavigationEvents.postOpenCurrentUserProfile()
+                dismiss()
+            }
     }
 
     private var lifecycleScene: some View {
         userPostsScene
-            .cheesePageTopBar(title: screenTitle)
+            .cheesePageTopBar(title: "个人主页")
             .overlay(alignment: .top) {
                 refreshOverlay
             }
@@ -174,15 +207,37 @@ struct UserPostsView: View {
                 activateCurrentViewer()
                 await loadInitialSurface()
             }
+            .onAppear {
+                startPostObservation()
+                if service.hasResolvedInitialSurfaceLoad {
+                    Task { await reconcilePostList() }
+                }
+            }
+            .onDisappear {
+                stopPostObservation?()
+                stopPostObservation = nil
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await reconcilePostList() }
+            }
+            .task(id: forumPostsTaskID) {
+                await forumPostLoader.load(
+                    postIDs: forumPostIDs,
+                    viewerID: authService.currentUser?.id,
+                    force: postRefreshGeneration > 0
+                )
+            }
+            .task(id: secondhandPostsTaskID) {
+                await secondhandPostLoader.load(
+                    postIDs: secondhandPostIDs,
+                    viewerID: authService.currentUser?.id,
+                    force: postRefreshGeneration > 0
+                )
+            }
             .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { notification in
                 guard PostFeatureEvents.changedAuthorId(from: notification) == userId else { return }
                 Task { await refreshPostListWithIndicator() }
-            }
-            .onChange(of: availableKinds) { _, kinds in
-                guard !service.isLoading else { return }
-                if let selectedKindFilter, !kinds.contains(selectedKindFilter) {
-                    selectPostCategory(nil)
-                }
             }
     }
 
@@ -196,38 +251,14 @@ struct UserPostsView: View {
             }
     }
 
-    private var sheetScene: some View {
+    private var presentedScene: some View {
         navigableScene
-            .navigationDestination(item: $editingPost) { post in
-                EditPostSheet(post: post) { payload in
-                    try await service.update(payload: payload)
-                }
-            }
-            .sheet(item: $reportingPost) { post in
-                ReportPostSheet(
-                    postId: post.id,
-                    postKind: post.kind
-                )
-            }
             .cheesePostSharePanel(item: $sharingPost) { message in
                 ShareFeedbackPresenter.show(message) {
                     uidCopyFeedbackMessage = $0
                 }
             }
-    }
-
-    private var presentedScene: some View {
-        sheetScene
             .shareFeedbackToast(message: $uidCopyFeedbackMessage)
-            .alert(
-                L10n.tr("Delete this post?", "确定删除这篇帖子？"),
-                isPresented: deleteConfirmationIsPresented,
-                presenting: deletingPost
-            ) { post in
-                deleteAlertActions(for: post)
-            } message: { _ in
-                Text(L10n.tr("This action cannot be undone.", "删除后无法恢复。"))
-            }
             .alert(
                 "操作失败",
                 isPresented: actionErrorIsPresented
@@ -238,13 +269,6 @@ struct UserPostsView: View {
             } message: {
                 Text(actionErrorMessage ?? "")
             }
-    }
-
-    private var deleteConfirmationIsPresented: Binding<Bool> {
-        Binding(
-            get: { deletingPost != nil },
-            set: { if !$0 { deletingPost = nil } }
-        )
     }
 
     private var actionErrorIsPresented: Binding<Bool> {
@@ -284,37 +308,17 @@ struct UserPostsView: View {
 
     @ViewBuilder
     private var loadedSurfaceContent: some View {
-        if !isCurrentUser && isBlockedProfile {
+        if isBlockedProfile {
             blockedState
                 .padding(.horizontal, 16)
                 .padding(.top, 40)
         } else {
             VStack(spacing: 0) {
                 profileHeader
-                if isCurrentUser {
-                    NavigationLink(destination: PrivateContentView()) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "lock.fill")
-                                .foregroundStyle(AppColors.textPrimary)
-                            Text("私密内容")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(AppColors.textPrimary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(AppColors.textMuted)
-                        }
-                        .padding(.vertical, 14)
-                        .overlay(alignment: .bottom) {
-                            Divider()
-                                .overlay(AppColors.divider)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
                 categoryFilterBar
-                    .padding(.top, isCurrentUser ? 0 : 10)
+                    .padding(.top, 10)
                 postListSection
+                    .padding(.top, 12)
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -338,23 +342,6 @@ struct UserPostsView: View {
             .clipShape(Capsule())
             .padding(.top, 66)
             .transition(.move(edge: .top).combined(with: .opacity))
-        }
-    }
-
-    @ViewBuilder
-    private func deleteAlertActions(for post: UserPostSummary) -> some View {
-        Button(L10n.tr("Cancel", "取消"), role: .cancel) {
-            deletingPost = nil
-        }
-        Button(L10n.tr("Delete", "删除"), role: .destructive) {
-            Task {
-                do {
-                    try await service.delete(postId: post.id)
-                    deletingPost = nil
-                } catch {
-                    deletingPost = nil
-                }
-            }
         }
     }
 
@@ -393,17 +380,6 @@ struct UserPostsView: View {
             HStack(spacing: 16) {
                 socialMetric(count: socialSummary.followerCount, label: "粉丝")
                 socialMetric(count: socialSummary.followingCount, label: "关注")
-                Text("互关")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(AppColors.link)
-                    .frame(width: 48, height: 28)
-                    .background(AppColors.link.opacity(0.12))
-                    .clipShape(Capsule())
-                    .opacity(socialSummary.isMutualFollow ? 1 : 0)
-                    .accessibilityHidden(!socialSummary.isMutualFollow)
-                    .transaction { transaction in
-                        transaction.animation = nil
-                    }
                 Spacer()
             }
 
@@ -436,42 +412,42 @@ struct UserPostsView: View {
                 Spacer()
             }
 
-            if !isCurrentUser {
-                HStack(spacing: 10) {
-                    Button {
-                        Task { await toggleFollow() }
-                    } label: {
-                        Text(
-                            socialSummary.amFollowing
-                                ? "已关注"
-                                : (socialSummary.followsMe ? "回关" : "关注")
+            HStack(spacing: 10) {
+                Button {
+                    Task { await toggleFollow() }
+                } label: {
+                    Text(
+                        socialSummary.isMutualFollow
+                            ? "已互关"
+                            : socialSummary.amFollowing
+                            ? "已关注"
+                            : (socialSummary.followsMe ? "回关" : "关注")
+                    )
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(socialSummary.amFollowing ? AppColors.textPrimary : .black)
+                        .frame(width: 72, height: 36)
+                        .background(socialSummary.amFollowing ? Color.white : AppColors.accent)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(AppColors.textMuted.opacity(socialSummary.amFollowing ? 0.3 : 0), lineWidth: 1)
                         )
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(socialSummary.amFollowing ? AppColors.textPrimary : .black)
-                            .frame(width: 72, height: 36)
-                            .background(socialSummary.amFollowing ? Color.white : AppColors.accent)
-                            .clipShape(Capsule())
-                            .overlay(
-                                Capsule()
-                                    .stroke(AppColors.textMuted.opacity(socialSummary.amFollowing ? 0.3 : 0), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .allowsHitTesting(!isTogglingFollow && !isLoadingSocialSummary)
-
-                    Button {
-                        Task { await startChat() }
-                    } label: {
-                        Text("私信")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 9)
-                            .background(AppColors.accent)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
                 }
+                .buttonStyle(.plain)
+                .allowsHitTesting(!isTogglingFollow && !isLoadingSocialSummary)
+
+                Button {
+                    Task { await startChat() }
+                } label: {
+                    Text("私信")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(AppColors.accent)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(.vertical, 14)
@@ -494,11 +470,10 @@ struct UserPostsView: View {
 
     @ViewBuilder
     private var categoryFilterBar: some View {
-        if service.isLoading || managedPosts.isEmpty {
+        if service.isLoading || service.posts.isEmpty {
             EmptyView()
         } else {
             ProfilePostKindFilterBar(
-                availableKinds: availableKinds,
                 selectedKind: selectedKindFilter,
                 onSelect: selectPostCategory
             )
@@ -510,23 +485,37 @@ struct UserPostsView: View {
             Group {
                 if visiblePosts.isEmpty {
                     emptyState
+                } else if selectedKindFilter == .secondhand {
+                    secondhandPostGrid
                 } else {
                     LazyVStack(spacing: 0) {
                         ForEach(visiblePosts) { post in
-                            UserPostCard(
-                                post: post,
-                                isCurrentUser: isCurrentUser,
-                                onOpen: {
-                                    Task { await openPost(post) }
-                                },
-                                onEdit: { editingPost = post },
-                                onToggleHidden: {
-                                    Task { await toggleHidden(post) }
-                                },
-                                onShare: { sharingPost = post.sharePayload },
-                                onReport: { reportingPost = post },
-                                onDelete: { deletingPost = post }
-                            )
+                            if post.kind == .forum {
+                                if let forumPost = forumPostLoader.postsByID[post.id] {
+                                    ProfileForumPostCardView(
+                                        post: forumPost,
+                                        onTap: {
+                                            // The profile loader already supplied the complete
+                                            // forum model that this shared card displays. Reusing
+                                            // it avoids a second network request before navigation.
+                                            selectedResolvedPost = .forum(forumPost)
+                                        },
+                                        onBoardTap: {
+                                            selectedResolvedPost = .forumBoard(
+                                                forumPost.boardID
+                                            )
+                                        },
+                                        onShareTap: {
+                                            sharingPost = forumPost.sharePayload
+                                        },
+                                        onActionError: { message in
+                                            actionErrorMessage = message
+                                        }
+                                    )
+                                } else {
+                                    forumPostLoadingRow
+                                }
+                            }
                         }
                     }
                 }
@@ -538,6 +527,113 @@ struct UserPostsView: View {
         .contentShape(Rectangle())
     }
 
+    private var secondhandPostGrid: some View {
+        LazyVGrid(
+            columns: secondhandGridColumns,
+            spacing: secondhandGridSpacing
+        ) {
+            ForEach(visiblePosts) { summary in
+                if let item = secondhandPostLoader.itemsByID[summary.id] {
+                    SecondhandCardView(
+                        item: item,
+                        isOwnPost: false,
+                        constrainedWidth: secondhandCardWidth,
+                        onOpenTap: {
+                            selectedResolvedPost = .secondhand(item)
+                        },
+                        onAuthorTap: nil,
+                        onFavoriteTap: {
+                            Task { await toggleSecondhandFavorite(item) }
+                        }
+                    )
+                } else {
+                    secondhandPostLoadingCell
+                }
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { width in
+            guard width > 0,
+                  abs(secondhandGridWidth - width) > 0.5
+            else { return }
+            secondhandGridWidth = width
+        }
+        .padding(.horizontal, -8)
+    }
+
+    private var secondhandPostLoadingCell: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(Color.white)
+            .frame(
+                minWidth: secondhandCardWidth,
+                idealWidth: secondhandCardWidth,
+                maxWidth: secondhandCardWidth ?? .infinity,
+                minHeight: 280
+            )
+            .overlay {
+                if secondhandPostLoader.isLoading {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "exclamationmark.circle")
+                        .foregroundStyle(AppColors.textMuted)
+                }
+            }
+    }
+
+    private var secondhandCardWidth: CGFloat? {
+        guard secondhandGridWidth > secondhandGridSpacing else { return nil }
+        return floor((secondhandGridWidth - secondhandGridSpacing) / 2)
+    }
+
+    private var secondhandGridColumns: [GridItem] {
+        guard let secondhandCardWidth else {
+            return [
+                GridItem(.flexible(minimum: 0), spacing: secondhandGridSpacing),
+                GridItem(.flexible(minimum: 0), spacing: secondhandGridSpacing)
+            ]
+        }
+        return [
+            GridItem(.fixed(secondhandCardWidth), spacing: secondhandGridSpacing),
+            GridItem(.fixed(secondhandCardWidth), spacing: secondhandGridSpacing)
+        ]
+    }
+
+    @MainActor
+    private func toggleSecondhandFavorite(_ item: SecondhandItem) async {
+        let interaction = PostInteractionStore.shared.state(
+            for: item.id,
+            fallbackIsFavorited: item.isFavorited
+        )
+        do {
+            _ = try await SecondhandService.shared.toggleFavorite(
+                postId: item.id,
+                currentlyFavorited: interaction.isFavorited
+            )
+        } catch {
+            if error.isCancellationLike { return }
+            actionErrorMessage = error.localizedDescription
+        }
+    }
+
+    private var forumPostLoadingRow: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.small)
+            Text(
+                forumPostLoader.errorMessage == nil
+                    ? "正在载入论坛帖子…"
+                    : "论坛帖子载入失败，下拉即可重试"
+            )
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(AppColors.textMuted)
+        }
+        .frame(maxWidth: .infinity, minHeight: 96)
+        .overlay(alignment: .bottom) {
+            Divider().overlay(AppColors.divider)
+        }
+    }
+
     private var postCategoryTransition: AnyTransition {
         let isForward = categoryTransitionDirection >= 0
         return .asymmetric(
@@ -546,7 +642,7 @@ struct UserPostsView: View {
         )
     }
 
-    private func selectPostCategory(_ kind: PostKind?) {
+    private func selectPostCategory(_ kind: PostKind) {
         guard kind != selectedKindFilter else { return }
         let pages = postCategoryPages
         guard let currentIndex = pages.firstIndex(of: selectedKindFilter),
@@ -560,21 +656,6 @@ struct UserPostsView: View {
         categoryTransitionDirection = targetIndex >= currentIndex ? 1 : -1
         withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) {
             selectedKindFilter = kind
-        }
-    }
-
-    @MainActor
-    private func toggleHidden(_ post: UserPostSummary) async {
-        guard updatingPrivacyPostID == nil else { return }
-        updatingPrivacyPostID = post.id
-        defer { updatingPrivacyPostID = nil }
-        do {
-            try await service.setPostHidden(
-                postId: post.id,
-                hidden: !post.isPrivate
-            )
-        } catch {
-            actionErrorMessage = error.localizedDescription
         }
     }
 
@@ -596,32 +677,6 @@ struct UserPostsView: View {
             return nil
         }
         return value
-    }
-
-    @MainActor
-    private func openPost(_ post: UserPostSummary) async {
-        guard !isOpeningPost else { return }
-
-        isOpeningPost = true
-        defer { isOpeningPost = false }
-
-        do {
-            let destination = try await resolveDestination(for: post)
-            selectedResolvedPost = nil
-            selectedResolvedPost = destination
-        } catch {
-            actionErrorMessage = error.localizedDescription
-        }
-    }
-
-    @MainActor
-    private func resolveDestination(for post: UserPostSummary) async throws -> UserPostResolvedDestination {
-        switch post.kind {
-        case .secondhand:
-            return .secondhand(try await SecondhandService.shared.fetchItem(postId: post.id))
-        case .forum:
-            return .forum(try await ForumService.shared.fetchPost(postId: post.id))
-        }
     }
 
     private var emptyState: some View {
@@ -696,11 +751,7 @@ struct UserPostsView: View {
         }
         let hasCachedSurface = service.restoreCachedSurface(userId: userId)
 
-        if isCurrentUser {
-            blockRelation = .none
-            isBlockedProfile = false
-            hasCheckedBlockState = true
-        } else if let cachedBlockRelation =
+        if let cachedBlockRelation =
             UserPostsViewMemoryCache.blockRelation(
                 viewerID: viewerID,
                 targetUserID: userId
@@ -708,10 +759,6 @@ struct UserPostsView: View {
             blockRelation = cachedBlockRelation
             isBlockedProfile = cachedBlockRelation.isBlockedByOther
             hasCheckedBlockState = true
-        }
-
-        if isCurrentUser, let currentProfile = authService.currentUser {
-            service.primeProfile(currentProfile, for: userId)
         }
 
         return hasCachedSurface && hasCheckedBlockState
@@ -723,10 +770,6 @@ struct UserPostsView: View {
             return
         }
         activateCurrentViewer()
-
-        if selectedKindFilter == nil {
-            selectedKindFilter = initialKind
-        }
 
         if !forceRefresh, restoreCachedSurfaceIfPossible() {
             await loadSocialSummary()
@@ -741,28 +784,19 @@ struct UserPostsView: View {
             forceRefresh: forceRefresh
         )
 
-        if !isCurrentUser {
-            let relation = await chatService.fetchBlockRelation(with: userId)
-            guard authService.currentUser?.id == requestViewerID else { return }
-            blockRelation = relation
-            isBlockedProfile = relation.isBlockedByOther
-            hasCheckedBlockState = true
-            UserPostsViewMemoryCache.storeBlockRelation(
-                relation,
-                viewerID: requestViewerID,
-                targetUserID: userId
-            )
-            guard !isBlockedProfile else {
-                _ = await socialSummaryLoad
-                return
-            }
-        } else {
-            blockRelation = .none
-            isBlockedProfile = false
-            hasCheckedBlockState = true
-            if let currentProfile = authService.currentUser {
-                service.primeProfile(currentProfile, for: userId)
-            }
+        let relation = await chatService.fetchBlockRelation(with: userId)
+        guard authService.currentUser?.id == requestViewerID else { return }
+        blockRelation = relation
+        isBlockedProfile = relation.isBlockedByOther
+        hasCheckedBlockState = true
+        UserPostsViewMemoryCache.storeBlockRelation(
+            relation,
+            viewerID: requestViewerID,
+            targetUserID: userId
+        )
+        guard !isBlockedProfile else {
+            _ = await socialSummaryLoad
+            return
         }
 
         await service.load(userId: userId, forceRefresh: forceRefresh)
@@ -782,9 +816,6 @@ struct UserPostsView: View {
         isBlockedProfile = false
         hasCheckedBlockState = false
         hasResolvedSocialSummary = false
-        editingPost = nil
-        reportingPost = nil
-        deletingPost = nil
         selectedResolvedPost = nil
         activeConversation = nil
         actionErrorMessage = nil
@@ -796,6 +827,21 @@ struct UserPostsView: View {
         isRefreshingPostList = true
         defer { isRefreshingPostList = false }
         await service.refreshPosts(userId: userId)
+        postRefreshGeneration &+= 1
+    }
+
+    @MainActor
+    private func startPostObservation() {
+        stopPostObservation?()
+        stopPostObservation = service.observePostChanges(userId: userId) {
+            await reconcilePostList()
+        }
+    }
+
+    @MainActor
+    private func reconcilePostList() async {
+        await service.refreshPosts(userId: userId)
+        postRefreshGeneration &+= 1
     }
 
     private func loadSocialSummary(forceRefresh: Bool = false) async {
@@ -810,7 +856,6 @@ struct UserPostsView: View {
     }
 
     private func toggleFollow() async {
-        guard !isCurrentUser else { return }
         guard authService.currentUser?.id != nil else {
             actionErrorMessage = "请先登录后再关注。"
             return
@@ -832,7 +877,6 @@ struct UserPostsView: View {
     }
 
     private func startChat() async {
-        guard !isCurrentUser else { return }
         let relation = await chatService.fetchBlockRelation(with: userId)
         blockRelation = relation
 
@@ -851,30 +895,19 @@ struct UserPostsView: View {
 }
 
 struct ProfilePostKindFilterBar: View {
-    let availableKinds: [PostKind]
-    let selectedKind: PostKind?
-    let onSelect: (PostKind?) -> Void
+    let selectedKind: PostKind
+    let onSelect: (PostKind) -> Void
 
     var body: some View {
         PostFlowLayout(spacing: 8) {
-            Group {
+            ForEach(PostKind.profileDisplayOrder, id: \.self) { kind in
                 filterChip(
-                    title: L10n.tr("All", "全部"),
-                    isSelected: selectedKind == nil
+                    title: kind.displayName,
+                    isSelected: selectedKind == kind
                 ) {
-                    onSelect(nil)
-                }
-
-                ForEach(availableKinds, id: \.self) { kind in
-                    filterChip(
-                        title: kind.displayName,
-                        isSelected: selectedKind == kind
-                    ) {
-                        onSelect(kind)
-                    }
+                    onSelect(kind)
                 }
             }
-            .padding(.vertical, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -897,163 +930,22 @@ struct ProfilePostKindFilterBar: View {
     }
 }
 
-private struct UserPostCard: View {
-    let post: UserPostSummary
-    let isCurrentUser: Bool
-    let onOpen: () -> Void
-    let onEdit: () -> Void
-    let onToggleHidden: () -> Void
-    let onShare: () -> Void
-    let onReport: () -> Void
-    let onDelete: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Label(post.kind.displayName, systemImage: post.kind.icon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(AppColors.textMuted)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color(.systemGray6))
-                    .clipShape(Capsule())
-
-                if post.isPrivate {
-                    Label("私密", systemImage: "lock.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.orange)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.orange.opacity(0.12))
-                        .clipShape(Capsule())
-                }
-
-                if post.isArchived {
-                    Label("封存", systemImage: "archivebox.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.purple)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.purple.opacity(0.12))
-                        .clipShape(Capsule())
-                }
-
-                Spacer()
-
-                Text(post.relativeTimeText)
-                    .font(.system(size: 12))
-                    .foregroundStyle(AppColors.textMuted)
-
-                Menu {
-                    if isCurrentUser {
-                        Button {
-                            onToggleHidden()
-                        } label: {
-                            Label("私密", systemImage: "lock.fill")
-                        }
-
-                        Button {
-                            onEdit()
-                        } label: {
-                            Label("编辑", systemImage: "square.and.pencil")
-                        }
-
-                        Button {
-                            onShare()
-                        } label: {
-                            Label("分享", systemImage: "square.and.arrow.up")
-                        }
-
-                        Divider()
-
-                        Button(role: .destructive) {
-                            onDelete()
-                        } label: {
-                            Label("删除", systemImage: "trash")
-                        }
-                    }
-
-                    if !isCurrentUser {
-                        Button(role: .destructive) {
-                            onReport()
-                        } label: {
-                            Label("举报", systemImage: "flag.fill")
-                        }
-                    }
-                } label: {
-                    Group {
-                        if isCurrentUser {
-                            HStack(spacing: 5) {
-                                Text("编辑")
-                                Image(systemName: "ellipsis")
-                            }
-                        } else {
-                            Image(systemName: "ellipsis")
-                                .frame(width: 18, height: 18)
-                        }
-                    }
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(AppColors.textPrimary)
-                    .frame(
-                        width: isCurrentUser ? nil : 36,
-                        height: 30
-                    )
-                    .padding(.horizontal, isCurrentUser ? 10 : 0)
-                    .background(
-                        isCurrentUser
-                            ? Color(.systemGray6)
-                            : Color.clear
-                    )
-                    .clipShape(Capsule())
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text(post.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(AppColors.textPrimary)
-                    .singleLineEllipsized()
-
-                if !post.description.isEmpty {
-                    Text(post.description)
-                        .font(.system(size: 14))
-                        .foregroundStyle(AppColors.textMuted)
-                        .lineLimit(2)
-                }
-
-                HStack(spacing: 8) {
-                    if let priceText = post.priceDisplayText {
-                        Text(priceText)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(AppColors.link)
-                    }
-
-                    Text(post.subtitle)
-                        .font(.system(size: 13))
-                        .foregroundStyle(AppColors.textMuted)
-                        .lineLimit(1)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onOpen)
-        }
-        .padding(.vertical, 14)
-        .overlay(alignment: .bottom) {
-            Divider()
-                .overlay(AppColors.divider)
-        }
-    }
+extension PostKind {
+    static let profileDisplayOrder: [PostKind] = [.forum, .secondhand]
+    static let profileDefault: PostKind = .forum
 }
 
 private enum UserPostResolvedDestination: Hashable, Identifiable {
     case secondhand(SecondhandItem)
     case forum(ForumPostItem)
+    case forumBoard(UUID)
 
     var id: String {
         switch self {
         case .secondhand(let item): return "secondhand-\(item.id.uuidString)"
         case .forum(let post): return "forum-\(post.id.uuidString)"
+        case .forumBoard(let boardID):
+            return "forum-board-\(boardID.uuidString)"
         }
     }
 }
@@ -1067,6 +959,8 @@ private struct UserPostResolvedDetailRouter: View {
             SecondhandDetailView(item: item)
         case .forum(let post):
             ForumDetailView(post: post)
+        case .forumBoard(let boardID):
+            ForumBoardView(boardID: boardID)
         }
     }
 }

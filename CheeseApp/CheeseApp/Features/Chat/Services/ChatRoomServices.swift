@@ -18,6 +18,7 @@ protocol ChatRoomServicing: AnyObject {
     func setConversationRemark(conversationId: UUID, remark: String?)
     func fetchDirectConversationSettings(conversationId: UUID) async -> DirectConversationSettings
     func setConversationMuted(conversationId: UUID, isMuted: Bool) async throws
+    func setConversationPinned(conversationId: UUID, isPinned: Bool) async throws
     func clearConversationHistory(conversationId: UUID) async throws -> Date
     func deleteDirectMessage(messageId: UUID, forEveryone: Bool) async throws
     func fetchBlockRelation(with otherUserId: UUID) async -> UserBlockRelation
@@ -43,6 +44,9 @@ protocol SecondhandChatTransactionServicing: AnyObject {
     func cancelSecondhandPurchaseIntent(intentId: UUID) async throws
     func completeSecondhandSale(listingId: UUID, buyerId: UUID) async throws
     func cancelSellerSecondhandTransaction(intentId: UUID) async throws
+    func fetchConversationCompletedSecondhandTransactions(
+        conversationId: UUID
+    ) async throws -> [CompletedSecondhandTransaction]
 }
 
 extension ChatService: SecondhandChatTransactionServicing {}

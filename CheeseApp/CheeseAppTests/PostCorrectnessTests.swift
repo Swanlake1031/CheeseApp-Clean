@@ -389,6 +389,25 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertEqual(rawValue, "ride")
     }
 
+    func testCommentTargetMakesForumPostRouteIdentitySpecific() {
+        let postID = UUID(uuidString: "92000000-0000-0000-0000-000000000001")!
+        let firstCommentID = UUID(uuidString: "92000000-0000-0000-0000-000000000002")!
+        let secondCommentID = UUID(uuidString: "92000000-0000-0000-0000-000000000003")!
+        let first = PostDeepLinkRoute(
+            kind: .forum,
+            postId: postID,
+            commentId: firstCommentID
+        )
+        let second = PostDeepLinkRoute(
+            kind: .forum,
+            postId: postID,
+            commentId: secondCommentID
+        )
+
+        XCTAssertEqual(first.commentId, firstCommentID)
+        XCTAssertNotEqual(first.id, second.id)
+    }
+
     func testSecondhandDetailPayloadPreservesCanonicalSelectedCategory() {
         let input = makeSecondhandInput(category: .booksAcademic)
 
@@ -429,40 +448,89 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertEqual(SecondhandPost.Category(normalizing: "textbooks"), .booksAcademic)
     }
 
-    func testJustifiedGalleryPacksTwoPortraitImagesIntoOneCompactRow() throws {
-        let containerWidth: CGFloat = 343
-        let rows = JustifiedPhotoGalleryLayoutEngine.rows(
-            aspectRatios: [0.58, 0.72],
-            containerWidth: containerWidth,
-            spacing: 4
-        )
+    func testDetailCarouselFirstLandscapeImageOwnsEveryPageViewport() {
+        let pageSourceRatios: [CGFloat] = [4.0 / 3.0, 9.0 / 16.0, 16.0 / 9.0]
+        let layouts = pageSourceRatios.map { _ in
+            DetailMediaLayoutEngine.viewportLayout(
+                contentWidth: 358,
+                firstImageAspectRatio: pageSourceRatios[0],
+                metrics: .forum
+            )
+        }
 
-        let row = try XCTUnwrap(rows.first)
-        XCTAssertEqual(rows.count, 1)
-        XCTAssertEqual(row.indices, 0..<2)
-        XCTAssertEqual(row.widths.count, 2)
-        XCTAssertLessThan(row.height, containerWidth)
-        XCTAssertEqual(row.widths.reduce(0, +) + 4, containerWidth, accuracy: 0.01)
-        XCTAssertEqual(row.widths[0] / row.height, 0.58, accuracy: 0.001)
-        XCTAssertEqual(row.widths[1] / row.height, 0.72, accuracy: 0.001)
+        XCTAssertTrue(layouts.dropFirst().allSatisfy { $0 == layouts[0] })
+        XCTAssertEqual(layouts[0].aspectRatio, 4.0 / 3.0, accuracy: 0.001)
     }
 
-    func testJustifiedGalleryUsesEveryImageExactlyOnceWithoutCroppingMath() {
-        let ratios: [CGFloat] = [1.6, 0.67, 0.75, 1.45, 1.0, 0.8]
-        let rows = JustifiedPhotoGalleryLayoutEngine.rows(
-            aspectRatios: ratios,
-            containerWidth: 343,
-            spacing: 4
+    func testDetailCarouselFirstPortraitImageKeepsPortraitViewport() {
+        let layout = DetailMediaLayoutEngine.viewportLayout(
+            contentWidth: 366,
+            firstImageAspectRatio: 3.0 / 4.0,
+            metrics: .secondhand
         )
 
-        XCTAssertEqual(rows.flatMap { Array($0.indices) }, Array(ratios.indices))
-        XCTAssertTrue(rows.allSatisfy { (1...3).contains($0.indices.count) })
-        for row in rows {
-            XCTAssertEqual(row.widths.reduce(0, +) + CGFloat(row.widths.count - 1) * 4, 343, accuracy: 0.01)
-            for (offset, index) in row.indices.enumerated() {
-                XCTAssertEqual(row.widths[offset] / row.height, ratios[index], accuracy: 0.001)
-            }
+        XCTAssertEqual(layout.aspectRatio, 3.0 / 4.0, accuracy: 0.001)
+        XCTAssertEqual(layout.height, 488, accuracy: 0.001)
+    }
+
+    func testDetailCarouselClampsExtremelyTallFirstImage() {
+        let layout = DetailMediaLayoutEngine.viewportLayout(
+            contentWidth: 366,
+            firstImageAspectRatio: 1.0 / 5.0,
+            metrics: .secondhand
+        )
+
+        XCTAssertEqual(layout.aspectRatio, DetailMediaMetrics.secondhand.minimumAspectRatio)
+        XCTAssertEqual(layout.height, 488, accuracy: 0.001)
+    }
+
+    func testDetailCarouselClampsUltraWideFirstImage() {
+        let layout = DetailMediaLayoutEngine.viewportLayout(
+            contentWidth: 358,
+            firstImageAspectRatio: 5,
+            metrics: .forum
+        )
+
+        XCTAssertEqual(layout.aspectRatio, DetailMediaMetrics.forum.maximumAspectRatio)
+        XCTAssertEqual(layout.height, 201.375, accuracy: 0.001)
+    }
+
+    func testDetailCarouselPageChangesCannotChangeViewportHeight() {
+        let firstImageRatio: CGFloat = 4.0 / 3.0
+        let pageIndices = 0..<3
+        let heights = pageIndices.map { _ in
+            DetailMediaLayoutEngine.viewportLayout(
+                contentWidth: 358,
+                firstImageAspectRatio: firstImageRatio,
+                metrics: .forum
+            ).height
         }
+
+        XCTAssertEqual(heights[0], heights[1])
+        XCTAssertEqual(heights[1], heights[2])
+    }
+
+    func testDetailCarouselTappedSecondPageOpensSecondFullscreenImage() {
+        XCTAssertEqual(
+            DetailMediaPagingPolicy.previewIndex(tappedPage: 1, imageCount: 3),
+            1
+        )
+    }
+
+    func testDetailCarouselSingleImageHasNoPagingIndicator() {
+        XCTAssertFalse(DetailMediaPagingPolicy.showsPageIndicator(imageCount: 1))
+        XCTAssertTrue(DetailMediaPagingPolicy.showsPageIndicator(imageCount: 2))
+    }
+
+    func testDetailCarouselFailedFirstImageUsesStableFallbackViewport() {
+        let layout = DetailMediaLayoutEngine.viewportLayout(
+            contentWidth: 358,
+            firstImageAspectRatio: nil,
+            metrics: .forum
+        )
+
+        XCTAssertEqual(layout.aspectRatio, DetailMediaMetrics.forum.fallbackAspectRatio)
+        XCTAssertEqual(layout.height, 358, accuracy: 0.001)
     }
 
     func testSecondhandConditionAndStatusMappingAreStable() {

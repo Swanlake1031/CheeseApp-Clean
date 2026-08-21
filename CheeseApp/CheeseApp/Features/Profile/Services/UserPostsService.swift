@@ -273,6 +273,38 @@ final class UserPostsService: ObservableObject {
         }
     }
 
+    func observePostChanges(
+        userId: UUID,
+        onChange: @escaping @MainActor () async -> Void
+    ) -> () -> Void {
+        let channel = supabase.client.channel(
+            "profile-posts-\(userId.uuidString)-\(UUID().uuidString)"
+        )
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "posts",
+            filter: .eq("user_id", value: userId)
+        )
+        let task = Task {
+            do {
+                try await channel.subscribeWithError()
+                for await _ in changes {
+                    guard !Task.isCancelled else { break }
+                    await onChange()
+                }
+            } catch {
+                // Returning to the foreground performs an authoritative
+                // refresh, so a temporary realtime disconnect is recoverable.
+            }
+        }
+
+        return { [supabase] in
+            task.cancel()
+            Task { await supabase.client.removeChannel(channel) }
+        }
+    }
+
     func fetchPostCount(userId: UUID) async throws -> Int {
         let response = try await supabase
             .database("posts")

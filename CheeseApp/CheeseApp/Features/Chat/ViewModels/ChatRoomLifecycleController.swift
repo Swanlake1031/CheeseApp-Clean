@@ -101,7 +101,7 @@ struct ChatRoomMessageOperations<MessageType: ChatRoomTimelineMessage> {
         @escaping (MessageType) async -> Void,
         @escaping (UUID) async -> Void,
         @escaping () -> Void
-    ) -> () -> Void
+    ) async throws -> () -> Void
     let sendText: (String, QuotedMessageMetadata?) async throws -> MessageType
     let sendImage: (ChatMediaReference) async throws -> MessageType
     let markRead: () async -> Void
@@ -123,6 +123,7 @@ final class ChatRoomMessageState<MessageType: ChatRoomTimelineMessage>: Observab
     private let operations: ChatRoomMessageOperations<MessageType>
     private var lifecycle = ChatRoomLifecycleController()
     private var stopRealtimeObservation: (() -> Void)?
+    private var realtimeRecoveryTask: Task<Void, Never>?
     private var minimumVisibleDate: Date?
     private var isTransportingMessage = false
     private var historyCursor: ChatMessagePageCursor?
@@ -140,6 +141,12 @@ final class ChatRoomMessageState<MessageType: ChatRoomTimelineMessage>: Observab
         await prepare()
         guard lifecycle.acceptsEvents(for: sessionID) else { return }
 
+        // Establish the live subscription before taking the initial snapshot.
+        // Otherwise a message committed between the fetch and subscribe calls
+        // is invisible until the user leaves and re-enters the room.
+        await startRealtime(sessionID: sessionID)
+        guard lifecycle.acceptsEvents(for: sessionID) else { return }
+
         isLoading = true
         errorMessage = nil
         hasResolvedInitialLoad = false
@@ -149,7 +156,7 @@ final class ChatRoomMessageState<MessageType: ChatRoomTimelineMessage>: Observab
             guard lifecycle.acceptsEvents(for: sessionID) else { return }
 
             messages = ChatRoomMessageTimeline
-                .merge(page.messages, into: [])
+                .merge(page.messages, into: messages)
                 .filter(isVisible)
             historyCursor = page.nextCursor
             hasMoreHistory = page.nextCursor != nil
@@ -169,7 +176,6 @@ final class ChatRoomMessageState<MessageType: ChatRoomTimelineMessage>: Observab
         }
 
         guard lifecycle.acceptsEvents(for: sessionID) else { return }
-        startRealtime(sessionID: sessionID)
         lifecycle.completeBootstrap()
     }
 
@@ -275,6 +281,8 @@ final class ChatRoomMessageState<MessageType: ChatRoomTimelineMessage>: Observab
     func stop() {
         stopRealtimeObservation?()
         stopRealtimeObservation = nil
+        realtimeRecoveryTask?.cancel()
+        realtimeRecoveryTask = nil
         lifecycle.invalidateForRoomExit()
         historyRequestID = nil
         isLoading = false
@@ -282,27 +290,79 @@ final class ChatRoomMessageState<MessageType: ChatRoomTimelineMessage>: Observab
         isTransportingMessage = false
     }
 
-    private func startRealtime(sessionID: UUID) {
+    private func startRealtime(sessionID: UUID) async {
         stopRealtimeObservation?()
-        stopRealtimeObservation = operations.observe(
-            { [weak self] message in
-                await self?.receive(message, sessionID: sessionID)
-            },
-            { [weak self] messageID in
-                guard let self,
-                      self.lifecycle.acceptsEvents(for: sessionID)
-                else { return }
-                self.removeMessage(id: messageID)
-            },
-            { [weak self] in
-                Task { @MainActor [weak self] in
+        stopRealtimeObservation = nil
+
+        do {
+            stopRealtimeObservation = try await operations.observe(
+                { [weak self] message in
+                    await self?.receive(message, sessionID: sessionID)
+                },
+                { [weak self] messageID in
                     guard let self,
                           self.lifecycle.acceptsEvents(for: sessionID)
                     else { return }
-                    self.errorMessage = "Realtime disconnected. Pull to refresh."
+                    self.removeMessage(id: messageID)
+                },
+                { [weak self] in
+                    Task { @MainActor [weak self] in
+                        self?.scheduleRealtimeRecovery(sessionID: sessionID)
+                    }
                 }
+            )
+        } catch {
+            guard lifecycle.acceptsEvents(for: sessionID) else { return }
+            scheduleRealtimeRecovery(sessionID: sessionID)
+        }
+    }
+
+    private func scheduleRealtimeRecovery(sessionID: UUID) {
+        guard lifecycle.acceptsEvents(for: sessionID),
+              realtimeRecoveryTask == nil
+        else { return }
+
+        realtimeRecoveryTask = Task { [weak self] in
+            guard let self else { return }
+            var retryDelay: UInt64 = 500_000_000
+
+            while !Task.isCancelled,
+                  self.lifecycle.acceptsEvents(for: sessionID) {
+                try? await Task.sleep(nanoseconds: retryDelay)
+                guard !Task.isCancelled,
+                      self.lifecycle.acceptsEvents(for: sessionID)
+                else { return }
+
+                await self.startRealtime(sessionID: sessionID)
+                guard self.stopRealtimeObservation != nil else {
+                    retryDelay = min(retryDelay * 2, 8_000_000_000)
+                    continue
+                }
+
+                await self.reconcileLatestMessages(sessionID: sessionID)
+                guard self.lifecycle.acceptsEvents(for: sessionID) else { return }
+                self.realtimeRecoveryTask = nil
+                return
             }
-        )
+        }
+    }
+
+    private func reconcileLatestMessages(sessionID: UUID) async {
+        do {
+            let page = try await operations.loadInitialPage()
+            guard lifecycle.acceptsEvents(for: sessionID) else { return }
+            messages = ChatRoomMessageTimeline
+                .merge(page.messages, into: messages)
+                .filter(isVisible)
+            historyCursor = page.nextCursor
+            hasMoreHistory = page.nextCursor != nil
+            historyErrorMessage = nil
+            scrollToMessageID = messages.last?.id
+            hasResolvedInitialLoad = true
+            await operations.markRead()
+        } catch {
+            return
+        }
     }
 
     private func receive(_ message: MessageType, sessionID: UUID) async {
@@ -345,7 +405,7 @@ extension ChatRoomMessageState where MessageType == Message {
                     )
                 },
                 observe: { onMessage, onDelete, onDisconnect in
-                    repository.observeMessages(
+                    try await repository.observeMessages(
                         conversationId: conversationID,
                         onMessage: onMessage,
                         onMessageDeleted: onDelete,
@@ -384,7 +444,7 @@ extension ChatRoomMessageState where MessageType == GroupMessage {
                     )
                 },
                 observe: { onMessage, onDelete, onDisconnect in
-                    repository.observeGroupMessages(
+                    try await repository.observeGroupMessages(
                         groupId: groupID,
                         onMessage: onMessage,
                         onMessageDeleted: onDelete,

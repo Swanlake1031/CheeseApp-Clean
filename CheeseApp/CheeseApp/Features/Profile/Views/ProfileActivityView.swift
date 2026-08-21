@@ -70,6 +70,7 @@ private struct ProfileActivityPageHeightPreferenceKey: PreferenceKey {
 
 enum ProfileActivityPostAction {
     case makePrivate
+    case makePublic
     case edit
     case share
     case delete
@@ -114,7 +115,16 @@ private struct NativeProfilePostMenuButton: UIViewRepresentable {
     private func makeMenu(coordinator: Coordinator) -> UIMenu {
         var children: [UIMenuElement] = []
 
-        if !isPrivate {
+        if isPrivate {
+            children.append(
+                action(
+                    title: "恢复公开",
+                    systemImage: "lock.open.fill",
+                    value: .makePublic,
+                    coordinator: coordinator
+                )
+            )
+        } else {
             children.append(
                 action(
                     title: "私密",
@@ -229,7 +239,7 @@ struct ProfileActivityView: View {
     @EnvironmentObject private var authService: AuthService
     @StateObject private var userPostsService = UserPostsService()
     @State private var selectedKind: ProfileActivityKind
-    @State private var selectedPublishedKind: PostKind?
+    @State private var selectedPublishedKind: PostKind
     @State private var refreshGeneration = 0
     @State private var destination: ProfileActivityDestination?
     @State private var editingPost: UserPostSummary?
@@ -265,7 +275,7 @@ struct ProfileActivityView: View {
         onPresentEditor: ((UserPostSummary) -> Void)? = nil
     ) {
         _selectedKind = State(initialValue: initialKind)
-        _selectedPublishedKind = State(initialValue: nil)
+        _selectedPublishedKind = State(initialValue: PostKind.profileDefault)
         self.showsKindPicker = showsKindPicker
         self.isEmbedded = isEmbedded
         self.publishedVisibility = publishedVisibility
@@ -435,10 +445,19 @@ struct ProfileActivityView: View {
             onOpen: { item in
                 Task { await openPost(item) }
             },
+            onOpenForum: { post, commentID in
+                destination = .forum(post, commentID: commentID)
+            },
             onSetPrivacy: { item, hidden in
                 Task { await setPostPrivacy(item, hidden: hidden) }
             },
             onShare: share,
+            onOpenForumBoard: { boardID in
+                destination = .forumBoard(boardID)
+            },
+            onActionError: { message in
+                navigationErrorMessage = message
+            },
             onPerformAction: { action, item in
                 performPostAction(action, for: item)
             },
@@ -519,7 +538,7 @@ struct ProfileActivityView: View {
         }
     }
 
-    private func selectPublishedPostKind(_ kind: PostKind?) {
+    private func selectPublishedPostKind(_ kind: PostKind) {
         guard selectedPublishedKind != kind else { return }
         cancelPendingPostActions()
         withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) {
@@ -540,7 +559,7 @@ struct ProfileActivityView: View {
 
     private var embeddedPagerHeight: CGFloat {
         max(
-            embeddedPageHeights.values.max() ?? minimumEmbeddedPagerHeight,
+            embeddedPageHeights[selectedKind] ?? minimumEmbeddedPagerHeight,
             minimumEmbeddedPagerHeight
         )
     }
@@ -722,6 +741,8 @@ struct ProfileActivityView: View {
         switch action {
         case .makePrivate:
             Task { await setPostPrivacy(item, hidden: true) }
+        case .makePublic:
+            Task { await setPostPrivacy(item, hidden: false) }
         case .edit:
             Task {
                 await preparePostForEditing(
@@ -766,18 +787,26 @@ private struct ProfileActivityPageView: View {
     let editingPostID: UUID?
     let updatingPrivacyPostID: UUID?
     let deletingPostID: UUID?
-    let publishedPostKind: PostKind?
+    let publishedPostKind: PostKind
     let publishedVisibility: PublishedPostVisibility
     let embedsInParentScroll: Bool
     let onOpen: (ProfileActivityItem) -> Void
+    let onOpenForum: (ForumPostItem, UUID?) -> Void
     let onSetPrivacy: (ProfileActivityItem, Bool) -> Void
     let onShare: (ProfileActivityItem) -> Void
+    let onOpenForumBoard: (UUID) -> Void
+    let onActionError: (String) -> Void
     let onPerformAction: (ProfileActivityPostAction, ProfileActivityItem) -> Void
-    let onSelectPublishedKind: (PostKind?) -> Void
+    let onSelectPublishedKind: (PostKind) -> Void
 
     @StateObject private var service: ProfileActivityService
     @StateObject private var interactionStore = PostInteractionStore.shared
+    @StateObject private var forumPostLoader = ProfileForumPostLoader()
+    @StateObject private var secondhandPostLoader = ProfileSecondhandPostLoader()
     @State private var appliedRefreshGeneration = 0
+    @State private var secondhandGridWidth: CGFloat = 0
+
+    private let secondhandGridSpacing: CGFloat = 8
 
     init(
         kind: ProfileActivityKind,
@@ -788,14 +817,17 @@ private struct ProfileActivityPageView: View {
         editingPostID: UUID?,
         updatingPrivacyPostID: UUID?,
         deletingPostID: UUID?,
-        publishedPostKind: PostKind?,
+        publishedPostKind: PostKind,
         publishedVisibility: PublishedPostVisibility,
         embedsInParentScroll: Bool,
         onOpen: @escaping (ProfileActivityItem) -> Void,
+        onOpenForum: @escaping (ForumPostItem, UUID?) -> Void,
         onSetPrivacy: @escaping (ProfileActivityItem, Bool) -> Void,
         onShare: @escaping (ProfileActivityItem) -> Void,
+        onOpenForumBoard: @escaping (UUID) -> Void,
+        onActionError: @escaping (String) -> Void,
         onPerformAction: @escaping (ProfileActivityPostAction, ProfileActivityItem) -> Void,
-        onSelectPublishedKind: @escaping (PostKind?) -> Void
+        onSelectPublishedKind: @escaping (PostKind) -> Void
     ) {
         self.kind = kind
         self.isSelected = isSelected
@@ -809,8 +841,11 @@ private struct ProfileActivityPageView: View {
         self.publishedVisibility = publishedVisibility
         self.embedsInParentScroll = embedsInParentScroll
         self.onOpen = onOpen
+        self.onOpenForum = onOpenForum
         self.onSetPrivacy = onSetPrivacy
         self.onShare = onShare
+        self.onOpenForumBoard = onOpenForumBoard
+        self.onActionError = onActionError
         self.onPerformAction = onPerformAction
         self.onSelectPublishedKind = onSelectPublishedKind
         let initialServiceKind: ProfileActivityKind = kind == .privateContent
@@ -830,17 +865,16 @@ private struct ProfileActivityPageView: View {
     var body: some View {
         VStack(spacing: 0) {
             if isPublishedManagement {
-                if kind == .published && servicePublishedVisibility == .visible {
-                    completedTransactionsEntry
-                        .padding(.horizontal, embedsInParentScroll ? 12 : 16)
-                        .padding(.top, 12)
-                }
+                HStack(spacing: 8) {
+                    ProfilePostKindFilterBar(
+                        selectedKind: publishedPostKind,
+                        onSelect: onSelectPublishedKind
+                    )
 
-                ProfilePostKindFilterBar(
-                    availableKinds: PostKind.allCases,
-                    selectedKind: publishedPostKind,
-                    onSelect: onSelectPublishedKind
-                )
+                    if kind == .published && servicePublishedVisibility == .visible {
+                        completedTransactionsEntry
+                    }
+                }
                 .padding(.horizontal, embedsInParentScroll ? 12 : 16)
                 .padding(.top, 12)
             }
@@ -873,39 +907,41 @@ private struct ProfileActivityPageView: View {
                 let shouldForceRefresh = service.hasResolvedInitialLoad
                 await service.loadInitial(force: shouldForceRefresh)
             }
+            .task(id: forumPostLoadTaskID) {
+                guard isSelected else { return }
+                await forumPostLoader.load(
+                    postIDs: forumPostIDs,
+                    viewerID: userID,
+                    force: refreshGeneration > 0
+                )
+            }
+            .task(id: secondhandPostLoadTaskID) {
+                guard isSelected else { return }
+                await secondhandPostLoader.load(
+                    postIDs: secondhandPostIDs,
+                    viewerID: userID,
+                    force: refreshGeneration > 0
+                )
+            }
     }
 
     private var completedTransactionsEntry: some View {
         NavigationLink(destination: CompletedSecondhandTransactionsView()) {
-            HStack(spacing: 12) {
+            HStack(spacing: 5) {
                 Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(AppColors.textPrimary)
-                    .frame(width: 34, height: 34)
-                    .background(AppColors.accent.opacity(0.22))
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("已交易")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(AppColors.textPrimary)
-                    Text("查看已完成的二手买入与卖出记录")
-                        .font(.system(size: 11))
-                        .foregroundStyle(AppColors.textMuted)
-                }
-
-                Spacer()
-                Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(AppColors.textMuted)
+                Text("交易记录")
+                    .font(.system(size: 13, weight: .semibold))
             }
-            .padding(.vertical, 12)
-            .overlay(alignment: .bottom) {
-                Divider()
-                    .overlay(AppColors.divider)
-            }
+            .foregroundStyle(AppColors.textPrimary)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .background(Color(.systemGray6))
+            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+        .fixedSize()
+        .accessibilityLabel("查看交易记录")
     }
 
     @ViewBuilder
@@ -952,7 +988,6 @@ private struct ProfileActivityPageView: View {
     private var activityList: some View {
         if embedsInParentScroll {
             activityRows
-                .padding(.horizontal, 12)
                 .padding(.top, 12)
                 .padding(
                     .bottom,
@@ -961,7 +996,6 @@ private struct ProfileActivityPageView: View {
         } else {
             ScrollView(showsIndicators: false) {
                 activityRows
-                    .padding(.horizontal, 16)
                     .padding(.top, 12)
                     .padding(.bottom, 90)
             }
@@ -971,41 +1005,23 @@ private struct ProfileActivityPageView: View {
         }
     }
 
+    @ViewBuilder
     private var activityRows: some View {
+        if usesSecondhandGrid {
+            secondhandGrid
+        } else {
+            standardActivityRows
+        }
+    }
+
+    private var standardActivityRows: some View {
         LazyVStack(spacing: 0) {
             ForEach(service.items) { item in
-                ProfileActivityRow(
-                    item: item,
-                    activityKind: kind,
-                    isOpening: openingPostID == item.postID,
-                    isEditing: editingPostID == item.postID,
-                    isUpdatingPrivacy: updatingPrivacyPostID == item.postID,
-                    isDeleting: deletingPostID == item.postID,
-                    isPrivate: servicePublishedVisibility == .hidden
-                        || service.isPostPrivate(item.postID),
-                    hiddenReason: service.hiddenReason(item.postID),
-                    interactionState: interactionStore.state(
-                        for: item.postID,
-                        fallbackIsLiked: kind == .liked,
-                        fallbackIsFavorited: kind == .favorited
-                    ),
-                    onOpen: { onOpen(item) },
-                    onSetPrivacy: { hidden in
-                        onSetPrivacy(item, hidden)
-                    },
-                    onShare: { onShare(item) },
-                    onPerformAction: { action in
-                        onPerformAction(action, item)
-                    },
-                    onToggleReaction: { currentlyActive in
-                        Task {
-                            await service.toggleReaction(
-                                item,
-                                currentlyActive: currentlyActive
-                            )
-                        }
-                    }
-                )
+                activityRow(item)
+                    .padding(
+                        .horizontal,
+                        horizontalPadding(for: item)
+                    )
                 .onAppear {
                     Task {
                         await service.loadNextPageIfNeeded(currentItem: item)
@@ -1037,8 +1053,269 @@ private struct ProfileActivityPageView: View {
         )
     }
 
+    private var secondhandGrid: some View {
+        LazyVGrid(
+            columns: secondhandGridColumns,
+            spacing: secondhandGridSpacing
+        ) {
+            ForEach(service.items) { summary in
+                Group {
+                    if let item = secondhandPostLoader.itemsByID[summary.postID] {
+                        SecondhandCardView(
+                            item: item,
+                            isOwnPost: true,
+                            constrainedWidth: secondhandCardWidth,
+                            onOpenTap: { onOpen(summary) },
+                            onAuthorTap: nil,
+                            onFavoriteTap: {
+                                Task { await toggleSecondhandFavorite(item) }
+                            }
+                        )
+                        .overlay(alignment: .topTrailing) {
+                            forumManagementButton(for: summary)
+                                .padding(.top, 8)
+                                .padding(.trailing, 8)
+                        }
+                    } else {
+                        secondhandPostLoadingCell
+                    }
+                }
+                .onAppear {
+                    Task {
+                        await service.loadNextPageIfNeeded(currentItem: summary)
+                    }
+                }
+            }
+
+            if service.isLoadingNextPage {
+                ProgressView()
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { width in
+            guard width > 0,
+                  abs(secondhandGridWidth - width) > 0.5
+            else { return }
+            secondhandGridWidth = width
+        }
+        .padding(.horizontal, embedsInParentScroll ? -8 : 8)
+        .animation(
+            .easeInOut(duration: 0.20),
+            value: service.items.map(\.postID)
+        )
+    }
+
+    private var secondhandPostLoadingCell: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(Color.white)
+            .frame(
+                minWidth: secondhandCardWidth,
+                idealWidth: secondhandCardWidth,
+                maxWidth: secondhandCardWidth ?? .infinity,
+                minHeight: 280
+            )
+            .overlay {
+                if secondhandPostLoader.isLoading {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "exclamationmark.circle")
+                        .foregroundStyle(AppColors.textMuted)
+                }
+            }
+    }
+
+    private var secondhandCardWidth: CGFloat? {
+        guard secondhandGridWidth > secondhandGridSpacing else { return nil }
+        return floor((secondhandGridWidth - secondhandGridSpacing) / 2)
+    }
+
+    private var secondhandGridColumns: [GridItem] {
+        guard let secondhandCardWidth else {
+            return [
+                GridItem(.flexible(minimum: 0), spacing: secondhandGridSpacing),
+                GridItem(.flexible(minimum: 0), spacing: secondhandGridSpacing)
+            ]
+        }
+        return [
+            GridItem(.fixed(secondhandCardWidth), spacing: secondhandGridSpacing),
+            GridItem(.fixed(secondhandCardWidth), spacing: secondhandGridSpacing)
+        ]
+    }
+
+    @MainActor
+    private func toggleSecondhandFavorite(_ item: SecondhandItem) async {
+        let interaction = interactionStore.state(
+            for: item.id,
+            fallbackIsFavorited: item.isFavorited
+        )
+        do {
+            _ = try await SecondhandService.shared.toggleFavorite(
+                postId: item.id,
+                currentlyFavorited: interaction.isFavorited
+            )
+        } catch {
+            if error.isCancellationLike { return }
+            onActionError(error.localizedDescription)
+        }
+    }
+
+    @ViewBuilder
+    private func activityRow(_ item: ProfileActivityItem) -> some View {
+        if item.kind == .forum {
+            if let post = forumPostLoader.postsByID[item.postID] {
+                ProfileForumPostCardView(
+                    post: post,
+                    onTap: { onOpenForum(post, item.commentID) },
+                    onBoardTap: { onOpenForumBoard(post.boardID) },
+                    onShareTap: { onShare(item) },
+                    onActionError: onActionError,
+                    showsOwnerAnonymousBadge: isPublishedManagement && post.isAnonymous
+                )
+                .overlay(alignment: .topTrailing) {
+                    if isPublishedManagement {
+                        forumManagementButton(for: item)
+                            .padding(.top, 9)
+                            .padding(.trailing, 4)
+                    }
+                }
+            } else {
+                forumPostLoadingRow
+            }
+        } else {
+            ProfileActivityRow(
+                item: item,
+                activityKind: kind,
+                isOpening: openingPostID == item.postID,
+                isEditing: editingPostID == item.postID,
+                isUpdatingPrivacy: updatingPrivacyPostID == item.postID,
+                isDeleting: deletingPostID == item.postID,
+                isPrivate: isPrivate(item),
+                hiddenReason: service.hiddenReason(item.postID),
+                interactionState: interactionStore.state(
+                    for: item.postID,
+                    fallbackIsLiked: kind == .liked,
+                    fallbackIsFavorited: kind == .favorited
+                ),
+                onOpen: { onOpen(item) },
+                onSetPrivacy: { hidden in
+                    onSetPrivacy(item, hidden)
+                },
+                onShare: { onShare(item) },
+                onPerformAction: { action in
+                    onPerformAction(action, item)
+                },
+                onToggleReaction: { currentlyActive in
+                    Task {
+                        await service.toggleReaction(
+                            item,
+                            currentlyActive: currentlyActive
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    private func horizontalPadding(for item: ProfileActivityItem) -> CGFloat {
+        if item.kind == .forum {
+            return embedsInParentScroll ? 0 : 16
+        }
+        return embedsInParentScroll ? 12 : 16
+    }
+
+    private func isPrivate(_ item: ProfileActivityItem) -> Bool {
+        servicePublishedVisibility == .hidden
+            || service.isPostPrivate(item.postID)
+    }
+
+    private func forumManagementButton(
+        for item: ProfileActivityItem
+    ) -> some View {
+        ZStack {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(AppColors.textPrimary)
+                .frame(width: 36, height: 36)
+                .background(Color.white.opacity(0.96))
+                .clipShape(Circle())
+                .allowsHitTesting(false)
+
+            NativeProfilePostMenuButton(
+                isPrivate: isPrivate(item),
+                isDisabled: isPublishedActionDisabled(item),
+                onAction: { action in
+                    onPerformAction(action, item)
+                }
+            )
+            .frame(width: 36, height: 36)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("帖子操作")
+    }
+
+    private func isPublishedActionDisabled(
+        _ item: ProfileActivityItem
+    ) -> Bool {
+        openingPostID == item.postID
+            || editingPostID == item.postID
+            || updatingPrivacyPostID == item.postID
+            || deletingPostID == item.postID
+    }
+
+    private var forumPostLoadingRow: some View {
+        HStack(spacing: 10) {
+            if forumPostLoader.isLoading {
+                ProgressView().controlSize(.small)
+            } else {
+                Image(systemName: "exclamationmark.circle")
+                    .foregroundStyle(AppColors.textMuted)
+            }
+            Text(
+                forumPostLoader.errorMessage == nil
+                    ? "正在载入论坛帖子…"
+                    : "论坛帖子载入失败，下拉即可重试"
+            )
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(AppColors.textMuted)
+        }
+        .frame(maxWidth: .infinity, minHeight: 96)
+        .overlay(alignment: .bottom) {
+            Divider().overlay(AppColors.divider)
+        }
+    }
+
     private var loadTaskID: String {
-        "\(userID?.uuidString ?? "signed-out"):\(kind.rawValue):\(publishedPostKind?.rawValue ?? "all"):\(servicePublishedVisibility.rawValue):\(isSelected)"
+        "\(userID?.uuidString ?? "signed-out"):\(kind.rawValue):\(publishedPostKind.rawValue):\(servicePublishedVisibility.rawValue):\(isSelected)"
+    }
+
+    private var forumPostIDs: [UUID] {
+        service.items.compactMap { item in
+            item.kind == .forum ? item.postID : nil
+        }
+    }
+
+    private var forumPostLoadTaskID: String {
+        let postKey = forumPostIDs.map(\.uuidString).joined(separator: ",")
+        return "\(loadTaskID):\(refreshGeneration):\(postKey)"
+    }
+
+    private var secondhandPostIDs: [UUID] {
+        guard usesSecondhandGrid else { return [] }
+        return service.items.compactMap { item in
+            item.kind == .secondhand ? item.postID : nil
+        }
+    }
+
+    private var secondhandPostLoadTaskID: String {
+        let postKey = secondhandPostIDs.map(\.uuidString).joined(separator: ",")
+        return "\(loadTaskID):secondhand:\(refreshGeneration):\(postKey)"
+    }
+
+    private var usesSecondhandGrid: Bool {
+        isPublishedManagement && publishedPostKind == .secondhand
     }
 
     private var serviceKind: ProfileActivityKind {
@@ -1311,7 +1588,7 @@ struct CompletedSecondhandTransactionsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppColors.pageBackground.ignoresSafeArea())
-        .cheesePageTopBar(title: "已交易")
+        .cheesePageTopBar(title: "交易记录")
         .task {
             await service.select(.buyer)
         }
@@ -1549,6 +1826,7 @@ struct PrivateContentView: View {
 private enum ProfileActivityDestination: Identifiable, Hashable {
     case secondhand(SecondhandItem)
     case forum(ForumPostItem, commentID: UUID?)
+    case forumBoard(UUID)
 
     var id: String {
         switch self {
@@ -1556,6 +1834,8 @@ private enum ProfileActivityDestination: Identifiable, Hashable {
             return "secondhand:\(item.id)"
         case .forum(let post, let commentID):
             return "forum:\(post.id):\(commentID?.uuidString ?? "")"
+        case .forumBoard(let boardID):
+            return "forum-board:\(boardID.uuidString)"
         }
     }
 }
@@ -1572,6 +1852,8 @@ private struct ProfileActivityPostDetailRouter: View {
                 post: post,
                 initialCommentID: commentID
             )
+        case .forumBoard(let boardID):
+            ForumBoardView(boardID: boardID)
         }
     }
 }

@@ -24,6 +24,27 @@ struct SecondhandListView: View {
     @State private var selectedSellerRoute: SecondhandSellerRoute?
     @State private var interactionErrorMessage: String?
     @State private var hasLoadedInitialData = false
+    @State private var itemGridWidth: CGFloat = 0
+
+    private let itemGridSpacing: CGFloat = 8
+
+    private var itemCardWidth: CGFloat? {
+        guard itemGridWidth > itemGridSpacing else { return nil }
+        return floor((itemGridWidth - itemGridSpacing) / 2)
+    }
+
+    private var itemGridColumns: [GridItem] {
+        guard let itemCardWidth else {
+            return [
+                GridItem(.flexible(minimum: 0), spacing: itemGridSpacing),
+                GridItem(.flexible(minimum: 0), spacing: itemGridSpacing)
+            ]
+        }
+        return [
+            GridItem(.fixed(itemCardWidth), spacing: itemGridSpacing),
+            GridItem(.fixed(itemCardWidth), spacing: itemGridSpacing)
+        ]
+    }
     
     var body: some View {
         ZStack {
@@ -33,7 +54,9 @@ struct SecondhandListView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     secondhandSearchBar
+                        .padding(.horizontal, 8)
                     SecondhandCategoryPicker(selection: $selectedCategory)
+                        .padding(.horizontal, 8)
 
                     switch service.itemListState {
                     case .unresolved, .initialLoading:
@@ -51,14 +74,15 @@ struct SecondhandListView: View {
                         if filteredItems.isEmpty {
                             filteredEmptyState
                         } else {
-                            LazyVGrid(columns: [
-                                GridItem(.flexible(), spacing: 14),
-                                GridItem(.flexible(), spacing: 14)
-                            ], spacing: 14) {
+                            LazyVGrid(
+                                columns: itemGridColumns,
+                                spacing: itemGridSpacing
+                            ) {
                                 ForEach(filteredItems) { item in
                                     SecondhandCardView(
                                         item: item,
                                         isOwnPost: item.isOwned(by: authService.currentUser?.id),
+                                        constrainedWidth: itemCardWidth,
                                         onEditTap: {
                                             editingPost = item.editableSummary
                                         },
@@ -73,6 +97,14 @@ struct SecondhandListView: View {
                                         }
                                     )
                                 }
+                            }
+                            .onGeometryChange(for: CGFloat.self) { proxy in
+                                proxy.size.width
+                            } action: { width in
+                                guard width > 0,
+                                      abs(itemGridWidth - width) > 0.5
+                                else { return }
+                                itemGridWidth = width
                             }
                         }
                     }
@@ -98,7 +130,7 @@ struct SecondhandListView: View {
                     
                     Spacer(minLength: 100)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 8)
                 .padding(.top, 8)
             }
             .scrollDismissesKeyboard(.interactively)
@@ -286,7 +318,7 @@ struct SecondhandCardView: View {
 
     let item: SecondhandItem
     let isOwnPost: Bool
-    var allowsImagePreview = true
+    var constrainedWidth: CGFloat? = nil
     var onEditTap: (() -> Void)?
     var onOpenTap: (() -> Void)?
     var onAuthorTap: (() -> Void)?
@@ -301,6 +333,8 @@ struct SecondhandCardView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            cardImage
+
             VStack(alignment: .leading, spacing: 8) {
                 Text(item.title)
                     .font(.system(size: 14, weight: .semibold))
@@ -317,6 +351,10 @@ struct SecondhandCardView: View {
                     Text(Formatters.formatUSDCompact(item.price))
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(AppColors.categoryColor(for: "secondhand"))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                        .allowsTightening(true)
+                        .layoutPriority(1)
 
                     if let originalPrice = item.originalPrice, originalPrice > 0 {
                         Text(Formatters.formatUSDCompact(originalPrice))
@@ -324,96 +362,81 @@ struct SecondhandCardView: View {
                             .foregroundStyle(AppColors.textMuted)
                             .strikethrough(true, color: AppColors.textMuted)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.68)
+                            .allowsTightening(true)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
-            .background(Color.white)
-
-            cardImages
-
-            HStack(spacing: 8) {
-                Button(action: { onAuthorTap?() }) {
-                    SecondhandSellerIdentityLabel(
-                        item: item,
-                        avatarSize: 24,
-                        showsHint: false,
-                        showsDisclosure: false
-                    )
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(onAuthorTap == nil)
-
-                Spacer(minLength: 4)
-
-                Button(action: { onFavoriteTap?() }) {
-                    Image(systemName: isFavorited ? "star.fill" : "star")
-                        .foregroundStyle(
-                            isFavorited ? AppColors.accentStrong : AppColors.textMuted
+                HStack(spacing: 8) {
+                    Button(action: { onAuthorTap?() }) {
+                        SecondhandSellerIdentityLabel(
+                            item: item,
+                            avatarSize: 24,
+                            showsHint: false,
+                            showsDisclosure: false
                         )
-                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(onAuthorTap == nil)
+
+                    Spacer(minLength: 4)
+
+                    Button(action: { onFavoriteTap?() }) {
+                        Image(systemName: isFavorited ? "star.fill" : "star")
+                            .foregroundStyle(
+                                isFavorited ? AppColors.accentStrong : AppColors.textMuted
+                            )
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(onFavoriteTap == nil)
                 }
-                .buttonStyle(.plain)
-                .disabled(onFavoriteTap == nil)
             }
             .padding(12)
             .background(Color.white)
         }
+        .frame(
+            minWidth: constrainedWidth,
+            idealWidth: constrainedWidth,
+            maxWidth: constrainedWidth ?? .infinity,
+            alignment: .leading
+        )
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .shadow(
+            color: .black.opacity(0.055),
+            radius: 4,
+            x: 0,
+            y: 2
+        )
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onTapGesture { onOpenTap?() }
     }
 
-    @ViewBuilder
-    private var cardImages: some View {
-        let imageURLs = item.displayImageUrls.compactMap(URL.init(string:))
-
-        if imageURLs.isEmpty {
+    private var cardImage: some View {
+        ZStack {
             placeholderImage
-                .frame(maxWidth: .infinity)
-                .frame(height: 150)
-                .clipped()
-        } else {
-            GeometryReader { proxy in
-                let imageWidth = imageURLs.count > 1
-                    ? max(proxy.size.width * 0.88, 1)
-                    : max(proxy.size.width, 1)
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 5) {
-                        ForEach(Array(imageURLs.enumerated()), id: \.offset) { index, url in
-                            CachedRemoteImage(url: url, targetPixelWidth: 640) { image in
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                            } placeholder: {
-                                placeholderImage
-                            }
-                            .frame(width: imageWidth, height: 150)
-                            .clipped()
-                            .if(allowsImagePreview) { content in
-                                content.tappableImagePreview(
-                                    item.displayImageUrls,
-                                    initialIndex: index
-                                )
-                            }
-                        }
-                    }
-                    .scrollTargetLayout()
+            if let imageUrl = item.displayImageUrls.first,
+               let url = URL(string: imageUrl) {
+                CachedRemoteImage(url: url, targetPixelWidth: 640) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 150)
+                        .clipped()
+                } placeholder: {
+                    EmptyView()
                 }
-                .scrollTargetBehavior(.viewAligned)
-                .contentMargins(.horizontal, 0, for: .scrollContent)
             }
-            .frame(height: 150)
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: 150)
+        .clipped()
     }
-    
+
     private var placeholderImage: some View {
         Rectangle()
             .fill(
@@ -429,11 +452,104 @@ struct SecondhandCardView: View {
                     .foregroundStyle(.gray.opacity(0.4))
             }
     }
-    
+
     private func iconFor(category: SecondhandPost.Category) -> String {
         category.iconName
     }
 
+}
+
+// MARK: - Profile secondhand surface
+
+/// Resolves the complete Marketplace models required by the shared two-column
+/// card renderer. Profile RPCs intentionally return compact summaries, so the
+/// profile surfaces batch-hydrate those summaries instead of maintaining a
+/// separate Marketplace card style.
+@MainActor
+final class ProfileSecondhandPostLoader: ObservableObject {
+    @Published private(set) var itemsByID: [UUID: SecondhandItem] = [:]
+    @Published private(set) var isLoading = false
+    @Published private(set) var hasResolved = false
+    @Published private(set) var errorMessage: String?
+
+    private var activeRequestID: UUID?
+    private var activeViewerID: UUID?
+
+    func load(
+        postIDs: [UUID],
+        viewerID: UUID?,
+        force: Bool = false
+    ) async {
+        var seen: Set<UUID> = []
+        let uniqueIDs = postIDs.filter { seen.insert($0).inserted }
+        let requestedIDs = Set(uniqueIDs)
+
+        if activeViewerID != viewerID {
+            activeViewerID = viewerID
+            itemsByID = [:]
+            hasResolved = false
+            errorMessage = nil
+        }
+
+        itemsByID = itemsByID.filter { requestedIDs.contains($0.key) }
+
+        guard !uniqueIDs.isEmpty else {
+            activeRequestID = nil
+            isLoading = false
+            hasResolved = true
+            errorMessage = nil
+            return
+        }
+
+        if !force {
+            let service = SecondhandService.shared
+            let cachedItems = Array(service.itemSnapshots.values) + service.items
+            for item in cachedItems where requestedIDs.contains(item.id) {
+                itemsByID[item.id] = item
+            }
+        }
+
+        let unresolvedIDs = force
+            ? uniqueIDs
+            : uniqueIDs.filter { itemsByID[$0] == nil }
+        guard !unresolvedIDs.isEmpty else {
+            activeRequestID = nil
+            isLoading = false
+            hasResolved = true
+            errorMessage = nil
+            return
+        }
+
+        let requestID = UUID()
+        activeRequestID = requestID
+        isLoading = true
+        errorMessage = nil
+        defer {
+            if activeRequestID == requestID {
+                isLoading = false
+            }
+        }
+
+        do {
+            let items = try await SecondhandService.shared.fetchItems(
+                postIDs: unresolvedIDs
+            )
+            guard activeRequestID == requestID,
+                  activeViewerID == viewerID
+            else { return }
+            for item in items where requestedIDs.contains(item.id) {
+                itemsByID[item.id] = item
+            }
+            hasResolved = true
+        } catch {
+            guard activeRequestID == requestID,
+                  activeViewerID == viewerID
+            else { return }
+            if error.isCancellationLike { return }
+            hasResolved = true
+            errorMessage = error.localizedDescription
+        }
+    }
 }
 
 #Preview {
@@ -531,9 +647,9 @@ struct SecondhandDetailView: View {
                         isExpanded: $isDescriptionExpanded
                     )
 
-                    SecondhandImageGallery(
+                    DetailMediaCarousel(
                         urlStrings: item.displayImageUrls,
-                        category: item.category
+                        metrics: .secondhand
                     )
 
                     MentionedProfilesView(postID: item.id)
@@ -940,343 +1056,6 @@ private struct SecondhandDescriptionSection: View {
             .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct SecondhandImageGallery: View {
-    let urlStrings: [String]
-    let category: SecondhandPost.Category
-
-    @State private var resolvedAspectRatios: [CGFloat] = []
-
-    private let gap: CGFloat = 4
-    private let tileCornerRadius: CGFloat = 8
-    private let imagePixelSize = 1_080
-
-    private var previewURLs: [String] {
-        urlStrings.filter { URL(string: $0) != nil }
-    }
-
-    private var visibleURLs: [String] {
-        Array(previewURLs.prefix(6))
-    }
-
-    private var extraImageCount: Int {
-        max(previewURLs.count - visibleURLs.count, 0)
-    }
-
-    private var aspectRatioLoadKey: String {
-        visibleURLs.joined(separator: "\u{1F}")
-    }
-
-    var body: some View {
-        Group {
-            if visibleURLs.isEmpty {
-                placeholderTile
-                    .aspectRatio(1.55, contentMode: .fit)
-            } else if resolvedAspectRatios.count == visibleURLs.count {
-                JustifiedPhotoGalleryLayout(
-                    aspectRatios: resolvedAspectRatios,
-                    spacing: gap
-                ) {
-                    ForEach(Array(visibleURLs.enumerated()), id: \.offset) { index, urlString in
-                        galleryTile(
-                            urlString: urlString,
-                            index: index,
-                            aspectRatio: resolvedAspectRatios[index],
-                            extraCount: extraCount(for: index)
-                        )
-                    }
-                }
-            } else {
-                galleryLoadingPlaceholder
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .task(id: aspectRatioLoadKey) {
-            await resolveAspectRatios()
-        }
-    }
-
-    @MainActor
-    private func resolveAspectRatios() async {
-        let requestedURLs = visibleURLs
-        guard !requestedURLs.isEmpty else {
-            resolvedAspectRatios = []
-            return
-        }
-
-        // Start every request first. The cache coalesces the matching tile load,
-        // so ratio discovery does not create a second network download.
-        let remoteURLs = requestedURLs.compactMap(URL.init(string:))
-        RemoteImageCache.shared.prefetch(
-            remoteURLs,
-            maxPixelSize: imagePixelSize,
-            limit: requestedURLs.count
-        )
-
-        var ratios: [CGFloat] = []
-        ratios.reserveCapacity(requestedURLs.count)
-
-        for urlString in requestedURLs {
-            guard !Task.isCancelled else { return }
-            guard let url = URL(string: urlString),
-                  let image = try? await RemoteImageCache.shared.image(
-                    for: url,
-                    maxPixelSize: imagePixelSize
-                  ),
-                  image.size.width > 0,
-                  image.size.height > 0
-            else {
-                ratios.append(1)
-                continue
-            }
-            ratios.append(image.size.width / image.size.height)
-        }
-
-        guard !Task.isCancelled, requestedURLs == visibleURLs else { return }
-
-        // Commit only after every image has a ratio. The gallery never builds
-        // rows from a partially loaded set and then reshuffles one tile at a time.
-        resolvedAspectRatios = ratios
-    }
-
-    private func extraCount(for visibleIndex: Int) -> Int {
-        visibleIndex == visibleURLs.count - 1 ? extraImageCount : 0
-    }
-
-    private func galleryTile(
-        urlString: String,
-        index: Int,
-        aspectRatio: CGFloat,
-        extraCount: Int
-    ) -> some View {
-        ZStack {
-            Rectangle()
-                .fill(Color.black.opacity(0.05))
-
-            if let url = URL(string: urlString) {
-                CachedRemoteImage(url: url, targetPixelWidth: imagePixelSize) { image in
-                    image
-                        .resizable()
-                        // The parent tile is calculated from this same intrinsic
-                        // ratio. `fit` therefore fills the derived frame without
-                        // cropping or manufacturing letterbox space.
-                        .aspectRatio(aspectRatio, contentMode: .fit)
-                } placeholder: {
-                    ProgressView()
-                        .tint(AppColors.textMuted)
-                }
-            }
-
-            if extraCount > 0 {
-                Color.black.opacity(0.46)
-                Text("+\(extraCount)")
-                    .font(.system(size: 27, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous))
-        .tappableImagePreview(previewURLs, initialIndex: index)
-        .accessibilityLabel(
-            extraCount > 0
-                ? L10n.tr("Open image and \(extraCount) more", "打开图片，另有 \(extraCount) 张")
-                : L10n.tr("Open image", "打开图片")
-            )
-    }
-
-    private var galleryLoadingPlaceholder: some View {
-        RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous)
-            .fill(Color.black.opacity(0.035))
-            .frame(height: 220)
-            .overlay {
-                ProgressView()
-                    .tint(AppColors.textMuted)
-            }
-    }
-
-    private var placeholderTile: some View {
-        Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [Color.orange.opacity(0.16), Color.yellow.opacity(0.07)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .overlay {
-                VStack(spacing: 10) {
-                    Image(systemName: category.iconName)
-                        .font(.system(size: 34, weight: .medium))
-                    Text(L10n.tr("No item photos", "暂无商品图片"))
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .foregroundStyle(AppColors.textMuted)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: tileCornerRadius, style: .continuous))
-    }
-}
-
-/// A compact justified-gallery layout. Row membership is chosen from the
-/// complete aspect-ratio set; no image gets to decide its own full-width frame.
-struct JustifiedPhotoGalleryLayout: Layout {
-    let aspectRatios: [CGFloat]
-    let spacing: CGFloat
-
-    func sizeThatFits(
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout ()
-    ) -> CGSize {
-        let width = max(proposal.width ?? 320, 1)
-        let rows = JustifiedPhotoGalleryLayoutEngine.rows(
-            aspectRatios: Array(aspectRatios.prefix(subviews.count)),
-            containerWidth: width,
-            spacing: spacing
-        )
-        let height = rows.reduce(CGFloat.zero) { $0 + $1.height }
-            + spacing * CGFloat(max(rows.count - 1, 0))
-        return CGSize(width: width, height: height)
-    }
-
-    func placeSubviews(
-        in bounds: CGRect,
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout ()
-    ) {
-        let ratios = Array(aspectRatios.prefix(subviews.count))
-        let rows = JustifiedPhotoGalleryLayoutEngine.rows(
-            aspectRatios: ratios,
-            containerWidth: bounds.width,
-            spacing: spacing
-        )
-        var y = bounds.minY
-
-        for row in rows {
-            var x = bounds.minX
-            for (offset, itemIndex) in row.indices.enumerated() {
-                guard itemIndex < subviews.count, offset < row.widths.count else { continue }
-                let size = CGSize(width: row.widths[offset], height: row.height)
-                subviews[itemIndex].place(
-                    at: CGPoint(x: x, y: y),
-                    anchor: .topLeading,
-                    proposal: ProposedViewSize(size)
-                )
-                x += size.width + spacing
-            }
-            y += row.height + spacing
-        }
-    }
-}
-
-struct JustifiedPhotoGalleryRow: Equatable {
-    let indices: Range<Int>
-    let height: CGFloat
-    let widths: [CGFloat]
-}
-
-enum JustifiedPhotoGalleryLayoutEngine {
-    private static let maximumItemsPerRow = 3
-
-    static func rows(
-        aspectRatios: [CGFloat],
-        containerWidth: CGFloat,
-        spacing: CGFloat
-    ) -> [JustifiedPhotoGalleryRow] {
-        let ratios = aspectRatios.map { max($0, 0.01) }
-        guard !ratios.isEmpty, containerWidth > 0 else { return [] }
-
-        let targetHeight = min(max(containerWidth * 0.52, 150), 220)
-        var bestScore = Array(repeating: CGFloat.infinity, count: ratios.count + 1)
-        var nextBreak = Array(repeating: 0, count: ratios.count + 1)
-        bestScore[ratios.count] = 0
-
-        for start in stride(from: ratios.count - 1, through: 0, by: -1) {
-            let maximumEnd = min(start + maximumItemsPerRow, ratios.count)
-            for end in (start + 1)...maximumEnd {
-                let row = makeRow(
-                    range: start..<end,
-                    ratios: ratios,
-                    containerWidth: containerWidth,
-                    spacing: spacing
-                )
-                let score = rowPenalty(
-                    row,
-                    ratios: ratios,
-                    targetHeight: targetHeight
-                ) + bestScore[end]
-                if score < bestScore[start] {
-                    bestScore[start] = score
-                    nextBreak[start] = end
-                }
-            }
-        }
-
-        var result: [JustifiedPhotoGalleryRow] = []
-        var start = 0
-        while start < ratios.count {
-            let end = max(nextBreak[start], start + 1)
-            result.append(makeRow(
-                range: start..<end,
-                ratios: ratios,
-                containerWidth: containerWidth,
-                spacing: spacing
-            ))
-            start = end
-        }
-        return result
-    }
-
-    private static func makeRow(
-        range: Range<Int>,
-        ratios: [CGFloat],
-        containerWidth: CGFloat,
-        spacing: CGFloat
-    ) -> JustifiedPhotoGalleryRow {
-        let itemRatios = range.map { ratios[$0] }
-        let usableWidth = max(
-            containerWidth - spacing * CGFloat(max(itemRatios.count - 1, 0)),
-            1
-        )
-        let rowHeight = usableWidth / max(itemRatios.reduce(0, +), 0.01)
-        return JustifiedPhotoGalleryRow(
-            indices: range,
-            height: rowHeight,
-            widths: itemRatios.map { $0 * rowHeight }
-        )
-    }
-
-    private static func rowPenalty(
-        _ row: JustifiedPhotoGalleryRow,
-        ratios: [CGFloat],
-        targetHeight: CGFloat
-    ) -> CGFloat {
-        let normalizedHeight = max(row.height / targetHeight, 0.01)
-        var penalty = pow(log(normalizedHeight), 2) * 1.4
-
-        // Very shallow strips are hard to inspect; very tall rows recreate the
-        // original giant-portrait failure. These are soft constraints because a
-        // listing with only one extreme image still has to preserve its content.
-        if row.height < targetHeight * 0.56 {
-            penalty += pow((targetHeight * 0.56 - row.height) / targetHeight, 2) * 6
-        }
-        if row.height > targetHeight * 1.55 {
-            penalty += pow((row.height - targetHeight * 1.55) / targetHeight, 2) * 8
-        }
-
-        if row.indices.count == 1,
-           let index = row.indices.first,
-           ratios[index] < 0.9,
-           ratios.count > 1 {
-            penalty += 4
-        }
-
-        // Prefer compatible photos sharing a row when visual balance is close.
-        penalty -= CGFloat(max(row.indices.count - 1, 0)) * 0.09
-        return penalty
     }
 }
 

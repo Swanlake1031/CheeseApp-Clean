@@ -13,6 +13,18 @@ enum CheeseTabBarLayout {
     static let contentBottomClearance: CGFloat = 104
 }
 
+enum MainTabNavigationEvents {
+    static let openCurrentUserProfile = Notification.Name(
+        "cheese.main-tab.open-current-user-profile"
+    )
+
+    static func postOpenCurrentUserProfile(
+        center: NotificationCenter = .default
+    ) {
+        center.post(name: openCurrentUserProfile, object: nil)
+    }
+}
+
 // MARK: - 主视图
 struct MainTabView: View {
     @EnvironmentObject private var authService: AuthService
@@ -222,6 +234,16 @@ struct MainTabView: View {
             guard PostFeatureEvents.change(from: notification) == .created else { return }
             activatedTabs.insert(.home)
             selectedTab = .home
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: MainTabNavigationEvents.openCurrentUserProfile
+            )
+        ) { _ in
+            tabBarVisibilityController.resetVisibility()
+            profileRootResetID = UUID()
+            activatedTabs.insert(.profile)
+            selectedTab = .profile
         }
         .onChange(of: notificationRouter.pendingActionID) { _, _ in
             routeNotificationIfNeeded()

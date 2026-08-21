@@ -52,15 +52,9 @@ struct ProfileView: View {
                         // 用户资料使用与首页信息流一致的无框内容面。
                         userInfoCard
 
-                        // 分页至少铺满一个完整可视区，避免内容较少时
-                        // Profile 外层滚动区高度突然收缩。
                         ProfileActivityView(
                             isEmbedded: true,
                             externalRefreshGeneration: activityRefreshGeneration,
-                            minimumEmbeddedPagerHeight: max(
-                                contentProxy.size.height + 24,
-                                320
-                            ),
                             onPresentShare: { payload in
                                 activitySharingPost = payload
                             },

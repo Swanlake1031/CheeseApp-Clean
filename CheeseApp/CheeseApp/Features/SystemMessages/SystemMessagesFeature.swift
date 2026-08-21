@@ -87,6 +87,11 @@ enum SystemMessageCTA: String, Decodable, Hashable {
     case secondhandAvailability = "secondhand_availability"
 }
 
+enum SystemMessageNavigationTarget: Hashable {
+    case post(PostDeepLinkRoute)
+    case profile(UUID)
+}
+
 struct SystemMessageItem: Decodable, Identifiable, Hashable {
     let id: UUID
     let eventID: String
@@ -109,6 +114,102 @@ struct SystemMessageItem: Decodable, Identifiable, Hashable {
             return .forum
         }
         return PostKind(remoteValue: contentKind)
+    }
+
+    var postRoute: PostDeepLinkRoute? {
+        let resolvedKind: PostKind? = postKind ?? {
+            switch kind {
+            case .mention, .postLike, .commentLike, .postComment, .commentReply:
+                return .forum
+            case .secondhandAvailability:
+                return .secondhand
+            case .automatic, .follow:
+                return nil
+            }
+        }()
+        guard let postID, let resolvedKind else { return nil }
+
+        return PostDeepLinkRoute(
+            kind: resolvedKind,
+            postId: postID,
+            commentId: resolvedKind == .forum ? resolvedCommentID : nil
+        )
+    }
+
+    /// Older interaction rows may predate the dedicated `comment_id` column.
+    /// Their durable event key still contains the target comment UUID, so keep
+    /// those rows capable of opening the exact comment instead of degrading to
+    /// a post-only route.
+    private var resolvedCommentID: UUID? {
+        if let commentID { return commentID }
+
+        let components = eventID.split(separator: ":", omittingEmptySubsequences: false)
+        let candidate: Substring?
+
+        switch kind {
+        case .postComment, .commentReply:
+            candidate = components.count > 1 ? components[1] : nil
+        case .commentLike:
+            candidate = components.count > 2 ? components[2] : nil
+        case .mention where contentKind == "comment":
+            candidate = components.count > 2 ? components[2] : nil
+        default:
+            candidate = nil
+        }
+
+        return candidate.flatMap { UUID(uuidString: String($0)) }
+    }
+
+    /// Resolves the exact comment to reveal after the post comments have loaded.
+    ///
+    /// Current notification rows carry `comment_id`, while a small set of
+    /// legacy rows only identify the post. For those legacy comment events,
+    /// match the actor's comment created in the same transaction window. Keep
+    /// the window deliberately narrow so a missing ID never redirects to an
+    /// unrelated comment.
+    func targetCommentID(in comments: [ForumCommentItem]) -> UUID? {
+        if let resolvedCommentID {
+            return resolvedCommentID
+        }
+
+        let supportsLegacyMatch: Bool
+        switch kind {
+        case .postComment, .commentReply:
+            supportsLegacyMatch = true
+        case .mention:
+            supportsLegacyMatch = contentKind == "comment"
+        default:
+            supportsLegacyMatch = false
+        }
+
+        guard supportsLegacyMatch else { return nil }
+
+        let candidates: [ForumCommentItem]
+        if let actorUserID {
+            candidates = comments.filter { $0.userId == actorUserID }
+        } else {
+            candidates = comments
+        }
+
+        guard let nearest = candidates.min(by: {
+            abs($0.createdAt.timeIntervalSince(createdAt))
+                < abs($1.createdAt.timeIntervalSince(createdAt))
+        }), abs(nearest.createdAt.timeIntervalSince(createdAt)) <= 30 else {
+            return nil
+        }
+
+        return nearest.id
+    }
+
+    var navigationTarget: SystemMessageNavigationTarget? {
+        switch ctaKind {
+        case .viewPost, .secondhandAvailability:
+            return postRoute.map(SystemMessageNavigationTarget.post)
+        case .viewProfile:
+            return actorUserID.map(SystemMessageNavigationTarget.profile)
+        case .none:
+            return nil
+        }
     }
 
     enum CodingKeys: String, CodingKey {

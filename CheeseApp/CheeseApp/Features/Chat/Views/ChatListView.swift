@@ -9,7 +9,6 @@ import SwiftUI
 
 struct ChatListView: View {
     @EnvironmentObject private var notificationRouter: AppNotificationRouter
-    @EnvironmentObject private var postDeepLinkCoordinator: PostDeepLinkCoordinator
     @StateObject private var chatService = ChatService.shared
     @StateObject private var systemMessageService = SystemMessageService.shared
 
@@ -21,6 +20,7 @@ struct ChatListView: View {
     @State private var isSwipeHorizontallyDragging = false
     @State private var isSearchFieldFocused = false
     @State private var optimisticallyDeletedConversationIds: Set<UUID> = []
+    @State private var optimisticallyDeletedGroupIds: Set<UUID> = []
 
     private var conversationDisplayNamesById: [UUID: String] {
         chatService.conversations.reduce(into: [UUID: String]()) { partialResult, preview in
@@ -34,7 +34,9 @@ struct ChatListView: View {
             directConversations: chatService.conversations.filter {
                 !optimisticallyDeletedConversationIds.contains($0.id)
             },
-            groupConversations: chatService.groupConversations,
+            groupConversations: chatService.groupConversations.filter {
+                !optimisticallyDeletedGroupIds.contains($0.id)
+            },
             displayNamesByConversationId: conversationDisplayNamesById
         )
     }
@@ -196,7 +198,21 @@ struct ChatListView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 if !inboxState.isSearching {
-                    pinnedDirectMessageCard
+                    systemMessageCard
+
+                    if !inboxState.visibleSections.isEmpty {
+                        conversationRowDivider
+                    }
+
+                    if let pinnedConversationSection {
+                        flatListSection(title: nil) {
+                            sectionRows(for: pinnedConversationSection)
+                        }
+
+                        if !remainingVisibleSections.isEmpty {
+                            conversationRowDivider
+                        }
+                    }
                 }
 
                 if inboxState.isSearching {
@@ -255,12 +271,12 @@ struct ChatListView: View {
 
     private var emptyState: some View {
         ScrollView(showsIndicators: false) {
-            pinnedDirectMessageCard
+            systemMessageCard
                 .padding(.top, 12)
         }
     }
 
-    private var pinnedDirectMessageCard: some View {
+    private var systemMessageCard: some View {
         VStack(spacing: 0) {
             systemCategoryEntry(.system)
 
@@ -268,23 +284,16 @@ struct ChatListView: View {
                 .padding(.leading, 76)
 
             systemCategoryEntry(.interaction)
-
-            if let directMessageSection {
-                Divider()
-                    .padding(.leading, 84)
-
-                sectionRows(for: directMessageSection)
-            }
         }
     }
 
-    private var directMessageSection: ChatInboxSection? {
-        inboxState.visibleSections.first { $0.kind == .directMessages }
+    private var pinnedConversationSection: ChatInboxSection? {
+        inboxState.visibleSections.first { $0.kind == .pinned }
     }
 
     private var remainingVisibleSections: [ChatInboxSection] {
         guard !inboxState.isSearching else { return inboxState.visibleSections }
-        return inboxState.visibleSections.filter { $0.kind != .directMessages }
+        return inboxState.visibleSections.filter { $0.kind != .pinned }
     }
 
     private func systemCategoryEntry(_ category: SystemMessageCategory) -> some View {
@@ -417,22 +426,28 @@ struct ChatListView: View {
             sectionRow(item)
 
             if index != section.items.count - 1 {
-                Divider()
-                    .padding(.leading, 84)
+                conversationRowDivider
             }
         }
+    }
+
+    private var conversationRowDivider: some View {
+        Divider()
+            .overlay(AppColors.divider)
+            .padding(.leading, 84)
     }
 
     @ViewBuilder
     private func sectionRow(_ item: ChatInboxSectionItem) -> some View {
         switch item {
         case .group(let group):
-            Button {
-                openGroup(group)
-            } label: {
-                GroupChatRow(group: group)
-            }
-            .buttonStyle(.plain)
+            GroupConversationSwipeActionRow(
+                group: group,
+                activeSwipeConversationId: $activeSwipeConversationId,
+                isAnyRowHorizontallyDragging: $isSwipeHorizontallyDragging,
+                onOpenConversation: { openGroup(group) },
+                onDelete: { deleteGroupOptimistically(group) }
+            )
 
         case .direct(let conversation):
             ConversationSwipeActionRow(
@@ -479,18 +494,7 @@ struct ChatListView: View {
     private func destinationView(_ route: ChatInboxRoute) -> some View {
         switch route {
         case .systemMessages(let category):
-            SystemMessageTimelineView(
-                category: category,
-                onOpenPost: { route in
-                    postDeepLinkCoordinator.openRoute(
-                        route,
-                        canPresentProtectedContent: true
-                    )
-                },
-                onOpenProfile: { userID in
-                    activeRoute = .profile(userID)
-                }
-            )
+            SystemMessageTimelineView(category: category)
         case .group(let group):
             GroupChatRoomView(group: currentGroupRoute(group))
         case .conversation(let conversation):
@@ -511,6 +515,7 @@ private extension ChatListView {
         isSwipeHorizontallyDragging = false
         isSearchFieldFocused = false
         optimisticallyDeletedConversationIds = []
+        optimisticallyDeletedGroupIds = []
     }
 
     func deleteConversationOptimistically(_ conversation: ChatConversationPreview) {
@@ -534,6 +539,31 @@ private extension ChatListView {
                     _ = optimisticallyDeletedConversationIds.remove(conversation.id)
                 }
                 rowActionErrorMessage = "删除失败，已恢复该会话。\n\(error.localizedDescription)"
+            }
+        }
+    }
+
+    func deleteGroupOptimistically(_ group: ChatGroupPreview) {
+        guard !optimisticallyDeletedGroupIds.contains(group.id) else { return }
+        let requestGeneration = chatService.accountGeneration
+
+        withAnimation(.easeOut(duration: 0.2)) {
+            optimisticallyDeletedGroupIds.insert(group.id)
+            activeSwipeConversationId = nil
+        }
+
+        Task {
+            do {
+                try await chatService.deleteGroupConversation(groupId: group.id)
+                guard chatService.accountGeneration == requestGeneration else { return }
+                rowActionErrorMessage = nil
+                optimisticallyDeletedGroupIds.remove(group.id)
+            } catch {
+                guard chatService.accountGeneration == requestGeneration else { return }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    _ = optimisticallyDeletedGroupIds.remove(group.id)
+                }
+                rowActionErrorMessage = "删除失败，已恢复该群聊。\n\(error.localizedDescription)"
             }
         }
     }

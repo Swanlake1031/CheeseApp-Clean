@@ -13,14 +13,16 @@ struct GroupChatRoomView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
     @StateObject private var viewModel: GroupChatRoomViewModel
-    @State private var selectedImageItem: PhotosPickerItem?
+    @State private var selectedImageItems: [PhotosPickerItem] = []
     @State private var showingMediaSourceMenu = false
     @State private var showingPhotoLibrary = false
     @State private var showingCamera = false
+    @State private var showingAnnouncement = false
     @State private var keyboardHeight: CGFloat = 0
     @FocusState private var isDraftFocused: Bool
 
     private let composerVerticalGap: CGFloat = 6
+    private let timelineComposerGap: CGFloat = 8
 
     init(group: ChatGroupPreview) {
         _viewModel = StateObject(wrappedValue: GroupChatRoomViewModel(group: group))
@@ -33,7 +35,6 @@ struct GroupChatRoomView: View {
             .background(AppColors.pageBackground.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .cheeseTabBarHidden(true)
-            .dismissKeyboardOnTap()
             .task {
                 await viewModel.bootstrap()
             }
@@ -56,16 +57,21 @@ struct GroupChatRoomView: View {
             .onDisappear {
                 viewModel.stopOnDisappear()
             }
-            .onChange(of: selectedImageItem) { _, newItem in
-                guard let newItem else { return }
-                selectedImageItem = nil
-                viewModel.submitImageSelection(newItem)
+            .onChange(of: selectedImageItems) { _, newItems in
+                guard !newItems.isEmpty else { return }
+                selectedImageItems = []
+                viewModel.stageMediaSelections(newItems)
             }
             .navigationDestination(item: $viewModel.destination) { destination in
                 destinationView(destination)
             }
             .sheet(item: $viewModel.reportTarget) { target in
                 ReportMessageSheet(target: target)
+            }
+            .sheet(isPresented: $showingAnnouncement) {
+                GroupAnnouncementDetailSheet(
+                    announcement: viewModel.announcement ?? "暂无群公告"
+                )
             }
             .alert(
                 L10n.tr("Delete this message?", "删除这则讯息？"),
@@ -92,9 +98,12 @@ struct GroupChatRoomView: View {
             }
             .enableSwipeBackGesture()
             .safeAreaInset(edge: .top) {
-                topBar
+                VStack(spacing: 0) {
+                    topBar
+                    announcementBanner
+                }
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+            .safeAreaInset(edge: .bottom, spacing: timelineComposerGap) {
                 composerView
             }
     }
@@ -154,13 +163,19 @@ struct GroupChatRoomView: View {
                             .id(entry.message.id)
                     }
 
-                    Spacer(minLength: 10)
+                    Color.clear
+                        .frame(height: 4)
+                        .id("group-chat-timeline-end")
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
                 .padding(.bottom, 12)
                 .frame(maxWidth: .infinity)
             }
+            // Keep short histories at the bottom of the visible timeline too.
+            // Otherwise the first message can remain above the keyboard-safe
+            // viewport until there is enough content to make the view scroll.
+            .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(
                 TapGesture().onEnded {
@@ -168,24 +183,18 @@ struct GroupChatRoomView: View {
                 }
             )
             .onChange(of: viewModel.scrollToMessageID) { _, newID in
-                guard let newID else { return }
-                withAnimation(.easeOut(duration: 0.2)) {
-                    proxy.scrollTo(newID, anchor: .bottom)
-                }
+                guard newID != nil else { return }
+                scrollToLatest(using: proxy)
             }
             .onChange(of: keyboardHeight) { _, newHeight in
-                guard newHeight > 0, let lastMessageID = viewModel.messages.last?.id else {
+                guard newHeight > 0, !viewModel.messages.isEmpty else {
                     return
                 }
-                DispatchQueue.main.async {
-                    withAnimation(.easeOut(duration: 0.22)) {
-                        proxy.scrollTo(lastMessageID, anchor: .bottom)
-                    }
-                }
+                scrollToLatest(using: proxy)
             }
             .onAppear {
-                if let lastMessageID = viewModel.messages.last?.id {
-                    proxy.scrollTo(lastMessageID, anchor: .bottom)
+                if !viewModel.messages.isEmpty {
+                    proxy.scrollTo("group-chat-timeline-end", anchor: .bottom)
                 }
             }
         }
@@ -198,7 +207,7 @@ struct GroupChatRoomView: View {
             }
             .buttonStyle(.plain)
         } center: {
-            Text(viewModel.group.displayName)
+            Text(viewModel.groupDisplayName)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(AppColors.textPrimary)
                 .lineLimit(1)
@@ -213,10 +222,38 @@ struct GroupChatRoomView: View {
         }
     }
 
-    private var composerView: some View {
-        let isPreparingImage = viewModel.isPreparingImage
+    @ViewBuilder
+    private var announcementBanner: some View {
+        if let announcement = viewModel.announcement, !announcement.isEmpty {
+            Button {
+                showingAnnouncement = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "megaphone.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AppColors.accentStrong)
+                    Text("群公告 · \(announcement)")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(AppColors.textMuted)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(AppColors.accent.opacity(0.12))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("查看群公告")
+        }
+    }
 
-        return VStack(spacing: 8) {
+    private var composerView: some View {
+        VStack(spacing: 8) {
             if let quotedMessage = viewModel.pendingQuote {
                 HStack(spacing: 6) {
                     Rectangle()
@@ -249,6 +286,16 @@ struct GroupChatRoomView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             }
 
+            if viewModel.isPreparingMedia {
+                mediaPreparationStatus
+            } else if let progress = viewModel.mediaProgress {
+                mediaUploadStatus(progress: progress)
+            }
+
+            if !viewModel.stagedImages.isEmpty {
+                stagedImageStrip
+            }
+
             HStack(spacing: 10) {
                 Button {
                     showingMediaSourceMenu = true
@@ -256,7 +303,7 @@ struct GroupChatRoomView: View {
                     Image(systemName: "photo.on.rectangle")
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(
-                            isPreparingImage ? .secondary : AppColors.textPrimary
+                            viewModel.isPreparingMedia ? .secondary : AppColors.textPrimary
                         )
                         .frame(width: 40, height: 40)
                         .background(Color.white)
@@ -282,14 +329,16 @@ struct GroupChatRoomView: View {
                 }
                 .photosPicker(
                     isPresented: $showingPhotoLibrary,
-                    selection: $selectedImageItem,
+                    selection: $selectedImageItems,
+                    maxSelectionCount: viewModel.imageSelectionLimit,
+                    selectionBehavior: .ordered,
                     matching: .images,
                     photoLibrary: .shared()
                 )
                 .fullScreenCover(isPresented: $showingCamera) {
                     CameraImagePicker(
                         onCapture: { image in
-                            viewModel.submitCapturedImage(image)
+                            viewModel.stageCapturedImage(image)
                             showingCamera = false
                         },
                         onCancel: {
@@ -309,8 +358,7 @@ struct GroupChatRoomView: View {
                     .cheeseInputChrome(cornerRadius: 14)
 
                 Button {
-                    viewModel.submitText()
-                    dismissDraftKeyboard()
+                    viewModel.submitComposer()
                 } label: {
                     Image(systemName: "paperplane.fill")
                         .font(.system(size: 17, weight: .semibold))
@@ -319,17 +367,24 @@ struct GroupChatRoomView: View {
                         .background(AppColors.accent)
                         .clipShape(Circle())
                 }
+                .overlay(alignment: .topTrailing) {
+                    if !viewModel.stagedImages.isEmpty {
+                        Text("\(viewModel.stagedImages.count)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(minWidth: 16, minHeight: 16)
+                            .background(Color.red)
+                            .clipShape(Circle())
+                            .offset(x: 4, y: -4)
+                    }
+                }
                 .disabled(
                     viewModel.isComposerBusy
-                        || viewModel.draftText.trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        ).isEmpty
+                        || !viewModel.hasComposerContent
                 )
                 .opacity(
                     viewModel.isComposerBusy
-                        || viewModel.draftText.trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        ).isEmpty ? 0.5 : 1
+                        || !viewModel.hasComposerContent ? 0.5 : 1
                 )
             }
         }
@@ -337,6 +392,71 @@ struct GroupChatRoomView: View {
             topGap: composerVerticalGap,
             keyboardHeight: keyboardHeight
         )
+    }
+
+    private var mediaPreparationStatus: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text("正在处理图片…")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("取消") {
+                viewModel.cancelActiveMediaWork()
+            }
+            .font(.system(size: 12, weight: .semibold))
+        }
+    }
+
+    private func mediaUploadStatus(progress: ChatRoomMediaProgress) -> some View {
+        HStack(spacing: 8) {
+            ProgressView(value: progress.fraction)
+                .frame(maxWidth: 110)
+            Text(
+                viewModel.isCancellingMediaSend
+                    ? "正在停止发送…"
+                    : "已发送 \(progress.completed)/\(progress.total) 张"
+            )
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.secondary)
+            Spacer()
+            Button("停止发送") {
+                viewModel.cancelActiveMediaWork()
+            }
+            .font(.system(size: 12, weight: .semibold))
+            .disabled(viewModel.isCancellingMediaSend)
+        }
+    }
+
+    private var stagedImageStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(viewModel.stagedImages.indices, id: \.self) { index in
+                    ZStack(alignment: .topTrailing) {
+                        Image(uiImage: viewModel.stagedImages[index])
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 62, height: 62)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                        Button {
+                            viewModel.removeStagedImage(at: index)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 17, weight: .semibold))
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(.white, Color.black.opacity(0.72))
+                        }
+                        .buttonStyle(.plain)
+                        .offset(x: 5, y: -5)
+                    }
+                    .padding(.top, 5)
+                    .padding(.trailing, 5)
+                }
+            }
+        }
+        .frame(height: 72)
     }
 
     private func messageBubble(_ message: GroupMessage) -> some View {
@@ -355,7 +475,7 @@ struct GroupChatRoomView: View {
 
             VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
                 if !isMine {
-                    Text(message.senderName)
+                    Text(viewModel.displayName(for: message))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(AppColors.textMuted)
                 }
@@ -463,9 +583,7 @@ struct GroupChatRoomView: View {
         size: CGFloat
     ) -> some View {
         let avatarURL = isMine ? authService.currentUser?.avatarUrl : message.senderAvatar
-        let fallbackName = isMine
-            ? (authService.currentUser?.fullName ?? "Me")
-            : message.senderName
+        let fallbackName = viewModel.displayName(for: message)
 
         return Group {
             if let avatarURL,
@@ -498,10 +616,19 @@ struct GroupChatRoomView: View {
     private func destinationView(_ destination: GroupChatRoomDestination) -> some View {
         switch destination {
         case .details:
-            GroupChatDetailsView(group: viewModel.group) {
-                viewModel.roomState.stop()
-                dismiss()
-            }
+            GroupChatDetailsView(
+                group: viewModel.group,
+                onLeftGroup: {
+                    viewModel.roomState.stop()
+                    dismiss()
+                },
+                onClearedHistory: viewModel.applyClearedHistory,
+                onRenamed: viewModel.applyGroupName,
+                onAnnouncementUpdated: viewModel.applyAnnouncement,
+                onMemberDisplayNamesUpdated: viewModel.applyMemberDisplayNames
+            )
+        case .history:
+            GroupChatHistoryView(group: viewModel.group)
         case .userProfile(let userID):
             UserPostsView(userId: userID)
         case .sharedForumPost(let postID):
@@ -523,8 +650,19 @@ struct GroupChatRoomView: View {
         let nextHeight = ChatComposerLayout.keyboardOverlapHeight(from: notification)
         withAnimation(.easeOut(duration: 0.2)) {
             keyboardHeight = nextHeight
-            if nextHeight > 0, !viewModel.messages.isEmpty {
-                viewModel.requestScrollToLatest()
+        }
+    }
+
+    /// A newly sent first message does not exist in the scroll view during the
+    /// keyboard frame callback. Scroll once after SwiftUI lays it out, then
+    /// once more after the keyboard finishes its own layout animation.
+    private func scrollToLatest(using proxy: ScrollViewProxy) {
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo("group-chat-timeline-end", anchor: .bottom)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+                proxy.scrollTo("group-chat-timeline-end", anchor: .bottom)
             }
         }
     }

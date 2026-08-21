@@ -46,11 +46,20 @@ struct ForumDetailView: View {
     @State private var pendingCommentLikeIds: Set<UUID> = []
     @State private var suppressReplyTargetActivationForCurrentTap = false
     @State private var suppressOutsideComposerDismissForCurrentTap = false
+    @State private var highlightedCommentID: UUID?
+    @State private var stopCommentObservation: (() -> Void)?
+    @State private var isReconcilingRealtimeComments = false
+    @State private var needsRealtimeCommentReconcile = false
     private let autoCollapseReplyThreshold = 3
     private let commentSectionAnchorId = "forum-comment-section-anchor"
     private let initialCommentID: UUID?
+    private let hasInitialComments: Bool
 
-    init(post: ForumPostItem, initialCommentID: UUID? = nil) {
+    init(
+        post: ForumPostItem,
+        initialCommentID: UUID? = nil,
+        initialComments: [ForumCommentItem]? = nil
+    ) {
         let entryInteraction = PostInteractionStore.shared.state(
             for: post.id,
             fallbackLikeCount: post.likes,
@@ -60,7 +69,12 @@ struct ForumDetailView: View {
         entryPost.likes = entryInteraction.likeCount
         entryPost.isLiked = entryInteraction.isLiked
         _post = State(initialValue: entryPost)
+        _comments = State(initialValue: initialComments ?? [])
+        _commentLoadState = State(
+            initialValue: initialComments.map { $0.isEmpty ? .empty : .loaded } ?? .unresolved
+        )
         self.initialCommentID = initialCommentID
+        self.hasInitialComments = initialComments != nil
     }
 
     private var interaction: PostInteractionState {
@@ -103,10 +117,17 @@ struct ForumDetailView: View {
                 .task(id: initialCommentID) {
                     async let recordView: Void = service.recordView(postId: post.id)
                     async let favoriteState: Void = loadFavoriteState()
-                    await reloadData()
+                    if hasInitialComments {
+                        await scrollToInitialComment(using: proxy)
+                        likedCommentIds = await service.fetchLikedCommentIds(
+                            commentIds: comments.map(\.id)
+                        )
+                    } else {
+                        await reloadData()
+                        await scrollToInitialComment(using: proxy)
+                    }
                     await favoriteState
                     await recordView
-                    await scrollToInitialComment(using: proxy)
                 }
             }
         }
@@ -195,6 +216,11 @@ struct ForumDetailView: View {
                 .presentationCornerRadius(24)
                 .presentationBackground(AppColors.pageBackground)
                 .interactiveDismissDisabled(isSubmittingComment)
+                // Mention suggestions need more room, but the detent must snap
+                // directly instead of animating the entire keyboard-attached sheet.
+                .transaction { transaction in
+                    transaction.animation = nil
+                }
         }
         .alert(L10n.tr("Delete this post?", "确定删除这篇贴文？"), isPresented: $showingDeleteConfirm) {
             Button(L10n.tr("Cancel", "取消"), role: .cancel) {}
@@ -232,6 +258,13 @@ struct ForumDetailView: View {
         }
         .onChange(of: authService.currentUser?.id) { _, _ in
             Task { await loadFavoriteState() }
+        }
+        .onAppear {
+            startCommentObservation()
+        }
+        .onDisappear {
+            stopCommentObservation?()
+            stopCommentObservation = nil
         }
         .enableSwipeBackGesture()
     }
@@ -343,14 +376,10 @@ struct ForumDetailView: View {
             MentionedProfilesView(postID: post.id)
 
             if !post.imageUrls.isEmpty {
-                PostImageCarousel(
+                DetailMediaCarousel(
                     urlStrings: post.imageUrls,
-                    height: 190,
-                    cornerRadius: 12
-                ) {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.gray.opacity(0.15))
-                }
+                    metrics: .forum
+                )
             }
 
             HStack(spacing: 6) {
@@ -452,44 +481,57 @@ struct ForumDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
             case .loaded:
-                LazyVStack(spacing: 0) {
-                    ForEach(commentThreads) { thread in
-                        let isCollapsed = shouldCollapseReplies(forRootId: thread.id)
-
-                        VStack(spacing: 0) {
-                            commentRow(
-                                thread.root,
-                                parentAuthorName: nil,
-                                depth: 0
-                            )
-                            .id(commentScrollId(for: thread.root.id))
-
-                            if !isCollapsed {
-                                ForEach(thread.replies) { reply in
-                                    commentRow(
-                                        reply,
-                                        parentAuthorName: parentAuthorName(for: reply),
-                                        depth: 1
-                                    )
-                                    .id(commentScrollId(for: reply.id))
-                                }
-                            }
-
-                            if !thread.replies.isEmpty {
-                                commentThreadToggle(
-                                    rootId: thread.id,
-                                    replyCount: thread.replies.count,
-                                    isCollapsed: isCollapsed
-                                )
-                            }
-                        }
-                        .padding(.bottom, 3)
+                if initialCommentID == nil {
+                    LazyVStack(spacing: 0) {
+                        commentThreadRows
+                    }
+                } else {
+                    // Targeted notification navigation needs every comment ID
+                    // registered during the first layout pass. The normal
+                    // detail path remains lazy.
+                    VStack(spacing: 0) {
+                        commentThreadRows
                     }
                 }
             }
         }
         .padding(.top, 18)
         .id(commentSectionAnchorId)
+    }
+
+    private var commentThreadRows: some View {
+        ForEach(commentThreads) { thread in
+            let isCollapsed = shouldCollapseReplies(forRootId: thread.id)
+
+            VStack(spacing: 0) {
+                commentRow(
+                    thread.root,
+                    parentAuthorName: nil,
+                    depth: 0
+                )
+                .id(commentScrollId(for: thread.root.id))
+
+                if !isCollapsed {
+                    ForEach(thread.replies) { reply in
+                        commentRow(
+                            reply,
+                            parentAuthorName: parentAuthorName(for: reply),
+                            depth: 1
+                        )
+                        .id(commentScrollId(for: reply.id))
+                    }
+                }
+
+                if !thread.replies.isEmpty {
+                    commentThreadToggle(
+                        rootId: thread.id,
+                        replyCount: thread.replies.count,
+                        isCollapsed: isCollapsed
+                    )
+                }
+            }
+            .padding(.bottom, 3)
+        }
     }
 
     private struct CommentThread: Identifiable {
@@ -663,6 +705,18 @@ struct ForumDetailView: View {
         .padding(.vertical, isReply ? 6 : 8)
         .contentShape(Rectangle())
         .padding(.leading, isReply ? 42 : 0)
+        .background {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(
+                    highlightedCommentID == comment.id
+                        ? AppColors.accent.opacity(0.18)
+                        : Color.clear
+                )
+        }
+        .animation(
+            .easeInOut(duration: 0.1),
+            value: highlightedCommentID == comment.id
+        )
     }
 
     private func commentThreadToggle(rootId: UUID, replyCount: Int, isCollapsed: Bool) -> some View {
@@ -717,7 +771,7 @@ struct ForumDetailView: View {
 
     @ViewBuilder
     private func commentAuthorAvatar(_ comment: ForumCommentItem, size: CGFloat) -> some View {
-        if comment.isAnonymous {
+        if comment.isAnonymous || comment.isAuthorDeactivated {
             commentAvatarView(comment, size: size)
         } else {
             NavigationLink {
@@ -732,7 +786,7 @@ struct ForumDetailView: View {
 
     @ViewBuilder
     private func commentAuthorName(_ comment: ForumCommentItem) -> some View {
-        if comment.isAnonymous {
+        if comment.isAnonymous || comment.isAuthorDeactivated {
             commentAuthorNameLabel(comment)
         } else {
             NavigationLink {
@@ -760,6 +814,14 @@ struct ForumDetailView: View {
                     .overlay {
                         Image(systemName: "theatermasks.fill")
                             .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white)
+                    }
+            } else if comment.isAuthorDeactivated {
+                Circle()
+                    .fill(Color(.systemGray4))
+                    .overlay {
+                        Image(systemName: "person.slash.fill")
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.white)
                     }
             } else if let avatar = comment.authorAvatar,
@@ -1010,7 +1072,7 @@ struct ForumDetailView: View {
                 .background(Color.black.opacity(0.045))
             }
 
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 9) {
                     AvatarView(source: commentAuthorAvatarSource, size: 36)
 
@@ -1035,14 +1097,31 @@ struct ForumDetailView: View {
                         isFirstResponder: $isCommentFieldFocused,
                         fontSize: 18
                     )
-                        .frame(height: 58)
+                    // A mention query only needs one text line. Keeping the
+                    // normal multi-line height here leaves a visibly empty
+                    // gap between `@` and the first suggested person.
+                        .frame(height: isMentionQueryActive ? 36 : 58)
                 }
 
                 MentionSuggestionPanel(
                     text: $commentText,
                     selectedMentions: $selectedCommentMentions,
-                    maxVisibleCandidates: 3
+                    maxVisibleCandidates: 3,
+                    scrollsCandidates: true,
+                    contentPadding: 8
                 )
+                // Keep the suggestion slot stable while its contents change
+                // from “searching” to matching people. This prevents the
+                // anonymous / mention / send controls from jumping.
+                .frame(
+                    height: isMentionQueryActive
+                        ? mentionSuggestionReservedHeight
+                        : 0,
+                    alignment: .top
+                )
+                .clipped()
+
+                Spacer(minLength: 0)
 
                 HStack(spacing: 12) {
                     Button {
@@ -1062,6 +1141,16 @@ struct ForumDetailView: View {
                         }
                     }
                     .buttonStyle(.plain)
+
+                    Button(action: beginMention) {
+                        Image(systemName: "at")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(AppColors.accentStrong)
+                            .frame(width: 30, height: 30)
+                            .background(AppColors.accent.opacity(0.14), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.tr("Mention someone", "提及用户"))
 
                     Spacer()
 
@@ -1085,9 +1174,10 @@ struct ForumDetailView: View {
             .padding(.horizontal, 18)
             .padding(.top, 16)
             .padding(.bottom, 6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(AppColors.pageBackground)
-        .animation(.easeInOut(duration: 0.18), value: isMentionQueryActive)
     }
 
     private var commentAuthorName: String {
@@ -1116,17 +1206,37 @@ struct ForumDetailView: View {
         return .url(url)
     }
 
+    private var commentComposerHeight: CGFloat {
+        let compactHeight: CGFloat = replyingToComment == nil ? 216 : 252
+        return compactHeight + (
+            isMentionQueryActive ? mentionSuggestionReservedHeight + 10 : 0
+        )
+    }
+
+    /// Three 34pt rows with two 8pt gaps and the panel's 8pt vertical padding.
+    /// The panel is a fixed slot, not a dynamic layout participant.
+    private let mentionSuggestionReservedHeight: CGFloat = 134
+
     private var isMentionQueryActive: Bool {
         MentionTextLogic.query(in: commentText) != nil
     }
 
-    private var commentComposerHeight: CGFloat {
-        let compactHeight: CGFloat = replyingToComment == nil ? 216 : 252
-        return isMentionQueryActive ? compactHeight + 146 : compactHeight
-    }
-
     private var canSubmitComment: Bool {
         !commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func beginMention() {
+        isCommentFieldFocused = true
+
+        // Keep an active mention query intact, but otherwise start a fresh
+        // one at the caret so the shared suggestion panel opens immediately.
+        guard MentionTextLogic.query(in: commentText) == nil else { return }
+        if let lastCharacter = commentText.last,
+           !lastCharacter.isWhitespace,
+           !lastCharacter.isNewline {
+            commentText.append(" ")
+        }
+        commentText.append("@")
     }
 
     private func reloadData() async {
@@ -1161,6 +1271,57 @@ struct ForumDetailView: View {
                 commentLoadState = .error(message: loadMessage)
             }
         }
+    }
+
+    @MainActor
+    private func startCommentObservation() {
+        guard stopCommentObservation == nil else { return }
+        stopCommentObservation = service.observeCommentChanges(postId: post.id) {
+            await reconcileRealtimeComments()
+        }
+    }
+
+    @MainActor
+    private func reconcileRealtimeComments() async {
+        if isReconcilingRealtimeComments {
+            needsRealtimeCommentReconcile = true
+            return
+        }
+
+        isReconcilingRealtimeComments = true
+        defer { isReconcilingRealtimeComments = false }
+
+        repeat {
+            needsRealtimeCommentReconcile = false
+            do {
+                let latestComments = try await service.fetchComments(postId: post.id)
+                let latestLikedCommentIds = await service.fetchLikedCommentIds(
+                    commentIds: latestComments.map(\.id)
+                )
+                let validCommentIds = Set(latestComments.map(\.id))
+
+                comments = latestComments
+                likedCommentIds = latestLikedCommentIds
+                commentLikeCountOverrides = commentLikeCountOverrides.filter {
+                    validCommentIds.contains($0.key)
+                }
+                pendingCommentLikeIds = pendingCommentLikeIds.intersection(validCommentIds)
+                commentLoadState = latestComments.isEmpty ? .empty : .loaded
+                post.comments = latestComments.count
+
+                let validRootIds = Set(buildRootCommentIdMap(from: latestComments).values)
+                collapsedRootCommentIds = collapsedRootCommentIds.intersection(validRootIds)
+                expandedRootCommentIds = expandedRootCommentIds.intersection(validRootIds)
+                if let replyingToComment,
+                   !validCommentIds.contains(replyingToComment.id) {
+                    self.replyingToComment = nil
+                }
+            } catch {
+                if isCancellation(error) { return }
+                // Keep the currently rendered comments during a transient
+                // realtime refresh failure. Pull-to-refresh remains available.
+            }
+        } while needsRealtimeCommentReconcile
     }
 
     private func mergedDetailPost(from fetched: ForumPostItem) -> ForumPostItem {
@@ -1452,12 +1613,26 @@ struct ForumDetailView: View {
         collapsedRootCommentIds.remove(rootID)
         expandedRootCommentIds.insert(rootID)
         await Task.yield()
-        try? await Task.sleep(nanoseconds: 80_000_000)
-        withAnimation(.easeInOut(duration: 0.25)) {
+
+        // A reply can be absent from the first lazy-stack layout while its
+        // thread is expanding. Move to the root once so the target row is
+        // materialized, then keep asserting the exact target through the end
+        // of the navigation transition and any late media layout pass.
+        proxy.scrollTo(commentScrollId(for: rootID), anchor: .center)
+        highlightedCommentID = initialCommentID
+        for delay in [UInt64(40_000_000), 120_000_000, 260_000_000, 480_000_000] {
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: delay)
+            }
             proxy.scrollTo(
                 commentScrollId(for: initialCommentID),
                 anchor: .center
             )
+        }
+
+        guard highlightedCommentID == initialCommentID else { return }
+        withAnimation(.easeOut(duration: 0.15)) {
+            highlightedCommentID = nil
         }
     }
 

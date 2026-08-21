@@ -170,6 +170,7 @@ struct ChatRoomView: View {
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel: ChatRoomViewModel
     @State private var selectedImageItems: [PhotosPickerItem] = []
     @State private var showingMediaSourceMenu = false
@@ -178,6 +179,7 @@ struct ChatRoomView: View {
     @State private var keyboardHeight: CGFloat = 0
 
     private let composerVerticalGap: CGFloat = 6
+    private let timelineComposerGap: CGFloat = 8
 
     init(conversation: ChatConversationPreview) {
         self.conversation = conversation
@@ -230,9 +232,9 @@ struct ChatRoomView: View {
                 selectedImageItems = []
                 viewModel.stageMediaSelections(newItems)
             }
-            .onChange(of: viewModel.latestSecondhandTransactionSignalMessageID) { _, newID in
-                guard newID != nil else { return }
-                viewModel.refreshSecondhandPurchaseIntentAfterTimelineSignal()
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                viewModel.reconcileSecondhandPurchaseIntent()
             }
             .navigationDestination(item: $viewModel.navigationDestination) { destination in
                 navigationView(for: destination)
@@ -247,7 +249,7 @@ struct ChatRoomView: View {
             .safeAreaInset(edge: .top) {
                 topBar
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+            .safeAreaInset(edge: .bottom, spacing: timelineComposerGap) {
                 composerView
             }
     }
@@ -445,13 +447,19 @@ struct ChatRoomView: View {
                             .id(entry.message.id)
                     }
 
-                    Spacer(minLength: 10)
+                    Color.clear
+                        .frame(height: 4)
+                        .id("direct-chat-timeline-end")
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
                 .padding(.bottom, 12)
                 .frame(maxWidth: .infinity)
             }
+            // Keep short histories at the bottom of the visible timeline too.
+            // Otherwise the first message can remain above the keyboard-safe
+            // viewport until there is enough content to make the view scroll.
+            .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(
                 TapGesture().onEnded {
@@ -459,17 +467,18 @@ struct ChatRoomView: View {
                 }
             )
             .onChange(of: viewModel.scrollToMessageID) { _, newID in
-                scrollTo(newID, using: proxy)
+                guard newID != nil else { return }
+                scrollToLatest(using: proxy)
             }
             .onChange(of: keyboardHeight) { _, newHeight in
-                guard newHeight > 0 else { return }
+                guard newHeight > 0, !viewModel.messages.isEmpty else { return }
                 DispatchQueue.main.async {
-                    scrollTo(viewModel.messages.last?.id, using: proxy)
+                    scrollToLatest(using: proxy)
                 }
             }
             .onAppear {
-                if let lastMessageID = viewModel.messages.last?.id {
-                    proxy.scrollTo(lastMessageID, anchor: .bottom)
+                if !viewModel.messages.isEmpty {
+                    proxy.scrollTo("direct-chat-timeline-end", anchor: .bottom)
                 }
             }
         }
@@ -652,11 +661,10 @@ struct ChatRoomView: View {
 
             PressEnterComposerField(text: $viewModel.draftText) {
                 viewModel.submitText()
-                dismissDraftKeyboard()
             }
             .frame(height: composerInputHeight)
             .padding(.horizontal, 12)
-            .disabled(!viewModel.canCompose || viewModel.isSubmittingComposer)
+            .disabled(!viewModel.canCompose)
         }
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -666,7 +674,6 @@ struct ChatRoomView: View {
     private var sendButton: some View {
         Button {
             viewModel.submitComposer()
-            dismissDraftKeyboard()
         } label: {
             Image(systemName: "paperplane.fill")
                 .font(.system(size: 17, weight: .semibold))
@@ -899,9 +906,11 @@ struct ChatRoomView: View {
                 conversation: conversation,
                 remark: viewModel.conversationRemark,
                 isMuted: viewModel.isMuted,
+                isPinned: viewModel.isPinned,
                 blockRelation: viewModel.blockRelation,
                 isBusy: viewModel.isApplyingPrivacyAction,
                 onToggleMute: { viewModel.handleSettingsAction(.setMuted($0)) },
+                onTogglePin: { viewModel.handleSettingsAction(.setPinned($0)) },
                 onSaveRemark: { viewModel.handleSettingsAction(.saveRemark($0)) },
                 onReport: { viewModel.handleSettingsAction(.report) },
                 onClearHistory: { viewModel.handleSettingsAction(.clearHistory) },
@@ -1070,16 +1079,21 @@ struct ChatRoomView: View {
         let nextHeight = ChatComposerLayout.keyboardOverlapHeight(from: notification)
         withAnimation(.easeOut(duration: 0.2)) {
             keyboardHeight = nextHeight
-            if nextHeight > 0, !viewModel.messages.isEmpty {
-                viewModel.requestScrollToLatest()
-            }
         }
     }
 
-    private func scrollTo<ID: Hashable>(_ id: ID?, using proxy: ScrollViewProxy) {
-        guard let id else { return }
-        withAnimation(.easeOut(duration: 0.2)) {
-            proxy.scrollTo(id, anchor: .bottom)
+    private func scrollToLatest(using proxy: ScrollViewProxy) {
+        // The first outgoing message can arrive while the keyboard is still
+        // resizing the safe area. Defer the initial scroll until its row has
+        // been laid out, then make one non-animated correction after the
+        // keyboard animation finishes.
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo("direct-chat-timeline-end", anchor: .bottom)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+                proxy.scrollTo("direct-chat-timeline-end", anchor: .bottom)
+            }
         }
     }
 }

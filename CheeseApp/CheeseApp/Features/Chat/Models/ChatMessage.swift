@@ -321,6 +321,7 @@ struct ChatConversationPreview: Codable, Identifiable, Hashable {
     let lastMessagePreview: String?
     var unreadCount: Int
     var isMuted: Bool = false
+    var isPinned: Bool = false
 
     var displayName: String {
         let trimmed = otherUserName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -348,6 +349,7 @@ struct ChatGroupPreview: Codable, Identifiable, Hashable {
     let memberCount: Int
     var unreadCount: Int
     var isMuted: Bool = false
+    var isPinned: Bool = false
 
     var displayName: String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -372,7 +374,8 @@ struct ChatGroupPreview: Codable, Identifiable, Hashable {
         lastMessagePreview: String?,
         memberCount: Int,
         unreadCount: Int = 0,
-        isMuted: Bool = false
+        isMuted: Bool = false,
+        isPinned: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -382,6 +385,7 @@ struct ChatGroupPreview: Codable, Identifiable, Hashable {
         self.memberCount = memberCount
         self.unreadCount = max(0, unreadCount)
         self.isMuted = isMuted
+        self.isPinned = isPinned
     }
 
     init(from decoder: Decoder) throws {
@@ -394,6 +398,7 @@ struct ChatGroupPreview: Codable, Identifiable, Hashable {
         memberCount = try container.decode(Int.self, forKey: .memberCount)
         unreadCount = max(0, try container.decodeIfPresent(Int.self, forKey: .unreadCount) ?? 0)
         isMuted = false
+        isPinned = false
     }
 }
 

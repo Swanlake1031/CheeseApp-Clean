@@ -10,9 +10,26 @@ import Foundation
 struct PostDeepLinkRoute: Identifiable, Hashable {
     let kind: PostKind
     let postId: UUID
+    let commentId: UUID?
+
+    init(
+        kind: PostKind,
+        postId: UUID,
+        commentId: UUID? = nil
+    ) {
+        self.kind = kind
+        self.postId = postId
+        self.commentId = commentId
+    }
 
     var id: String {
-        "\(kind.rawValue):\(postId.uuidString.lowercased())"
+        [
+            kind.rawValue,
+            postId.uuidString.lowercased(),
+            commentId?.uuidString.lowercased()
+        ]
+        .compactMap { $0 }
+        .joined(separator: ":")
     }
 
     static func parse(_ url: URL) -> Result<PostDeepLinkRoute, PostDeepLinkParseError>? {

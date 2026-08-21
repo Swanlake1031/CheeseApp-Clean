@@ -1,18 +1,18 @@
 import SwiftUI
 
-struct SwipeableConversationNavigationRow: View {
+struct SwipeableDeleteNavigationRow<RowContent: View>: View {
     private enum SwipeDragAxis {
         case none
         case horizontal
         case vertical
     }
 
-    let conversation: ChatConversationPreview
+    let rowID: UUID
     @Binding var activeSwipeConversationId: UUID?
     @Binding var isAnyRowHorizontallyDragging: Bool
     let onOpenConversation: () -> Void
-    let onOpenProfile: () -> Void
     let onDelete: () -> Void
+    let rowContent: RowContent
 
     @State private var restingOffset: CGFloat = 0
     @State private var dragTranslation: CGFloat = 0
@@ -25,6 +25,22 @@ struct SwipeableConversationNavigationRow: View {
     private var currentOffset: CGFloat {
         let raw = restingOffset + dragTranslation
         return min(0, max(-maxReveal, raw))
+    }
+
+    init(
+        rowID: UUID,
+        activeSwipeConversationId: Binding<UUID?>,
+        isAnyRowHorizontallyDragging: Binding<Bool>,
+        onOpenConversation: @escaping () -> Void,
+        onDelete: @escaping () -> Void,
+        @ViewBuilder rowContent: () -> RowContent
+    ) {
+        self.rowID = rowID
+        _activeSwipeConversationId = activeSwipeConversationId
+        _isAnyRowHorizontallyDragging = isAnyRowHorizontallyDragging
+        self.onOpenConversation = onOpenConversation
+        self.onDelete = onDelete
+        self.rowContent = rowContent()
     }
 
     var body: some View {
@@ -40,10 +56,7 @@ struct SwipeableConversationNavigationRow: View {
             .frame(width: maxReveal)
             .frame(maxHeight: .infinity)
 
-            ChatRow(
-                conversation: conversation,
-                onAvatarTap: onOpenProfile
-            )
+            rowContent
             .contentShape(Rectangle())
             .onTapGesture {
                 if currentOffset < -1 {
@@ -58,7 +71,7 @@ struct SwipeableConversationNavigationRow: View {
         .clipped()
         .animation(.spring(response: 0.22, dampingFraction: 0.88), value: currentOffset)
         .onChange(of: activeSwipeConversationId) { _, newValue in
-            guard newValue != conversation.id else { return }
+            guard newValue != rowID else { return }
             guard restingOffset != 0 || dragTranslation != 0 else { return }
             closeActions(resetActive: false)
         }
@@ -87,8 +100,8 @@ struct SwipeableConversationNavigationRow: View {
                     return
                 }
 
-                if activeSwipeConversationId != conversation.id {
-                    activeSwipeConversationId = conversation.id
+                if activeSwipeConversationId != rowID {
+                    activeSwipeConversationId = rowID
                 }
                 isAnyRowHorizontallyDragging = true
                 dragTranslation = value.translation.width
@@ -115,7 +128,7 @@ struct SwipeableConversationNavigationRow: View {
                 withAnimation(.spring(response: 0.24, dampingFraction: 0.9)) {
                     restingOffset = shouldOpen ? -maxReveal : 0
                     dragTranslation = 0
-                    activeSwipeConversationId = shouldOpen ? conversation.id : nil
+                    activeSwipeConversationId = shouldOpen ? rowID : nil
                 }
             }
     }
@@ -124,7 +137,7 @@ struct SwipeableConversationNavigationRow: View {
         withAnimation(.spring(response: 0.24, dampingFraction: 0.9)) {
             restingOffset = 0
             dragTranslation = 0
-            if resetActive, activeSwipeConversationId == conversation.id {
+            if resetActive, activeSwipeConversationId == rowID {
                 activeSwipeConversationId = nil
             }
         }
@@ -156,6 +169,15 @@ struct ChatRow: View {
         chatService.displayName(for: conversation)
     }
 
+    private var lastMessagePreview: String {
+        guard let preview = conversation.lastMessagePreview,
+              !preview.isEmpty
+        else { return "还没有消息" }
+
+        // Older contact-card messages stored this fallback preview in English.
+        return preview == "Post contact card" ? "帖子联系卡" : preview
+    }
+
     var body: some View {
         HStack(spacing: 14) {
             avatarView
@@ -168,6 +190,11 @@ struct ChatRow: View {
                     Spacer()
 
                     HStack(spacing: 6) {
+                        if conversation.isPinned {
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(AppColors.accentStrong)
+                        }
                         Text(formatTime(conversation.lastMessageAt))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
@@ -179,7 +206,7 @@ struct ChatRow: View {
                     }
                 }
 
-                Text(conversation.lastMessagePreview?.isEmpty == false ? conversation.lastMessagePreview! : "还没有消息")
+                Text(lastMessagePreview)
                     .font(.system(size: 13))
                     .foregroundStyle(conversation.unreadCount > 0 ? .primary : .secondary)
                     .lineLimit(1)

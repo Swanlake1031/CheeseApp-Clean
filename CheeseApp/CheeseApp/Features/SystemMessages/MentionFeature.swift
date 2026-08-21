@@ -106,6 +106,13 @@ struct MentionSuggestionPanel: View {
     @Binding var text: String
     @Binding var selectedMentions: [MentionCandidate]
     var maxVisibleCandidates: Int = 6
+    /// Editors with limited vertical space, such as the comment sheet, can
+    /// keep the suggestion area compact while still exposing every result.
+    var scrollsCandidates: Bool = false
+    var contentPadding: CGFloat = 10
+    /// Lets constrained containers reserve exactly the panel's current height
+    /// rather than the maximum possible candidate-list height.
+    var onPresentationHeightChange: ((CGFloat) -> Void)? = nil
 
     @State private var candidates: [MentionCandidate] = []
     @State private var isLoading = false
@@ -135,18 +142,21 @@ struct MentionSuggestionPanel: View {
                         Text("没有匹配的用户")
                             .font(.system(size: 12))
                             .foregroundStyle(AppColors.textMuted)
-                    } else {
-                        ForEach(candidates.prefix(max(1, maxVisibleCandidates))) { candidate in
-                            Button {
-                                select(candidate)
-                            } label: {
-                                MentionCandidateRow(candidate: candidate)
+                    } else if scrollsCandidates {
+                        ScrollView(
+                            .vertical,
+                            showsIndicators: candidates.count > maxVisibleCandidates
+                        ) {
+                            LazyVStack(alignment: .leading, spacing: 8) {
+                                candidateButtons(candidates)
                             }
-                            .buttonStyle(.plain)
                         }
+                        .frame(maxHeight: candidateListMaximumHeight, alignment: .top)
+                    } else {
+                        candidateButtons(candidates.prefix(max(1, maxVisibleCandidates)))
                     }
                 }
-                .padding(10)
+                .padding(contentPadding)
                 .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
@@ -154,9 +164,59 @@ struct MentionSuggestionPanel: View {
         }
         .onChange(of: text) { _, _ in
             scheduleSearch()
+            if activeQuery == nil {
+                reportPresentationHeight()
+            }
+        }
+        .onChange(of: isLoading) { _, _ in
+            reportPresentationHeight()
+        }
+        .onChange(of: candidates) { _, _ in
+            reportPresentationHeight()
+        }
+        .onChange(of: errorMessage) { _, _ in
+            reportPresentationHeight()
+        }
+        .onAppear {
+            reportPresentationHeight()
         }
         .onDisappear {
             searchTask?.cancel()
+        }
+    }
+
+    private var candidateListMaximumHeight: CGFloat {
+        let visibleCount = max(1, maxVisibleCandidates)
+        return CGFloat(visibleCount * 34 + max(visibleCount - 1, 0) * 8)
+    }
+
+    private var presentationHeight: CGFloat {
+        guard activeQuery != nil else { return 0 }
+
+        if isLoading || errorMessage != nil || candidates.isEmpty {
+            return 22 + contentPadding * 2
+        }
+
+        let visibleCount = min(max(1, maxVisibleCandidates), candidates.count)
+        let rowsHeight = CGFloat(visibleCount * 34 + max(visibleCount - 1, 0) * 8)
+        return rowsHeight + contentPadding * 2
+    }
+
+    private func reportPresentationHeight() {
+        onPresentationHeightChange?(presentationHeight)
+    }
+
+    @ViewBuilder
+    private func candidateButtons<Candidates: Collection>(
+        _ candidates: Candidates
+    ) -> some View where Candidates.Element == MentionCandidate {
+        ForEach(Array(candidates)) { candidate in
+            Button {
+                select(candidate)
+            } label: {
+                MentionCandidateRow(candidate: candidate)
+            }
+            .buttonStyle(.plain)
         }
     }
 

@@ -82,6 +82,8 @@ class AuthService: ObservableObject {
     @Published private(set) var bootstrapState: AuthBootstrapState = .restoringSession
     @Published private(set) var savedAccounts: [SavedAuthAccount] = []
     @Published private(set) var recentLoginAccounts: [RecentLoginAccount] = []
+    @Published private(set) var accountTransitionGeneration: UInt64 = 0
+    @Published private(set) var isAccountTransitionInProgress = false
 
     var maxSavedAccountCount: Int { maxSavedAccounts }
     var maxRecentLoginCount: Int { maxRecentLoginAccounts }
@@ -280,6 +282,55 @@ class AuthService: ObservableObject {
         return session.user.id
     }
 
+    /// Protected feed requests must not leave the app while OAuth or account
+    /// restoration is replacing the SDK session. In that window the client can
+    /// still carry the publishable key but no user access token, which makes
+    /// PostgREST execute the request as `anon`.
+    func prepareAuthenticatedRequest(expectedUserID: UUID) async -> Bool {
+        guard isAuthenticatedRequestReady(for: expectedUserID) else {
+            return false
+        }
+
+        do {
+            let session = try await currentValidSession()
+            return session.user.id == expectedUserID
+                && isAuthenticatedRequestReady(for: expectedUserID)
+        } catch {
+            return false
+        }
+    }
+
+    /// A protected request may race the final SDK session publication even
+    /// after the UI transition has ended. Refresh once and let the caller retry
+    /// the original request exactly once.
+    func recoverAuthenticatedRequest(expectedUserID: UUID) async -> Bool {
+        guard isAuthenticatedRequestReady(for: expectedUserID) else {
+            return false
+        }
+
+        do {
+            let session = try await supabase.auth.refreshSession()
+            return session.user.id == expectedUserID
+                && isAuthenticatedRequestReady(for: expectedUserID)
+        } catch {
+            return false
+        }
+    }
+
+    func isAuthenticatedRequestReady(for expectedUserID: UUID) -> Bool {
+        guard bootstrapState == .ready,
+              !isLoading,
+              !isAccountTransitionInProgress,
+              isAuthenticated,
+              currentUser?.id == expectedUserID,
+              let session = supabase.auth.currentSession,
+              session.user.id == expectedUserID
+        else {
+            return false
+        }
+        return true
+    }
+
     // MARK: - 统一重置认证状态
     private func resetAuthState() {
         sessionValidationTask?.cancel()
@@ -300,10 +351,13 @@ class AuthService: ObservableObject {
     }
 
     private func beginAccountStateTransition() {
+        accountTransitionGeneration &+= 1
+        isAccountTransitionInProgress = true
         accountTransitionHandler?()
     }
 
     private func activateAccountState(_ userID: UUID?) {
+        isAccountTransitionInProgress = false
         accountActivationHandler?(userID)
     }
     

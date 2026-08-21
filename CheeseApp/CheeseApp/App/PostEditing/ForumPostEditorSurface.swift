@@ -39,7 +39,6 @@ struct ForumPostEditorSurface: View {
     private var isValid: Bool {
         selectedBoard != nil
             && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && title.count <= ForumComposerRules.maximumTitleLength
     }
 

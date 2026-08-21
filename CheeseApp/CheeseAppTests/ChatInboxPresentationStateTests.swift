@@ -2,7 +2,7 @@ import XCTest
 @testable import CheeseApp
 
 final class ChatInboxPresentationStateTests: XCTestCase {
-    func testBrowsingStateKeepsPrimaryConversationSectionsSeparateFromInboxCategories() {
+    func testBrowsingStateMergesDirectAndGroupChatsByMessageTime() {
         let direct = ChatConversationPreview.fixture(
             id: UUID(uuidString: "70000000-0000-0000-0000-000000000002")!,
             otherUserName: "阿哲",
@@ -20,10 +20,10 @@ final class ChatInboxPresentationStateTests: XCTestCase {
             displayNamesByConversationId: [direct.id: "阿哲"]
         )
 
-        XCTAssertEqual(state.visibleSections.map(\.kind), [.groups, .directMessages])
+        XCTAssertEqual(state.visibleSections.map(\.kind), [.conversations])
         XCTAssertEqual(state.visibleItemCount, 2)
-        XCTAssertNil(ChatInboxSectionKind.groups.title)
-        XCTAssertNil(ChatInboxSectionKind.directMessages.title)
+        XCTAssertNil(ChatInboxSectionKind.pinned.title)
+        XCTAssertNil(ChatInboxSectionKind.conversations.title)
     }
 
     func testSearchMatchesConversationRemark() {
@@ -40,7 +40,7 @@ final class ChatInboxPresentationStateTests: XCTestCase {
             displayNamesByConversationId: [direct.id: "新室友"]
         )
 
-        XCTAssertEqual(state.visibleSections.map(\.kind), [.directMessages])
+        XCTAssertEqual(state.visibleSections.map(\.kind), [.conversations])
         XCTAssertEqual(state.visibleItemCount, 1)
 
         guard let item = state.visibleSections.first?.items.first else {
@@ -82,7 +82,7 @@ final class ChatInboxPresentationStateTests: XCTestCase {
             displayNamesByConversationId: [:]
         )
 
-        XCTAssertEqual(matchingState.visibleSections.map(\.kind), [.groups])
+        XCTAssertEqual(matchingState.visibleSections.map(\.kind), [.conversations])
         XCTAssertFalse(matchingState.showsSearchEmptyState)
 
         let emptyState = ChatInboxPresentationState(
@@ -95,6 +95,31 @@ final class ChatInboxPresentationStateTests: XCTestCase {
         XCTAssertTrue(emptyState.showsSearchEmptyState)
         XCTAssertEqual(emptyState.visibleItemCount, 0)
     }
+
+    func testPinnedGroupSortsAheadOfNewerDirectConversation() {
+        let newerDirect = ChatConversationPreview.fixture(
+            id: UUID(uuidString: "70000000-0000-0000-0000-000000000031")!,
+            otherUserName: "新消息",
+            lastMessagePreview: "刚刚",
+            lastMessageAt: Date(timeIntervalSince1970: 2_000)
+        )
+        let pinnedGroup = ChatGroupPreview.fixture(
+            id: UUID(uuidString: "70000000-0000-0000-0000-000000000032")!,
+            name: "置顶群",
+            lastMessageAt: Date(timeIntervalSince1970: 1_000),
+            isPinned: true
+        )
+
+        let state = ChatInboxPresentationState(
+            searchText: "",
+            directConversations: [newerDirect],
+            groupConversations: [pinnedGroup],
+            displayNamesByConversationId: [:]
+        )
+
+        XCTAssertEqual(state.visibleSections.map(\.kind), [.pinned, .conversations])
+        XCTAssertEqual(state.visibleSections.first?.items.map(\.id), [pinnedGroup.id])
+    }
 }
 
 private extension ChatConversationPreview {
@@ -102,7 +127,9 @@ private extension ChatConversationPreview {
         id: UUID,
         otherUserId: UUID = UUID(uuidString: "80000000-0000-0000-0000-000000000001")!,
         otherUserName: String,
-        lastMessagePreview: String?
+        lastMessagePreview: String?,
+        lastMessageAt: Date = Date(),
+        isPinned: Bool = false
     ) -> ChatConversationPreview {
         ChatConversationPreview(
             id: id,
@@ -110,10 +137,11 @@ private extension ChatConversationPreview {
             otherUserName: otherUserName,
             otherUserAvatar: nil,
             relatedPostId: nil,
-            lastMessageAt: Date(),
+            lastMessageAt: lastMessageAt,
             lastMessagePreview: lastMessagePreview,
             unreadCount: 0,
-            isMuted: false
+            isMuted: false,
+            isPinned: isPinned
         )
     }
 }
@@ -121,17 +149,20 @@ private extension ChatConversationPreview {
 private extension ChatGroupPreview {
     static func fixture(
         id: UUID,
-        name: String
+        name: String,
+        lastMessageAt: Date = Date(),
+        isPinned: Bool = false
     ) -> ChatGroupPreview {
         ChatGroupPreview(
             id: id,
             name: name,
             avatarURL: nil,
-            lastMessageAt: Date(),
+            lastMessageAt: lastMessageAt,
             lastMessagePreview: "准备出发",
             memberCount: 4,
             unreadCount: 0,
-            isMuted: false
+            isMuted: false,
+            isPinned: isPinned
         )
     }
 }

@@ -7,14 +7,22 @@ struct ForumBoardRulesSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                Text(board.rules)
-                    .font(.body)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
+            ZStack {
+                Color(.systemBackground)
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    Text(board.rules)
+                        .font(.body)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                }
+                .background(Color(.systemBackground))
             }
             .navigationTitle(L10n.tr("Board Rules", "板块规则"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(.systemBackground), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
         .presentationDetents([.medium, .large])
     }

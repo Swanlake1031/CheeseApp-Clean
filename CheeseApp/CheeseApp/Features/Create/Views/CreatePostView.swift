@@ -37,7 +37,7 @@ struct CreatePostView: View {
                         
                         // 发布类型选择
                         VStack(spacing: 14) {
-                            ForEach(PostKind.allCases, id: \.self) { type in
+                            ForEach([PostKind.forum, .secondhand], id: \.self) { type in
                                 PostTypeCard(
                                     type: type,
                                     isSelected: selectedType == type

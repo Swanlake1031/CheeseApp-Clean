@@ -248,10 +248,12 @@ struct CheesePostShareBottomSheet: View {
     @State private var selectedTargetIDs: Set<String> = []
     @State private var shareNote = ""
     @State private var friendProfiles: [MutualFollowProfile] = []
+    @State private var discoveredProfileTargets: [PostChatShareTarget] = []
     @State private var isLoadingFriends = false
     @State private var friendsErrorMessage: String?
     @State private var isPanelPresented = false
     @State private var isDismissingPanel = false
+    @State private var isRecipientPickerPresented = false
 
     private let panelAnimation = Animation.spring(
         response: 0.34,
@@ -262,17 +264,20 @@ struct CheesePostShareBottomSheet: View {
     private var directTargets: [PostChatShareTarget] {
         var seen = Set<UUID>()
         let conversations = chatService.conversations.filter {
-            seen.insert($0.id).inserted
+            seen.insert($0.otherUserId).inserted
         }
+        let mutualFollowIDs = Set(friendProfiles.map(\.id))
 
         return conversations.map { conversation in
             PostChatShareTarget(
-                id: "direct:\(conversation.id.uuidString)",
+                id: "user:\(conversation.otherUserId.uuidString)",
                 kind: .direct(conversation),
                 title: chatService.displayName(for: conversation),
                 subtitle: conversationPreviewText(conversation),
                 avatarURL: conversation.otherUserAvatar,
-                lastActiveAt: conversation.lastMessageAt
+                lastActiveAt: conversation.lastMessageAt,
+                recipientUserID: conversation.otherUserId,
+                isMutualFollow: mutualFollowIDs.contains(conversation.otherUserId)
             )
         }
     }
@@ -285,7 +290,9 @@ struct CheesePostShareBottomSheet: View {
                 title: group.displayName,
                 subtitle: L10n.tr("Group · \(group.memberCount) people", "群聊 · \(group.memberCount)人"),
                 avatarURL: group.avatarURL,
-                lastActiveAt: group.lastMessageAt
+                lastActiveAt: group.lastMessageAt,
+                recipientUserID: nil,
+                isMutualFollow: false
             )
         }
     }
@@ -302,25 +309,43 @@ struct CheesePostShareBottomSheet: View {
             )
             .map { profile in
                 PostChatShareTarget(
-                    id: "friend:\(profile.id.uuidString)",
+                    id: "user:\(profile.id.uuidString)",
                     kind: .friend(profile),
                     title: profile.fullName,
                     subtitle: profile.university
                         ?? L10n.tr("Mutual friend", "互关好友"),
                     avatarURL: profile.avatarURL,
-                    lastActiveAt: .distantPast
+                    lastActiveAt: .distantPast,
+                    recipientUserID: profile.id,
+                    isMutualFollow: true
                 )
             }
     }
 
     private var allTargets: [PostChatShareTarget] {
-        let recent = (directTargets + groupTargets)
-            .sorted { lhs, rhs in lhs.lastActiveAt > rhs.lastActiveAt }
-        return recent + friendTargets
+        orderedPostShareTargets(
+            uniquePostShareTargets(directTargets + groupTargets + friendTargets)
+        )
+    }
+
+    private var availableTargets: [PostChatShareTarget] {
+        orderedPostShareTargets(
+            uniquePostShareTargets(allTargets + discoveredProfileTargets)
+        )
     }
 
     private var selectedTargets: [PostChatShareTarget] {
-        allTargets.filter { selectedTargetIDs.contains($0.id) }
+        availableTargets.filter { selectedTargetIDs.contains($0.id) }
+    }
+
+    private var selectedTargetNames: String {
+        selectedTargets.map(\.title).joined(separator: "、")
+    }
+
+    private var quickPickerTargets: [PostChatShareTarget] {
+        // Directory-only recipients are not in the original recent-chat
+        // list. Put selected targets first so every selection stays visible.
+        uniquePostShareTargets(selectedTargets + allTargets)
     }
 
     private var bottomSafeAreaInset: CGFloat {
@@ -332,7 +357,9 @@ struct CheesePostShareBottomSheet: View {
     }
 
     private var panelHeight: CGFloat {
-        let contentHeight: CGFloat = selectedTargets.isEmpty ? 322 : 430
+        // Reserve one compact row for recipient search while keeping the
+        // original horizontal quick-pick layout when the field is empty.
+        let contentHeight: CGFloat = selectedTargets.isEmpty ? 378 : 506
         return min(contentHeight + bottomSafeAreaInset, UIScreen.main.bounds.height * 0.72)
     }
 
@@ -346,9 +373,28 @@ struct CheesePostShareBottomSheet: View {
 
                 VStack(spacing: 0) {
                     ZStack {
-                        Text(L10n.tr("Share to", "分享给"))
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(AppColors.textPrimary)
+                        VStack(spacing: 2) {
+                            Text(L10n.tr("Share to", "分享给"))
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(AppColors.textPrimary)
+
+                            if !selectedTargetNames.isEmpty {
+                                GeometryReader { proxy in
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        Text(selectedTargetNames)
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(AppColors.textMuted)
+                                            .lineLimit(1)
+                                            .frame(
+                                                minWidth: proxy.size.width,
+                                                alignment: .center
+                                            )
+                                    }
+                                }
+                                .frame(height: 18)
+                                .padding(.horizontal, 62)
+                            }
+                        }
 
                         HStack {
                             Spacer()
@@ -429,8 +475,15 @@ struct CheesePostShareBottomSheet: View {
         .task {
             await loadShareTargets()
         }
-        .onChange(of: allTargets.map(\.id)) { _, latestIds in
+        .onChange(of: availableTargets.map(\.id)) { _, latestIds in
             selectedTargetIDs = selectedTargetIDs.intersection(Set(latestIds))
+        }
+        .fullScreenCover(isPresented: $isRecipientPickerPresented) {
+            PostShareRecipientPicker(
+                initialTargets: allTargets,
+                discoveredProfileTargets: $discoveredProfileTargets,
+                selectedTargetIDs: $selectedTargetIDs
+            )
         }
         .sheet(isPresented: $showSystemShareSheet) {
             PostShareSheet(payload: payload)
@@ -439,58 +492,108 @@ struct CheesePostShareBottomSheet: View {
 
     @ViewBuilder
     private var shareTargetsSection: some View {
-        if (chatService.isLoadingConversations || isLoadingFriends)
-            && allTargets.isEmpty {
-            VStack(spacing: 10) {
-                ProgressView()
-                Text(L10n.tr("Loading friends and chats...", "正在加载好友和聊天..."))
-                    .font(.system(size: 13))
-                    .foregroundStyle(AppColors.textMuted)
-            }
-            .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112)
-        } else if allTargets.isEmpty {
-            VStack(spacing: 10) {
-                Image(systemName: "bubble.left.and.bubble.right")
-                    .font(.system(size: 30))
-                    .foregroundStyle(AppColors.textMuted)
-                Text(L10n.tr("No friends or chats available", "暂无可分享的好友或聊天"))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(AppColors.textPrimary)
-                Text(
-                    friendsErrorMessage
-                        ?? L10n.tr(
-                            "Mutual friends will appear here even before your first message.",
-                            "互关好友即使还没聊过，也会显示在这里。"
-                        )
-                )
-                    .font(.system(size: 12))
-                    .foregroundStyle(AppColors.textMuted)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112)
-            .padding(.horizontal, 18)
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(alignment: .top, spacing: 14) {
-                    ForEach(allTargets) { target in
-                        Button {
-                            toggleTargetSelection(target)
-                        } label: {
-                            PostChatShareTargetAvatar(
-                                target: target,
-                                isSending: sendingTargetId == target.id,
-                                isSelected: selectedTargetIDs.contains(target.id)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(sendingTargetId != nil)
-                    }
-                }
+        VStack(spacing: 12) {
+            recipientSearchField
                 .padding(.horizontal, 18)
-                .padding(.vertical, 4)
+
+            if (chatService.isLoadingConversations || isLoadingFriends)
+                && quickPickerTargets.isEmpty {
+                VStack(spacing: 10) {
+                    ProgressView()
+                    Text(L10n.tr("Loading friends and chats...", "正在加载好友和聊天..."))
+                        .font(.system(size: 13))
+                        .foregroundStyle(AppColors.textMuted)
+                }
+                .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112)
+            } else if quickPickerTargets.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "bubble.left.and.bubble.right")
+                        .font(.system(size: 30))
+                        .foregroundStyle(AppColors.textMuted)
+                    Text(L10n.tr("No friends or chats available", "暂无可分享的好友或聊天"))
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppColors.textPrimary)
+                    Text(
+                        friendsErrorMessage
+                            ?? L10n.tr(
+                                "Mutual friends will appear here even before your first message.",
+                                "互关好友即使还没聊过，也会显示在这里。"
+                            )
+                    )
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppColors.textMuted)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112)
+                .padding(.horizontal, 18)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(alignment: .top, spacing: 14) {
+                        ForEach(quickPickerTargets) { target in
+                            targetSelectionButton(target)
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 4)
+                }
+                .frame(height: 112)
             }
-            .frame(height: 112)
         }
+    }
+
+    private var recipientSearchField: some View {
+        Button {
+            isRecipientPickerPresented = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(AppColors.textMuted)
+
+                Text(L10n.tr("Search friends or chats", "搜索好友或聊天"))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(AppColors.textMuted)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(AppColors.textMuted)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 40)
+            .background(Color.black.opacity(0.06))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func targetSelectionButton(_ target: PostChatShareTarget) -> some View {
+        Button {
+            toggleTargetSelection(target)
+        } label: {
+            PostChatShareTargetAvatar(
+                target: target,
+                isSending: sendingTargetId == target.id,
+                isSelected: selectedTargetIDs.contains(target.id)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(sendingTargetId != nil)
+    }
+
+    private func targetSearchRow(_ target: PostChatShareTarget) -> some View {
+        Button {
+            toggleTargetSelection(target)
+        } label: {
+            PostChatShareTargetSearchRow(
+                target: target,
+                isSelected: selectedTargetIDs.contains(target.id),
+                isSending: sendingTargetId == target.id
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(sendingTargetId != nil)
     }
 
     private var quickActionsSection: some View {
@@ -666,6 +769,21 @@ struct CheesePostShareBottomSheet: View {
                         conversationId: conversation.id,
                         card: card
                     )
+                case .profile(let profile):
+                    let conversation = try await chatService.getOrCreateConversation(
+                        otherUserId: profile.id,
+                        relatedPostId: payload.postId
+                    )
+                    if !note.isEmpty {
+                        _ = try await chatService.sendMessage(
+                            conversationId: conversation.id,
+                            content: note
+                        )
+                    }
+                    _ = try await chatService.sendSharedPostCardMessage(
+                        conversationId: conversation.id,
+                        card: card
+                    )
                 }
             }
 
@@ -756,6 +874,7 @@ private struct PostChatShareTarget: Identifiable {
         case direct(ChatConversationPreview)
         case group(ChatGroupPreview)
         case friend(MutualFollowProfile)
+        case profile(SearchProfileResult)
     }
 
     let id: String
@@ -764,6 +883,254 @@ private struct PostChatShareTarget: Identifiable {
     let subtitle: String
     let avatarURL: String?
     let lastActiveAt: Date
+    let recipientUserID: UUID?
+    let isMutualFollow: Bool
+}
+
+private func uniquePostShareTargets(
+    _ targets: [PostChatShareTarget]
+) -> [PostChatShareTarget] {
+    var seen = Set<String>()
+    return targets.filter { seen.insert($0.id).inserted }
+}
+
+private func orderedPostShareTargets(
+    _ targets: [PostChatShareTarget]
+) -> [PostChatShareTarget] {
+    targets.sorted { lhs, rhs in
+        if lhs.isMutualFollow != rhs.isMutualFollow {
+            return lhs.isMutualFollow && !rhs.isMutualFollow
+        }
+        if lhs.lastActiveAt != rhs.lastActiveAt {
+            return lhs.lastActiveAt > rhs.lastActiveAt
+        }
+        return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+    }
+}
+
+private func postShareTarget(for profile: SearchProfileResult) -> PostChatShareTarget {
+    let subtitle = [
+        "@\(profile.publicID)",
+        profile.university
+    ]
+    .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+    .filter { !$0.isEmpty }
+    .joined(separator: " · ")
+
+    return PostChatShareTarget(
+        id: "user:\(profile.id.uuidString)",
+        kind: .profile(profile),
+        title: profile.fullName,
+        subtitle: subtitle,
+        avatarURL: profile.avatarURL,
+        lastActiveAt: .distantPast,
+        recipientUserID: profile.id,
+        isMutualFollow: profile.isMutualFollow
+    )
+}
+
+private struct PostShareRecipientPicker: View {
+    let initialTargets: [PostChatShareTarget]
+    @Binding var discoveredProfileTargets: [PostChatShareTarget]
+    @Binding var selectedTargetIDs: Set<String>
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+    @State private var profileSearchResults: [PostChatShareTarget] = []
+    @State private var isSearching = false
+    @State private var searchErrorMessage: String?
+    @State private var searchTask: Task<Void, Never>?
+    @FocusState private var isSearchFocused: Bool
+
+    private var normalizedSearchText: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var visibleTargets: [PostChatShareTarget] {
+        guard !normalizedSearchText.isEmpty else {
+            return orderedPostShareTargets(initialTargets)
+        }
+
+        let query = normalizedSearchText
+        let localMatches = initialTargets.filter { target in
+            target.title.localizedCaseInsensitiveContains(query)
+                || target.subtitle.localizedCaseInsensitiveContains(query)
+        }
+        return orderedPostShareTargets(
+            uniquePostShareTargets(localMatches + profileSearchResults)
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(AppColors.textMuted)
+
+                        TextField(
+                            L10n.tr("Search anyone", "搜索用户、好友或聊天"),
+                            text: $searchText
+                        )
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .focused($isSearchFocused)
+                        .submitLabel(.done)
+                        .onSubmit { dismiss() }
+
+                        if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 17))
+                                    .foregroundStyle(AppColors.textMuted)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(L10n.tr("Clear search", "清除搜索"))
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(height: 50)
+                    .background(Color.black.opacity(0.06))
+                    .clipShape(Capsule())
+
+                    Button(L10n.tr("Done", "完成")) {
+                        dismiss()
+                    }
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AppColors.accentStrong)
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 12)
+
+                Divider()
+
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        Text(
+                            normalizedSearchText.isEmpty
+                                ? L10n.tr("Mutual friends and recent chats", "互关好友与最近聊天")
+                                : L10n.tr("Search results", "搜索结果")
+                        )
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppColors.textMuted)
+                        .padding(.horizontal, 22)
+                        .padding(.top, 18)
+                        .padding(.bottom, 8)
+
+                        if isSearching {
+                            HStack(spacing: 10) {
+                                ProgressView()
+                                Text(L10n.tr("Searching users...", "正在搜索用户..."))
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(AppColors.textMuted)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 72)
+                        } else if let searchErrorMessage, !searchErrorMessage.isEmpty {
+                            Text(searchErrorMessage)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.red)
+                                .frame(maxWidth: .infinity, minHeight: 72)
+                                .padding(.horizontal, 22)
+                        } else if visibleTargets.isEmpty {
+                            Text(
+                                normalizedSearchText.isEmpty
+                                    ? L10n.tr("No friends or chats available", "暂无可分享的好友或聊天")
+                                    : L10n.tr("No matching users", "没有匹配的用户")
+                            )
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(AppColors.textMuted)
+                            .frame(maxWidth: .infinity, minHeight: 72)
+                        } else {
+                            ForEach(visibleTargets) { target in
+                                Button {
+                                    toggleSelection(for: target)
+                                } label: {
+                                    PostChatShareTargetSearchRow(
+                                        target: target,
+                                        isSelected: selectedTargetIDs.contains(target.id),
+                                        isSending: false
+                                    )
+                                    .padding(.horizontal, 18)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(.bottom, 28)
+                }
+                .scrollDismissesKeyboard(.immediately)
+            }
+            .background(AppColors.pageBackground.ignoresSafeArea())
+            .navigationBarHidden(true)
+        }
+        .task {
+            try? await Task.sleep(nanoseconds: 180_000_000)
+            guard !Task.isCancelled else { return }
+            isSearchFocused = true
+        }
+        .onChange(of: searchText) { _, newValue in
+            searchProfiles(query: newValue)
+        }
+        .onDisappear {
+            searchTask?.cancel()
+        }
+    }
+
+    private func toggleSelection(for target: PostChatShareTarget) {
+        if selectedTargetIDs.contains(target.id) {
+            selectedTargetIDs.remove(target.id)
+        } else {
+            selectedTargetIDs.insert(target.id)
+        }
+    }
+
+    private func searchProfiles(query: String) {
+        searchTask?.cancel()
+
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            isSearching = false
+            searchErrorMessage = nil
+            profileSearchResults = []
+            return
+        }
+
+        isSearching = true
+        searchErrorMessage = nil
+        profileSearchResults = []
+
+        searchTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 250_000_000)
+                guard !Task.isCancelled else { return }
+
+                let currentUserID = AuthService.shared.currentUser?.id
+                let profiles = try await SearchService.shared
+                    .searchProfiles(query: normalized, limit: 50)
+                    .filter { $0.id != currentUserID }
+                guard !Task.isCancelled, normalized == normalizedSearchText else { return }
+
+                let targets = profiles.map(postShareTarget)
+                profileSearchResults = targets
+                discoveredProfileTargets = uniquePostShareTargets(
+                    discoveredProfileTargets + targets
+                )
+                isSearching = false
+            } catch is CancellationError {
+                // A newer keystroke superseded this request.
+            } catch {
+                guard !Task.isCancelled, normalized == normalizedSearchText else { return }
+                isSearching = false
+                searchErrorMessage = error.localizedDescription
+            }
+        }
+    }
 }
 
 private struct PostChatShareTargetAvatar: View {
@@ -837,6 +1204,73 @@ private struct PostChatShareTargetAvatar: View {
             .overlay {
                 Text(String(target.title.prefix(1)).uppercased())
                     .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.black)
+            }
+    }
+}
+
+private struct PostChatShareTargetSearchRow: View {
+    let target: PostChatShareTarget
+    let isSelected: Bool
+    let isSending: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Group {
+                    if let avatar = target.avatarURL,
+                       let url = URL(string: avatar),
+                       !avatar.isEmpty {
+                        AsyncImage(url: url) { image in
+                            image.resizable().scaledToFill()
+                        } placeholder: {
+                            avatarFallback
+                        }
+                    } else {
+                        avatarFallback
+                    }
+                }
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+
+                if isSending {
+                    Circle()
+                        .fill(Color.black.opacity(0.34))
+                        .frame(width: 40, height: 40)
+                    ProgressView()
+                        .tint(.white)
+                        .scaleEffect(0.7)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(target.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .lineLimit(1)
+
+                Text(target.subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(AppColors.textMuted)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(isSelected ? AppColors.accentStrong : AppColors.textMuted)
+        }
+        .frame(maxWidth: .infinity, minHeight: 52)
+        .contentShape(Rectangle())
+    }
+
+    private var avatarFallback: some View {
+        Circle()
+            .fill(AppColors.accent)
+            .overlay {
+                Text(String(target.title.prefix(1)).uppercased())
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.black)
             }
     }

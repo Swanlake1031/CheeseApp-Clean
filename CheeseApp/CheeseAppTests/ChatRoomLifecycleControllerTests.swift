@@ -39,6 +39,48 @@ final class ChatRoomLifecycleControllerTests: XCTestCase {
         XCTAssertNotEqual(controller.activeSessionID, previousSessionID)
     }
 
+    @MainActor
+    func testBootstrapSubscribesBeforeSnapshotAndPreservesRealtimeMessage() async {
+        let baseDate = Date(timeIntervalSince1970: 1_710_000_000)
+        let snapshotMessage = Message.fixture(
+            id: UUID(uuidString: "71000000-0000-0000-0000-000000000001")!,
+            createdAt: baseDate,
+            content: "snapshot"
+        )
+        let realtimeMessage = Message.fixture(
+            id: UUID(uuidString: "71000000-0000-0000-0000-000000000002")!,
+            createdAt: baseDate.addingTimeInterval(1),
+            content: "realtime"
+        )
+        var onMessage: ((Message) async -> Void)?
+
+        let state = ChatRoomMessageState<Message>(
+            operations: ChatRoomMessageOperations(
+                loadInitialPage: {
+                    XCTAssertNotNil(onMessage)
+                    await onMessage?(realtimeMessage)
+                    return ChatMessagePage(messages: [snapshotMessage], nextCursor: nil)
+                },
+                loadOlderPage: { _ in
+                    ChatMessagePage(messages: [], nextCursor: nil)
+                },
+                observe: { incoming, _, _ in
+                    onMessage = incoming
+                    return {}
+                },
+                sendText: { _, _ in snapshotMessage },
+                sendImage: { _ in snapshotMessage },
+                markRead: {},
+                isIncoming: { _ in false },
+                marksReadWhenLoadFails: true
+            )
+        )
+
+        await state.bootstrap()
+
+        XCTAssertEqual(state.messages.map(\.id), [snapshotMessage.id, realtimeMessage.id])
+    }
+
     func testRealtimeMergeSortsChronologicallyAndDeduplicates() {
         let baseDate = Date(timeIntervalSince1970: 1_710_000_000)
         let lateMessage = Message.fixture(
@@ -815,6 +857,7 @@ private final class ChatRoomServiceStub: ChatRoomServicing {
         muteAttempts += 1
         if muteShouldFail { throw ChatRoomTestError.sendFailed }
     }
+    func setConversationPinned(conversationId: UUID, isPinned: Bool) async throws {}
 
     func clearConversationHistory(conversationId: UUID) async throws -> Date { Date() }
     func deleteDirectMessage(messageId: UUID, forEveryone: Bool) async throws {}
@@ -874,6 +917,12 @@ private final class SecondhandTransactionServiceStub: SecondhandChatTransactionS
         cancelledSellerIntentIDs.append(intentId)
         guard let current = intent else { return }
         intent = current.replacing(status: .sellerStopped)
+    }
+
+    func fetchConversationCompletedSecondhandTransactions(
+        conversationId: UUID
+    ) async throws -> [CompletedSecondhandTransaction] {
+        []
     }
 }
 

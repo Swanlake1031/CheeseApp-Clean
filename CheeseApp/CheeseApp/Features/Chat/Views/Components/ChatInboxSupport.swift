@@ -80,13 +80,34 @@ struct ConversationSwipeActionRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        SwipeableConversationNavigationRow(
-            conversation: conversation,
+        SwipeableDeleteNavigationRow(
+            rowID: conversation.id,
             activeSwipeConversationId: $activeSwipeConversationId,
             isAnyRowHorizontallyDragging: $isAnyRowHorizontallyDragging,
             onOpenConversation: onOpenConversation,
-            onOpenProfile: onOpenProfile,
             onDelete: onDelete
-        )
+        ) {
+            ChatRow(conversation: conversation, onAvatarTap: onOpenProfile)
+        }
+    }
+}
+
+struct GroupConversationSwipeActionRow: View {
+    let group: ChatGroupPreview
+    @Binding var activeSwipeConversationId: UUID?
+    @Binding var isAnyRowHorizontallyDragging: Bool
+    let onOpenConversation: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        SwipeableDeleteNavigationRow(
+            rowID: group.id,
+            activeSwipeConversationId: $activeSwipeConversationId,
+            isAnyRowHorizontallyDragging: $isAnyRowHorizontallyDragging,
+            onOpenConversation: onOpenConversation,
+            onDelete: onDelete
+        ) {
+            GroupChatRow(group: group)
+        }
     }
 }

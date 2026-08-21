@@ -1,7 +1,10 @@
 import SwiftUI
 import UIKit
 
-private struct HorizontalScrollGestureFence: UIViewRepresentable {
+/// Keeps one horizontal drag owned by the nearest inner scroll view for its
+/// entire lifetime, including edge bounce and deceleration. This prevents a
+/// nested strip from handing residual velocity to an outer paging scroll view.
+struct HorizontalScrollGestureFence: UIViewRepresentable {
     func makeUIView(context: Context) -> HorizontalScrollGestureFenceView {
         let view = HorizontalScrollGestureFenceView()
         view.isUserInteractionEnabled = false
@@ -13,13 +16,14 @@ private struct HorizontalScrollGestureFence: UIViewRepresentable {
     }
 }
 
-private final class HorizontalScrollGestureFenceView: UIView {
+final class HorizontalScrollGestureFenceView: UIView {
     private weak var configuredInnerScrollView: UIScrollView?
     private weak var configuredOuterScrollView: UIScrollView?
     private var lockedOuterContentOffset: CGPoint?
     private var outerScrollWasEnabled = true
     private var earliestUnlockTime: CFTimeInterval = 0
     private var lockDisplayLink: CADisplayLink?
+    private var installationScheduled = false
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
@@ -32,12 +36,21 @@ private final class HorizontalScrollGestureFenceView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        guard configuredInnerScrollView == nil
+                || configuredOuterScrollView == nil
+        else {
+            return
+        }
         scheduleInstallation()
     }
 
     func scheduleInstallation() {
+        guard !installationScheduled else { return }
+        installationScheduled = true
         DispatchQueue.main.async { [weak self] in
-            self?.installGestureFenceIfNeeded()
+            guard let self else { return }
+            self.installationScheduled = false
+            self.installGestureFenceIfNeeded()
         }
     }
 
@@ -57,9 +70,6 @@ private final class HorizontalScrollGestureFenceView: UIView {
         }
 
         removeGestureFence()
-        outerScrollView.panGestureRecognizer.require(
-            toFail: innerScrollView.panGestureRecognizer
-        )
         innerScrollView.panGestureRecognizer.addTarget(
             self,
             action: #selector(handleInnerScrollPan(_:))
@@ -327,9 +337,11 @@ struct ExpandableCategoryPicker<Option: Hashable>: View {
     ) -> some View {
         let isSelected = selection == option
         return Button {
-            withAnimation(.easeInOut(duration: 0.18)) {
-                selection = option
-            }
+            // Category filtering replaces the feed below this control. Do not
+            // pass an animation transaction to every card: media deliberately
+            // opts out of animations, which otherwise makes images move ahead
+            // of their text content during a filter change.
+            selection = option
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: icon)
@@ -376,22 +388,13 @@ struct ExpandableCategoryPicker<Option: Hashable>: View {
     }
 
     private func setExpanded(_ expanded: Bool) {
-        if expanded {
-            isShowingExpandedPanel = true
-            isExpanded = false
-            DispatchQueue.main.async {
-                withAnimation(.easeInOut(duration: 0.24)) {
-                    isExpanded = true
-                }
-            }
-        } else {
-            withAnimation(.easeInOut(duration: 0.22)) {
-                isExpanded = false
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-                guard !isExpanded else { return }
-                isShowingExpandedPanel = false
-            }
+        // Expand and collapse in a single layout pass so the feed below moves
+        // as one unit instead of allowing media and text to settle separately.
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isShowingExpandedPanel = expanded
+            isExpanded = expanded
         }
     }
 }

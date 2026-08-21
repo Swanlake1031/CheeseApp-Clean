@@ -88,6 +88,44 @@ final class HomeFeedServiceTests: XCTestCase {
         )
     }
 
+    func testHomeFeedRetriesTransientMissingSessionFailures() {
+        XCTAssertTrue(
+            HomeFeedAuthFailurePolicy.shouldRetry(
+                NSError(
+                    domain: "PostgREST",
+                    code: 42_501,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "permission denied for view forum_posts_view"
+                    ]
+                )
+            )
+        )
+        XCTAssertTrue(
+            HomeFeedAuthFailurePolicy.shouldRetry(
+                NSError(
+                    domain: "HTTP",
+                    code: 401,
+                    userInfo: [NSLocalizedDescriptionKey: "Unauthorized"]
+                )
+            )
+        )
+    }
+
+    func testHomeFeedDoesNotRetryOrdinaryQueryFailures() {
+        XCTAssertFalse(
+            HomeFeedAuthFailurePolicy.shouldRetry(
+                NSError(
+                    domain: "PostgREST",
+                    code: 42_703,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "column likes.id does not exist"
+                    ]
+                )
+            )
+        )
+    }
+
     func testHomeFeedTabsUseRequestedOrder() {
         XCTAssertEqual(
             HomeFeedTab.allCases,

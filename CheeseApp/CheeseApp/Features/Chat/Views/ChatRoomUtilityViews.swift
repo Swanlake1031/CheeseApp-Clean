@@ -215,26 +215,45 @@ struct ChatRoomTradeRecordsPlaceholderView: View {
     let conversation: ChatConversationPreview
 
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var chatService = ChatService.shared
+    @State private var records: [CompletedSecondhandTransaction] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 12) {
-                fillerCard(
-                    title: "交易记录",
-                    subtitle: "功能建设中，后续将展示订单、收付款与纠纷节点。"
-                )
-                fillerCard(
-                    title: "最近往来",
-                    subtitle: "当前先保留入口，避免影响聊天详情布局。"
-                )
-                fillerCard(
-                    title: "对方",
-                    subtitle: conversation.displayName
-                )
+        Group {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let errorMessage {
+                ErrorView(errorMessage) { Task { await loadRecords() } }
+            } else if records.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "bag")
+                        .font(.system(size: 34))
+                        .foregroundStyle(AppColors.textMuted)
+                    Text("暂无已完成交易")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("你和\(conversation.displayName)完成二手交易后，会永久显示在这里。")
+                        .font(.system(size: 13))
+                        .foregroundStyle(AppColors.textMuted)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 28)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: 10) {
+                        ForEach(records) { record in
+                            tradeRecordCard(record)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+                    .padding(.bottom, 24)
+                }
+                .refreshable { await loadRecords() }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
-            .padding(.bottom, 24)
         }
         .background(AppColors.pageBackground.ignoresSafeArea())
         .navigationTitle("交易记录")
@@ -250,23 +269,179 @@ struct ChatRoomTradeRecordsPlaceholderView: View {
                 .buttonStyle(.plain)
             }
         }
+        .task { await loadRecords() }
     }
 
-    private func fillerCard(title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(AppColors.textPrimary)
-            Text(subtitle)
-                .font(.system(size: 13))
-                .foregroundStyle(AppColors.textMuted)
-                .fixedSize(horizontal: false, vertical: true)
+    private func tradeRecordCard(_ record: CompletedSecondhandTransaction) -> some View {
+        HStack(spacing: 12) {
+            Group {
+                if let cover = record.coverImage, let url = URL(string: cover) {
+                    CachedRemoteImage(url: url) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Color.gray.opacity(0.12)
+                    }
+                } else {
+                    Color.gray.opacity(0.12)
+                        .overlay { Image(systemName: "shippingbox") }
+                }
+            }
+            .frame(width: 72, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(record.role == .buyer ? "已买入" : "已卖出")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(AppColors.accentStrong)
+                    Spacer()
+                    Text(record.completedAt.formatted(date: .numeric, time: .omitted))
+                        .font(.system(size: 10))
+                        .foregroundStyle(AppColors.textMuted)
+                }
+                Text(record.listingTitle)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .lineLimit(2)
+                Text("CAD \(record.price, specifier: "%.2f")")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(AppColors.accentStrong)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
+        .padding(12)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .cheeseCardChrome(cornerRadius: 14)
+    }
+
+    private func loadRecords() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            records = try await chatService.fetchConversationCompletedSecondhandTransactions(
+                conversationId: conversation.id
+            )
+        } catch {
+            if !error.isCancellationLike { errorMessage = error.localizedDescription }
+        }
+    }
+}
+
+struct GroupChatHistoryView: View {
+    let group: ChatGroupPreview
+
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var chatService = ChatService.shared
+    @State private var queryText = ""
+    @State private var messages: [GroupMessage] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    private var filteredMessages: [GroupMessage] {
+        let source = messages.sorted { $0.createdAt > $1.createdAt }
+        let query = queryText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return source }
+        return source.filter {
+            $0.content.localizedCaseInsensitiveContains(query)
+                || $0.senderName.localizedCaseInsensitiveContains(query)
+                || ($0.messageType == "image" && "图片消息".contains(query))
+        }
+    }
+
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let errorMessage {
+                ErrorView(errorMessage) { Task { await load() } }
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 10) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundStyle(AppColors.textMuted)
+                            CheeseSearchTextField(
+                                text: $queryText,
+                                placeholder: "搜索聊天内容",
+                                fontSize: 14
+                            )
+                        }
+                        .padding(12)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .cheeseInputChrome(cornerRadius: 12)
+
+                        if filteredMessages.isEmpty {
+                            Text(queryText.isEmpty ? "暂无聊天记录" : "没有匹配结果")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(AppColors.textMuted)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 30)
+                        } else {
+                            VStack(spacing: 0) {
+                                ForEach(filteredMessages) { message in
+                                    HStack(spacing: 10) {
+                                        Circle()
+                                            .fill(Color.gray.opacity(0.12))
+                                            .frame(width: 42, height: 42)
+                                            .overlay {
+                                                Text(String(message.senderName.prefix(1)))
+                                                    .font(.system(size: 15, weight: .semibold))
+                                            }
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(message.senderName)
+                                                .font(.system(size: 12, weight: .semibold))
+                                                .foregroundStyle(AppColors.textMuted)
+                                            Text(message.messageType == "image" ? "图片消息" : message.content)
+                                                .font(.system(size: 14))
+                                                .foregroundStyle(AppColors.textPrimary)
+                                                .lineLimit(2)
+                                        }
+                                        Spacer()
+                                        Text(message.createdAt.formatted(date: .numeric, time: .shortened))
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(AppColors.textMuted)
+                                    }
+                                    .padding(12)
+                                    if message.id != filteredMessages.last?.id { Divider().padding(.leading, 64) }
+                                }
+                            }
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .cheeseCardChrome(cornerRadius: 14)
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .background(AppColors.pageBackground.ignoresSafeArea())
+        .navigationTitle("搜索聊天内容")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button(action: { dismiss() }) { PostToolbarIconCircle(icon: "chevron.left") }
+            }
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let settings = await chatService.fetchGroupConversationSettings(groupId: group.id)
+            let all = try await chatService.fetchGroupMessages(groupId: group.id)
+            messages = all.filter { message in
+                guard let clearedAt = settings.clearBeforeAt else { return true }
+                return message.createdAt >= clearedAt
+            }
+        } catch {
+            if !error.isCancellationLike { errorMessage = error.localizedDescription }
+        }
     }
 }
 

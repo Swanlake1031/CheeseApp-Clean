@@ -287,117 +287,193 @@ private struct RemoteImageGalleryPreviewView: View {
     }
 }
 
-// MARK: - Inline Post Gallery
+// MARK: - Detail Media Carousel
 
-/// Shared detail-page carousel for forum and marketplace posts.
-struct PostImageCarousel<Placeholder: View>: View {
-    let urlStrings: [String]
+struct DetailMediaMetrics: Equatable {
+    let horizontalInset: CGFloat
+    let minimumAspectRatio: CGFloat
+    let maximumAspectRatio: CGFloat
+    let fallbackAspectRatio: CGFloat
+    let targetPixelWidth: Int
+
+    static let forum = DetailMediaMetrics(
+        horizontalInset: 16,
+        minimumAspectRatio: 4 / 5,
+        maximumAspectRatio: 16 / 9,
+        fallbackAspectRatio: 1,
+        targetPixelWidth: 1_440
+    )
+
+    static let secondhand = DetailMediaMetrics(
+        horizontalInset: 12,
+        minimumAspectRatio: 3 / 4,
+        maximumAspectRatio: 16 / 9,
+        fallbackAspectRatio: 1,
+        targetPixelWidth: 1_440
+    )
+}
+
+enum DetailMediaStyle {
+    static let surroundingContentInset: CGFloat = 16
+    static let pageIndicatorBottomInset: CGFloat = 12
+
+    static var background: Color {
+        .white
+    }
+}
+
+struct DetailMediaViewportLayout: Equatable {
+    let width: CGFloat
     let height: CGFloat
-    let cornerRadius: CGFloat
-    private let placeholder: () -> Placeholder
+    let aspectRatio: CGFloat
+}
+
+enum DetailMediaLayoutEngine {
+    static func normalizedAspectRatio(
+        firstImageAspectRatio: CGFloat?,
+        metrics: DetailMediaMetrics
+    ) -> CGFloat {
+        guard let firstImageAspectRatio,
+              firstImageAspectRatio.isFinite,
+              firstImageAspectRatio > 0
+        else {
+            return metrics.fallbackAspectRatio
+        }
+
+        return min(
+            max(firstImageAspectRatio, metrics.minimumAspectRatio),
+            metrics.maximumAspectRatio
+        )
+    }
+
+    static func viewportLayout(
+        contentWidth: CGFloat,
+        firstImageAspectRatio: CGFloat?,
+        metrics: DetailMediaMetrics
+    ) -> DetailMediaViewportLayout {
+        let width = max(contentWidth, 0)
+        let aspectRatio = normalizedAspectRatio(
+            firstImageAspectRatio: firstImageAspectRatio,
+            metrics: metrics
+        )
+        return DetailMediaViewportLayout(
+            width: width,
+            height: width / aspectRatio,
+            aspectRatio: aspectRatio
+        )
+    }
+}
+
+enum DetailMediaPagingPolicy {
+    static func previewIndex(tappedPage: Int, imageCount: Int) -> Int {
+        min(max(tappedPage, 0), max(imageCount - 1, 0))
+    }
+
+    static func showsPageIndicator(imageCount: Int) -> Bool {
+        imageCount > 1
+    }
+}
+
+/// One shared, fixed-viewport carousel for Forum and Secondhand detail pages.
+/// The first image owns the bounded viewport ratio; every page aspect-fits inside it.
+struct DetailMediaCarousel: View {
+    let urlStrings: [String]
+    let metrics: DetailMediaMetrics
 
     @State private var currentIndex = 0
     @State private var previewInitialIndex = 0
     @State private var showingPreview = false
+    @State private var resolvedFirstImageRatio: ResolvedFirstImageRatio?
 
-    init(
-        urlStrings: [String],
-        height: CGFloat,
-        cornerRadius: CGFloat = 12,
-        @ViewBuilder placeholder: @escaping () -> Placeholder
-    ) {
-        self.urlStrings = urlStrings
-        self.height = height
-        self.cornerRadius = cornerRadius
-        self.placeholder = placeholder
+    private var imageItems: [URL] {
+        urlStrings.compactMap(URL.init(string:))
     }
 
-    private var imageItems: [(urlString: String, url: URL)] {
-        urlStrings.compactMap { value in
-            guard let url = URL(string: value) else { return nil }
-            return (value, url)
+    private var firstImageURL: URL? {
+        imageItems.first
+    }
+
+    private var firstImageAspectRatio: CGFloat? {
+        guard let firstImageURL else { return nil }
+        if resolvedFirstImageRatio?.url == firstImageURL {
+            return resolvedFirstImageRatio?.aspectRatio
         }
+        return RemoteImageCache.shared.aspectRatio(for: firstImageURL)
+    }
+
+    private var viewportAspectRatio: CGFloat {
+        DetailMediaLayoutEngine.normalizedAspectRatio(
+            firstImageAspectRatio: firstImageAspectRatio,
+            metrics: metrics
+        )
+    }
+
+    private var horizontalAdjustment: CGFloat {
+        metrics.horizontalInset - DetailMediaStyle.surroundingContentInset
     }
 
     var body: some View {
         let items = imageItems
 
         ZStack(alignment: .bottom) {
+            DetailMediaStyle.background
+
             if items.isEmpty {
-                placeholder()
+                detailPlaceholder
+            } else if items.count == 1, let url = items.first {
+                page(url: url, index: 0, imageCount: 1)
             } else {
                 TabView(selection: $currentIndex) {
-                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                        Button {
-                            previewInitialIndex = index
-                            showingPreview = true
-                        } label: {
-                            CachedRemoteImage(url: item.url) { image in
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                            } placeholder: {
-                                placeholder()
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: height)
-                            .clipped()
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .tag(index)
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, url in
+                        page(url: url, index: index, imageCount: items.count)
+                            .tag(index)
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
+            }
 
-                if items.count > 1 {
-                    HStack(spacing: 7) {
-                        ForEach(items.indices, id: \.self) { index in
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    currentIndex = index
-                                }
-                            } label: {
-                                Circle()
-                                    .fill(
-                                        index == currentIndex
-                                            ? Color.white
-                                            : Color.white.opacity(0.48)
-                                    )
-                                    .frame(
-                                        width: index == currentIndex ? 8 : 6,
-                                        height: index == currentIndex ? 8 : 6
-                                    )
-                                    .frame(width: 14, height: 18)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                L10n.tr("Show photo \(index + 1)", "查看第 \(index + 1) 张图片")
+            if DetailMediaPagingPolicy.showsPageIndicator(imageCount: items.count) {
+                HStack(spacing: 7) {
+                    ForEach(items.indices, id: \.self) { index in
+                        Circle()
+                            .fill(
+                                index == currentIndex
+                                    ? Color.white
+                                    : Color.white.opacity(0.46)
                             )
-                        }
+                            .frame(
+                                width: index == currentIndex ? 7 : 6,
+                                height: index == currentIndex ? 7 : 6
+                            )
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(.black.opacity(0.46))
-                    .clipShape(Capsule())
-                    .padding(.bottom, 10)
-                    .accessibilityValue(
-                        L10n.tr(
-                            "Photo \(currentIndex + 1) of \(items.count)",
-                            "第 \(currentIndex + 1) 张，共 \(items.count) 张"
-                        )
-                    )
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color.black.opacity(0.52))
+                .clipShape(Capsule())
+                .padding(.bottom, DetailMediaStyle.pageIndicatorBottomInset)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: height)
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .aspectRatio(viewportAspectRatio, contentMode: .fit)
+        .clipped()
+        .contentShape(Rectangle())
+        .padding(.horizontal, horizontalAdjustment)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L10n.tr("Photo carousel", "图片轮播"))
+        .accessibilityValue(
+            L10n.tr(
+                "Photo \(min(currentIndex + 1, max(items.count, 1))) of \(max(items.count, 1))",
+                "第 \(min(currentIndex + 1, max(items.count, 1))) 张，共 \(max(items.count, 1)) 张"
+            )
+        )
         // Keep presentation state on the stable carousel rather than a remote
         // image phase. This prevents the first tap from being dismissed when a
         // placeholder is replaced by the downloaded image.
         .fullScreenCover(isPresented: $showingPreview) {
-            let urls = imageItems.map { $0.url }
+            let urls = imageItems
             if urls.count == 1, let imageURL = urls.first {
                 RemoteImagePreviewView(imageURL: imageURL)
                     .presentationBackground(.clear)
@@ -409,13 +485,134 @@ struct PostImageCarousel<Placeholder: View>: View {
                 .presentationBackground(.clear)
             }
         }
-        .onChange(of: items.count) { _, count in
+        .task(id: firstImageURL) {
+            await resolveFirstImageAspectRatio()
+        }
+        .onChange(of: items) { _, updatedItems in
+            let count = updatedItems.count
             currentIndex = min(currentIndex, max(count - 1, 0))
             previewInitialIndex = min(previewInitialIndex, max(count - 1, 0))
             if count == 0 {
                 showingPreview = false
             }
         }
+    }
+
+    private var detailPlaceholder: some View {
+        DetailMediaStyle.background
+            .overlay {
+                Image(systemName: "photo")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(AppColors.textMuted.opacity(0.65))
+            }
+            .accessibilityLabel(L10n.tr("Image unavailable", "图片暂不可用"))
+    }
+
+    private func page(url: URL, index: Int, imageCount: Int) -> some View {
+        Button {
+            previewInitialIndex = DetailMediaPagingPolicy.previewIndex(
+                tappedPage: index,
+                imageCount: imageCount
+            )
+            showingPreview = true
+        } label: {
+            DetailMediaPage(
+                url: url,
+                targetPixelWidth: metrics.targetPixelWidth,
+                onImageLoaded: index == 0 ? recordFirstImageSize : nil
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            L10n.tr(
+                "Open photo \(index + 1) of \(imageCount)",
+                "打开第 \(index + 1) 张图片，共 \(imageCount) 张"
+            )
+        )
+    }
+
+    @MainActor
+    private func resolveFirstImageAspectRatio() async {
+        guard let url = firstImageURL else {
+            resolvedFirstImageRatio = nil
+            return
+        }
+
+        if let cachedRatio = RemoteImageCache.shared.aspectRatio(for: url) {
+            recordFirstImageRatio(cachedRatio, for: url)
+            return
+        }
+
+        guard let image = try? await RemoteImageCache.shared.image(
+            for: url,
+            maxPixelSize: metrics.targetPixelWidth
+        ), firstImageURL == url else { return }
+
+        recordFirstImageSize(image.size)
+    }
+
+    private func recordFirstImageSize(_ size: CGSize) {
+        guard let url = firstImageURL,
+              size.width.isFinite,
+              size.height.isFinite,
+              size.width > 0,
+              size.height > 0
+        else { return }
+
+        recordFirstImageRatio(size.width / size.height, for: url)
+    }
+
+    private func recordFirstImageRatio(_ aspectRatio: CGFloat, for url: URL) {
+        guard firstImageURL == url,
+              aspectRatio.isFinite,
+              aspectRatio > 0
+        else { return }
+
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            resolvedFirstImageRatio = ResolvedFirstImageRatio(
+                url: url,
+                aspectRatio: aspectRatio
+            )
+        }
+    }
+
+    private struct ResolvedFirstImageRatio: Equatable {
+        let url: URL
+        let aspectRatio: CGFloat
+    }
+}
+
+private struct DetailMediaPage: View {
+    let url: URL
+    let targetPixelWidth: Int
+    let onImageLoaded: ((CGSize) -> Void)?
+
+    var body: some View {
+        ZStack {
+            DetailMediaStyle.background
+
+            CachedRemoteImage(
+                url: url,
+                targetPixelWidth: targetPixelWidth,
+                onImageLoaded: onImageLoaded
+            ) { image in
+                image
+                    .resizable()
+                    .scaledToFit()
+            } placeholder: {
+                DetailMediaStyle.background
+                    .overlay {
+                        ProgressView()
+                            .tint(AppColors.textMuted)
+                    }
+            }
+        }
+        .clipped()
+        .accessibilityAddTraits(.isImage)
     }
 }
 

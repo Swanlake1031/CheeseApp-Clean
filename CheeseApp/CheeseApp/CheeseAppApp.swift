@@ -569,9 +569,9 @@ final class EngagementNotificationService: NSObject, UNUserNotificationCenterDel
 
         let totalLikes: Int
         do {
-            let response: PostgrestResponse<[ForumEntityIdRow]> = try await supabase
+            let response: PostgrestResponse<[ForumLikeTargetRow]> = try await supabase
                 .database("likes")
-                .select("id", count: .exact)
+                .select("target_id", count: .exact)
                 .eq("target_type", value: "post")
                 .`in`("target_id", values: postIdFilters)
                 .neq("user_id", value: userId.uuidString)
@@ -876,4 +876,12 @@ private struct OwnForumPostEngagementRow: Decodable {
 
 private struct ForumEntityIdRow: Decodable {
     let id: UUID
+}
+
+private struct ForumLikeTargetRow: Decodable {
+    let targetId: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case targetId = "target_id"
+    }
 }

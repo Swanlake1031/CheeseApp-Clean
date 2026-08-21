@@ -148,6 +148,11 @@ struct GroupChatRow: View {
                     Spacer()
 
                     HStack(spacing: 6) {
+                        if group.isPinned {
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(AppColors.accentStrong)
+                        }
                         Text(formatTime(group.lastMessageAt))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
@@ -179,8 +184,6 @@ struct GroupChatRow: View {
                     .padding(.vertical, 4)
                     .background(AppColors.accent)
                     .clipShape(Capsule())
-            } else {
-                Spacer()
             }
         }
         .padding(.horizontal, 16)

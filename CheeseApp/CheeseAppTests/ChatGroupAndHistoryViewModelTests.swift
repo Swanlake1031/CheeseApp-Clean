@@ -1,4 +1,7 @@
 import XCTest
+import PhotosUI
+import SwiftUI
+import UIKit
 @testable import CheeseApp
 
 @MainActor
@@ -149,6 +152,32 @@ final class GroupChatRoomViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.draftText, "next draft")
     }
 
+    func testMultipleStagedImagesSendWithGroupScope() async {
+        let group = ChatGroupPreview.auditFixture()
+        let recorder = GroupMessageRecorder(groupID: group.id)
+        let mediaService = GroupChatMediaServiceStub()
+        let viewModel = GroupChatRoomViewModel(
+            group: group,
+            roomState: makeRoomState(recorder: recorder),
+            mediaService: mediaService,
+            stagedImages: [UIImage(), UIImage()]
+        )
+
+        XCTAssertEqual(viewModel.imageSelectionLimit, 9)
+        XCTAssertEqual(viewModel.stagedImages.count, 2)
+
+        viewModel.submitComposer()
+        await waitUntil {
+            !viewModel.isComposerBusy && viewModel.stagedImages.isEmpty
+        }
+
+        let sendAttempts = await recorder.sendAttempts
+        XCTAssertEqual(sendAttempts, 2)
+        XCTAssertEqual(mediaService.uploadedScopes, [.group, .group])
+        XCTAssertEqual(mediaService.retainedAssets.count, 2)
+        XCTAssertEqual(viewModel.messages.count, 2)
+    }
+
     func testNavigationUsesOneTypedDestination() {
         let group = ChatGroupPreview.auditFixture()
         let viewModel = GroupChatRoomViewModel(
@@ -234,6 +263,38 @@ private actor GroupMessageRecorder {
             senderName: "Tester",
             senderAvatar: nil
         )
+    }
+}
+
+@MainActor
+private final class GroupChatMediaServiceStub: ChatRoomMediaServicing {
+    private(set) var uploadedScopes: [ChatMediaScope] = []
+    private(set) var deletedAssets: [ChatMediaAsset] = []
+    private(set) var retainedAssets: [ChatMediaAsset] = []
+
+    func loadImages(from items: [PhotosPickerItem]) async throws -> [UIImage] { [] }
+
+    func uploadImage(
+        _ image: UIImage,
+        scope: ChatMediaScope,
+        scopeID: UUID
+    ) async throws -> ChatMediaAsset {
+        uploadedScopes.append(scope)
+        let reference = ChatMediaReference(
+            bucket: StorageBuckets.chatImages,
+            objectPath: "\(scope.rawValue)/\(scopeID.uuidString.lowercased())/\(UUID().uuidString.lowercased())/\(UUID().uuidString.lowercased()).jpg",
+            scope: scope,
+            scopeID: scopeID
+        )
+        return ChatMediaAsset(reference: reference, cleanupID: UUID())
+    }
+
+    func deleteUploadedImage(_ asset: ChatMediaAsset) async {
+        deletedAssets.append(asset)
+    }
+
+    func retainUploadedImage(_ asset: ChatMediaAsset) async {
+        retainedAssets.append(asset)
     }
 }
 

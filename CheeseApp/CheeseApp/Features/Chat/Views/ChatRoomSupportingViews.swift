@@ -69,9 +69,11 @@ struct ChatRoomSettingsView: View {
     let conversation: ChatConversationPreview
     let remark: String?
     let isMuted: Bool
+    let isPinned: Bool
     let blockRelation: UserBlockRelation
     let isBusy: Bool
     let onToggleMute: (Bool) -> Void
+    let onTogglePin: (Bool) -> Void
     let onSaveRemark: (String?) -> Void
     let onReport: () -> Void
     let onClearHistory: () -> Void
@@ -79,6 +81,7 @@ struct ChatRoomSettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var localMuted: Bool
+    @State private var localPinned: Bool
     @State private var localRemark: String?
     @State private var remarkDraft: String
     @State private var showRemarkEditor = false
@@ -92,9 +95,11 @@ struct ChatRoomSettingsView: View {
         conversation: ChatConversationPreview,
         remark: String?,
         isMuted: Bool,
+        isPinned: Bool,
         blockRelation: UserBlockRelation,
         isBusy: Bool,
         onToggleMute: @escaping (Bool) -> Void,
+        onTogglePin: @escaping (Bool) -> Void,
         onSaveRemark: @escaping (String?) -> Void,
         onReport: @escaping () -> Void,
         onClearHistory: @escaping () -> Void,
@@ -103,14 +108,17 @@ struct ChatRoomSettingsView: View {
         self.conversation = conversation
         self.remark = remark
         self.isMuted = isMuted
+        self.isPinned = isPinned
         self.blockRelation = blockRelation
         self.isBusy = isBusy
         self.onToggleMute = onToggleMute
+        self.onTogglePin = onTogglePin
         self.onSaveRemark = onSaveRemark
         self.onReport = onReport
         self.onClearHistory = onClearHistory
         self.onToggleBlock = onToggleBlock
         _localMuted = State(initialValue: isMuted)
+        _localPinned = State(initialValue: isPinned)
         _localRemark = State(initialValue: remark)
         _remarkDraft = State(initialValue: remark ?? "")
     }
@@ -212,6 +220,20 @@ struct ChatRoomSettingsView: View {
                             set: { newValue in
                                 localMuted = newValue
                                 onToggleMute(newValue)
+                            }
+                        )
+                    )
+
+                    Divider().padding(.leading, 16)
+
+                    settingsToggleRow(
+                        title: "置顶聊天",
+                        systemImage: "pin.fill",
+                        isOn: Binding(
+                            get: { localPinned },
+                            set: { newValue in
+                                localPinned = newValue
+                                onTogglePin(newValue)
                             }
                         )
                     )

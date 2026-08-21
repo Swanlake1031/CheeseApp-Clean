@@ -435,10 +435,6 @@ private struct ForumBoardIntroductionCard: View {
         }
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .bottom) {
-            Divider()
-                .overlay(AppColors.divider)
-        }
         .accessibilityLabel(
             L10n.tr(
                 "\(board.name), \(board.description)",

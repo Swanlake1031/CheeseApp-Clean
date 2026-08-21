@@ -29,7 +29,6 @@ struct HomeFeaturedPost: Decodable, Hashable, Identifiable {
 
 struct HomeFeedImage {
     let url: String
-    let orderIndex: Int?
 }
 
 struct HomeFeaturedSecondhandPost {
@@ -186,9 +185,7 @@ final class HomeFeedService {
             userAvatar: row.userAvatar,
             isAnonymous: row.isAnonymous,
             isUserMcMasterVerified: !row.isAnonymous && row.userMcMasterVerified == true,
-            images: (row.images ?? []).map {
-                HomeFeedImage(url: $0.url, orderIndex: $0.orderIndex)
-            },
+            images: (row.images ?? []).map { HomeFeedImage(url: $0.url) },
             likeCount: row.likeCount ?? 0,
             viewCount: row.viewCount ?? 0,
             saveCount: row.saveCount ?? 0,

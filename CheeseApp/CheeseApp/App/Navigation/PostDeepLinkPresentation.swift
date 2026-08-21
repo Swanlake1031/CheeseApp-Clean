@@ -202,7 +202,10 @@ struct DeepLinkedPostPresenterView: View {
         case .secondhand(let item):
             SecondhandDetailView(item: item)
         case .forum(let post):
-            ForumDetailView(post: post)
+            ForumDetailView(
+                post: post,
+                initialCommentID: route.commentId
+            )
         }
     }
 

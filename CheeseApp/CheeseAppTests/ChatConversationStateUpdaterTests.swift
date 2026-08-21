@@ -39,6 +39,36 @@ final class ChatConversationStateUpdaterTests: XCTestCase {
 
         XCTAssertEqual(groups.first?.unreadCount, 0)
     }
+
+    func testDeletedGroupStaysHiddenUntilANewerMessageArrives() {
+        let updater = ChatConversationStateUpdater(timestampTolerance: 0)
+        let groupId = UUID(uuidString: "71000000-0000-0000-0000-000000000012")!
+        let deletedAt = Date(timeIntervalSince1970: 2_000)
+        var group = ChatGroupPreview.fixture(id: groupId, name: "学习群", unreadCount: 0)
+        group.lastMessageAt = Date(timeIntervalSince1970: 1_900)
+        let settings = GroupConversationSettings(
+            isMuted: false,
+            isPinned: false,
+            clearBeforeAt: deletedAt,
+            hideUntilAt: deletedAt
+        )
+
+        XCTAssertTrue(
+            updater.applyGroupListSettings(
+                to: [group],
+                settingsByGroupID: [groupId: settings]
+            ).isEmpty
+        )
+
+        group.lastMessageAt = Date(timeIntervalSince1970: 2_100)
+        XCTAssertEqual(
+            updater.applyGroupListSettings(
+                to: [group],
+                settingsByGroupID: [groupId: settings]
+            ).map(\.id),
+            [groupId]
+        )
+    }
 }
 
 private extension ChatConversationPreview {

@@ -240,7 +240,6 @@ struct EditPostSheet: View {
         case .forum:
             return !trimmedTitle.isEmpty
                 && title.count <= ForumComposerRules.maximumTitleLength
-                && !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && forumBoardID != nil
         }
     }

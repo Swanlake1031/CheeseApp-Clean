@@ -9,12 +9,14 @@ import Foundation
 
 struct DirectConversationSettings: Hashable {
     let isMuted: Bool
+    let isPinned: Bool
     let clearBeforeAt: Date?
     let manualUnread: Bool
     let hideUntilAt: Date?
 
     static let `default` = DirectConversationSettings(
         isMuted: false,
+        isPinned: false,
         clearBeforeAt: nil,
         manualUnread: false,
         hideUntilAt: nil
@@ -23,12 +25,21 @@ struct DirectConversationSettings: Hashable {
 
 struct GroupConversationSettings: Hashable {
     let isMuted: Bool
+    let isPinned: Bool
+    let clearBeforeAt: Date?
+    let hideUntilAt: Date?
 
-    static let `default` = GroupConversationSettings(isMuted: false)
+    static let `default` = GroupConversationSettings(
+        isMuted: false,
+        isPinned: false,
+        clearBeforeAt: nil,
+        hideUntilAt: nil
+    )
 }
 
 struct ChatConversationListSettingsSnapshot {
     let mutedConversationIDs: Set<UUID>
+    let pinnedConversationIDs: Set<UUID>
     let manualUnreadConversationIDs: Set<UUID>
     let hiddenConversationUntilMap: [UUID: Date]
     let clearBeforeMap: [UUID: Date]
@@ -40,6 +51,7 @@ struct ChatGroupMemberSummary: Identifiable, Hashable {
     let avatarURL: String?
     let role: String
     let joinedAt: Date?
+    let nickname: String?
 
     var roleLabel: String {
         role == "owner" ? "群主" : "成员"
@@ -308,27 +320,30 @@ class ChatService: ObservableObject {
         async let conversationSettingsTask = privacyActions.fetchConversationListSettings(
             userId: userID
         )
-        async let mutedGroupTask = privacyActions.fetchMutedGroupIDs(userId: userID)
+        async let groupSettingsTask = privacyActions.fetchGroupListSettings(userId: userID)
 
         let conversationSettings = try await conversationSettingsTask
-        let mutedGroupIDs = try await mutedGroupTask
+        let groupSettings = try await groupSettingsTask
         let directConversations = stateUpdater.applyClearHistoryToPreviews(
             snapshot.directConversations,
             clearMap: conversationSettings.clearBeforeMap
         )
 
         return ChatConversationRepositorySnapshot(
-            directConversations: stateUpdater.applyConversationListState(
-                to: stateUpdater.applyMuteState(
-                    to: directConversations,
-                    mutedConversationIDs: conversationSettings.mutedConversationIDs
+            directConversations: stateUpdater.applyPinState(
+                to: stateUpdater.applyConversationListState(
+                    to: stateUpdater.applyMuteState(
+                        to: directConversations,
+                        mutedConversationIDs: conversationSettings.mutedConversationIDs
+                    ),
+                    manualUnreadConversationIDs: conversationSettings.manualUnreadConversationIDs,
+                    hiddenConversationUntilMap: conversationSettings.hiddenConversationUntilMap
                 ),
-                manualUnreadConversationIDs: conversationSettings.manualUnreadConversationIDs,
-                hiddenConversationUntilMap: conversationSettings.hiddenConversationUntilMap
+                pinnedConversationIDs: conversationSettings.pinnedConversationIDs
             ),
-            groupConversations: stateUpdater.applyGroupMuteState(
+            groupConversations: stateUpdater.applyGroupListSettings(
                 to: snapshot.groupConversations,
-                mutedGroupIDs: mutedGroupIDs
+                settingsByGroupID: groupSettings
             )
         )
     }
@@ -407,6 +422,22 @@ class ChatService: ObservableObject {
 
     func fetchMessages(conversationId: UUID) async throws -> [Message] {
         try await repository.fetchMessages(conversationId: conversationId)
+    }
+
+    func fetchGroupMessages(groupId: UUID) async throws -> [GroupMessage] {
+        var messages: [GroupMessage] = []
+        var cursor: ChatMessagePageCursor?
+
+        repeat {
+            let page = try await repository.fetchGroupMessagesPage(
+                groupId: groupId,
+                before: cursor
+            )
+            messages.append(contentsOf: page.messages)
+            cursor = page.nextCursor
+        } while cursor != nil
+
+        return messages
     }
 
     func fetchMessagesPage(
@@ -511,7 +542,7 @@ class ChatService: ObservableObject {
 
         return try await sendMessage(
             conversationId: conversationId,
-            content: "Post contact card",
+            content: "帖子联系卡",
             messageType: "text",
             metadata: MessageMetadata(
                 imageURL: nil,
@@ -774,12 +805,99 @@ class ChatService: ObservableObject {
         )
     }
 
+    func setGroupConversationPinned(groupId: UUID, isPinned: Bool) async throws {
+        let userID = try await AuthService.shared.requireAuthUserId()
+        guard let requestGeneration = requestGeneration(for: userID) else { throw CancellationError() }
+        try await privacyActions.persistGroupConversationPin(groupId: groupId, isPinned: isPinned)
+        guard isCurrentAccountRequest(userID: userID, generation: requestGeneration) else { return }
+        stateUpdater.setGroupConversationPinned(
+            groupId: groupId,
+            isPinned: isPinned,
+            groupConversations: &groupConversations
+        )
+    }
+
+    func clearGroupConversationHistory(groupId: UUID) async throws -> Date {
+        let clearedAt = try await privacyActions.clearGroupConversationHistory(groupId: groupId)
+        stateUpdater.clearGroupConversationPreview(
+            groupId: groupId,
+            groupConversations: &groupConversations
+        )
+        return clearedAt
+    }
+
+    func deleteGroupConversation(groupId: UUID) async throws {
+        try await privacyActions.deleteGroupConversation(groupId: groupId)
+        groupConversations.removeAll { $0.id == groupId }
+    }
+
     func fetchChatGroupMembers(groupId: UUID) async throws -> [ChatGroupMemberSummary] {
         do {
             return try await repository.fetchChatGroupMembers(groupId: groupId)
         } catch {
             throw normalizedGroupDetailsError(from: error)
         }
+    }
+
+    func observeChatGroupMemberChanges(
+        groupId: UUID,
+        onChange: @escaping () async -> Void
+    ) -> () -> Void {
+        repository.observeChatGroupMemberChanges(groupId: groupId, onChange: onChange)
+    }
+
+    func renameChatGroup(groupId: UUID, name: String) async throws {
+        let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "群聊名称不能为空。"])
+        }
+        try await repository.renameChatGroup(groupId: groupId, name: normalized)
+        if let index = groupConversations.firstIndex(where: { $0.id == groupId }) {
+            let existing = groupConversations[index]
+            groupConversations[index] = ChatGroupPreview(
+                id: existing.id,
+                name: normalized,
+                avatarURL: existing.avatarURL,
+                lastMessageAt: existing.lastMessageAt,
+                lastMessagePreview: existing.lastMessagePreview,
+                memberCount: existing.memberCount,
+                unreadCount: existing.unreadCount,
+                isMuted: existing.isMuted,
+                isPinned: existing.isPinned
+            )
+        }
+    }
+
+    func fetchChatGroupAnnouncement(groupId: UUID) async -> String? {
+        try? await repository.fetchChatGroupAnnouncement(groupId: groupId)
+    }
+
+    func updateChatGroupAnnouncement(groupId: UUID, announcement: String?) async throws {
+        try await repository.updateChatGroupAnnouncement(
+            groupId: groupId,
+            announcement: sanitizedOptionalText(announcement)
+        )
+    }
+
+    func addChatGroupMembers(groupId: UUID, memberIds: [UUID]) async throws -> Int {
+        let uniqueIDs = Array(Set(memberIds))
+        guard !uniqueIDs.isEmpty else { return 0 }
+        let added = try await repository.addChatGroupMembers(groupId: groupId, memberIds: uniqueIDs)
+        await refreshConversations()
+        return added
+    }
+
+    func updateMyChatGroupNickname(groupId: UUID, nickname: String?) async throws {
+        let normalized = sanitizedOptionalText(nickname)
+        try await repository.updateMyChatGroupNickname(groupId: groupId, nickname: normalized)
+    }
+
+    func fetchConversationCompletedSecondhandTransactions(
+        conversationId: UUID
+    ) async throws -> [CompletedSecondhandTransaction] {
+        try await repository.fetchConversationCompletedSecondhandTransactions(
+            conversationId: conversationId
+        )
     }
 
     func isCurrentUserGroupOwner(groupId: UUID) async -> Bool {
@@ -848,6 +966,18 @@ class ChatService: ObservableObject {
 
     func fetchDirectConversationSettings(conversationId: UUID) async -> DirectConversationSettings {
         await privacyActions.fetchDirectConversationSettings(conversationId: conversationId)
+    }
+
+    func setConversationPinned(conversationId: UUID, isPinned: Bool) async throws {
+        let userID = try await AuthService.shared.requireAuthUserId()
+        guard let requestGeneration = requestGeneration(for: userID) else { throw CancellationError() }
+        try await privacyActions.persistConversationPin(conversationId: conversationId, isPinned: isPinned)
+        guard isCurrentAccountRequest(userID: userID, generation: requestGeneration) else { return }
+        stateUpdater.setConversationPinned(
+            conversationId: conversationId,
+            isPinned: isPinned,
+            conversations: &conversations
+        )
     }
 
     func setConversationMuted(conversationId: UUID, isMuted: Bool) async throws {
@@ -1198,7 +1328,8 @@ class ChatService: ObservableObject {
                 lastMessageAt: messageCreatedAt,
                 lastMessagePreview: lastMessagePreview,
                 unreadCount: current.unreadCount,
-                isMuted: current.isMuted
+                isMuted: current.isMuted,
+                isPinned: current.isPinned
             )
             stateUpdater.upsertConversation(
                 updated,
@@ -1239,7 +1370,8 @@ class ChatService: ObservableObject {
                     lastMessagePreview: previewText,
                     memberCount: current.memberCount,
                     unreadCount: 0,
-                    isMuted: current.isMuted
+                    isMuted: current.isMuted,
+                    isPinned: current.isPinned
                 ),
                 groupConversations: &groupConversations
             )
@@ -1393,6 +1525,10 @@ struct ChatGroupFallbackRow: Decodable {
     }
 }
 
+struct ChatGroupAnnouncementRow: Decodable {
+    let announcement: String?
+}
+
 struct ChatGroupMemberCountRow: Decodable {
     let userId: UUID
 
@@ -1419,6 +1555,7 @@ struct ChatGroupMemberRpcRow: Decodable {
     let avatarURL: String?
     let role: String
     let joinedAt: Date?
+    let nickname: String?
 
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
@@ -1426,6 +1563,7 @@ struct ChatGroupMemberRpcRow: Decodable {
         case avatarURL = "avatar_url"
         case role
         case joinedAt = "joined_at"
+        case nickname
     }
 }
 
@@ -1443,9 +1581,15 @@ struct GroupMessagePreviewRow: Decodable {
 
 struct GroupConversationSettingsRow: Decodable {
     let isMuted: Bool
+    let isPinned: Bool
+    let clearBeforeAt: Date?
+    let hideUntilAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case isMuted = "is_muted"
+        case isPinned = "is_pinned"
+        case clearBeforeAt = "clear_before_at"
+        case hideUntilAt = "hide_until_at"
     }
 }
 
@@ -1453,19 +1597,31 @@ struct GroupConversationSettingsInsert: Encodable {
     let userId: UUID
     let groupId: UUID
     let isMuted: Bool
+    let isPinned: Bool
+    let clearBeforeAt: Date?
+    let hideUntilAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case groupId = "group_id"
         case isMuted = "is_muted"
+        case isPinned = "is_pinned"
+        case clearBeforeAt = "clear_before_at"
+        case hideUntilAt = "hide_until_at"
     }
 }
 
 struct GroupConversationSettingsUpdate: Encodable {
     let isMuted: Bool
+    let isPinned: Bool
+    let clearBeforeAt: Date?
+    let hideUntilAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case isMuted = "is_muted"
+        case isPinned = "is_pinned"
+        case clearBeforeAt = "clear_before_at"
+        case hideUntilAt = "hide_until_at"
     }
 }
 
@@ -1492,6 +1648,7 @@ struct GroupConversationReadMarkerUpdate: Encodable {
 struct ConversationListSettingsRow: Decodable {
     let conversationId: UUID
     let isMuted: Bool
+    let isPinned: Bool
     let manualUnread: Bool
     let hideUntilAt: Date?
     let clearBeforeAt: Date?
@@ -1499,9 +1656,26 @@ struct ConversationListSettingsRow: Decodable {
     enum CodingKeys: String, CodingKey {
         case conversationId = "conversation_id"
         case isMuted = "is_muted"
+        case isPinned = "is_pinned"
         case manualUnread = "manual_unread"
         case hideUntilAt = "hide_until_at"
         case clearBeforeAt = "clear_before_at"
+    }
+}
+
+struct GroupConversationListSettingsRow: Decodable {
+    let groupId: UUID
+    let isMuted: Bool
+    let isPinned: Bool
+    let clearBeforeAt: Date?
+    let hideUntilAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case groupId = "group_id"
+        case isMuted = "is_muted"
+        case isPinned = "is_pinned"
+        case clearBeforeAt = "clear_before_at"
+        case hideUntilAt = "hide_until_at"
     }
 }
 
@@ -1515,12 +1689,14 @@ struct GroupIDRow: Decodable {
 
 struct ConversationSettingsRow: Decodable {
     let isMuted: Bool
+    let isPinned: Bool
     let clearBeforeAt: Date?
     let manualUnread: Bool
     let hideUntilAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case isMuted = "is_muted"
+        case isPinned = "is_pinned"
         case clearBeforeAt = "clear_before_at"
         case manualUnread = "manual_unread"
         case hideUntilAt = "hide_until_at"
@@ -1531,6 +1707,7 @@ struct ConversationSettingsInsert: Encodable {
     let userId: UUID
     let conversationId: UUID
     let isMuted: Bool
+    let isPinned: Bool
     let clearBeforeAt: Date?
     let manualUnread: Bool
     let hideUntilAt: Date?
@@ -1539,6 +1716,7 @@ struct ConversationSettingsInsert: Encodable {
         case userId = "user_id"
         case conversationId = "conversation_id"
         case isMuted = "is_muted"
+        case isPinned = "is_pinned"
         case clearBeforeAt = "clear_before_at"
         case manualUnread = "manual_unread"
         case hideUntilAt = "hide_until_at"
@@ -1547,12 +1725,14 @@ struct ConversationSettingsInsert: Encodable {
 
 struct ConversationSettingsUpdate: Encodable {
     let isMuted: Bool
+    let isPinned: Bool
     let clearBeforeAt: Date?
     let manualUnread: Bool
     let hideUntilAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case isMuted = "is_muted"
+        case isPinned = "is_pinned"
         case clearBeforeAt = "clear_before_at"
         case manualUnread = "manual_unread"
         case hideUntilAt = "hide_until_at"

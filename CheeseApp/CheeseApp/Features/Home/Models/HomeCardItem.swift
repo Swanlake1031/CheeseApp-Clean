@@ -22,7 +22,9 @@ enum ImageSource {
         return false
     }
     
-    /// 将图片来源转换为 SwiftUI View
+    /// Compatibility renderer for compact non-feed surfaces such as avatars.
+    /// Primary feed media must use `FeedMediaItem` so crop and presentation
+    /// policy cannot drift between product surfaces.
     @ViewBuilder
     func view(targetPixelWidth: Int) -> some View {
         switch self {
@@ -44,9 +46,6 @@ enum ImageSource {
         }
     }
 
-    var view: some View {
-        view(targetPixelWidth: 1024)
-    }
 }
 
 // MARK: - 卡片底部样式枚举

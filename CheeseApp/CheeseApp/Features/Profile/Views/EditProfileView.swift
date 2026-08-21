@@ -54,7 +54,9 @@ struct EditProfileView: View {
 
     private let genderOptions: [(value: String, label: String)] = [
         ("male", "男"),
-        ("female", "女")
+        ("female", "女"),
+        ("non_binary", "非二元"),
+        ("prefer_not_to_say", "暂不透露")
     ]
 
     private var selectedSchoolOption: CheeseUniversityOption? {

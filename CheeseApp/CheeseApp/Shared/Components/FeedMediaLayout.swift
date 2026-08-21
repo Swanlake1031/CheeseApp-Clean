@@ -2,9 +2,8 @@
 //  FeedMediaLayout.swift
 //  CheeseApp
 //
-//  Source-aware media sizing for forum feed thumbnails. Layout calculation is
-//  intentionally independent from SwiftUI rendering so the edge cases remain
-//  deterministic and unit-testable.
+//  One deterministic feed-media model: fixed height, source-ratio width, and
+//  one minimum-width exception that can crop only the vertical axis.
 //
 
 
@@ -12,44 +11,115 @@ import CoreGraphics
 import SwiftUI
 import UIKit
 
-struct FeedMediaMetrics: Equatable {
-    let minimumDisplayAspectRatio: CGFloat
-    let maximumDisplayAspectRatio: CGFloat
-    let fallbackAspectRatio: CGFloat
-    let singleImageMaxWidth: CGFloat
-    let singleImageMaxHeight: CGFloat
-    let multiImageRowHeight: CGFloat
-    let multiImageMaxWidth: CGFloat
-    let spacing: CGFloat
-    let cornerRadius: CGFloat
+enum FeedMediaRenderMode: Equatable {
+    case fit
+    case centerVerticalCrop(sourceAspectRatio: CGFloat)
+}
 
-    static let forum = FeedMediaMetrics(
-        minimumDisplayAspectRatio: 0.65,
-        maximumDisplayAspectRatio: 1.70,
-        fallbackAspectRatio: 1.0,
-        singleImageMaxWidth: 520,
-        singleImageMaxHeight: 360,
-        multiImageRowHeight: 190,
-        multiImageMaxWidth: 320,
-        spacing: 7,
-        cornerRadius: 12
-    )
+enum FeedMediaImageKey: Hashable {
+    case remote(URL)
+    case asset(String)
+    case placeholder
+}
+
+enum FeedMediaAspectRatioState {
+    static func reconciling(
+        _ existing: [FeedMediaImageKey: CGFloat],
+        currentKeys: [FeedMediaImageKey],
+        cachedRatio: (FeedMediaImageKey) -> CGFloat?
+    ) -> [FeedMediaImageKey: CGFloat] {
+        let currentKeySet = Set(currentKeys)
+        var reconciled = existing.filter { currentKeySet.contains($0.key) }
+
+        for key in currentKeys where reconciled[key] == nil {
+            if let ratio = cachedRatio(key) {
+                reconciled[key] = ratio
+            }
+        }
+
+        return reconciled
+    }
+}
+
+enum FeedMediaHorizontalPlacement: Equatable {
+    case leading
+
+    var alignment: Alignment {
+        switch self {
+        case .leading: .leading
+        }
+    }
+}
+
+enum FeedMediaPlaceholderStyle: Equatable {
+    case neutralGray
+}
+
+enum FeedMediaStyle {
+    static let cornerRadius: CGFloat = 12
+    static let itemSpacing: CGFloat = 7
+    static let contentInset: CGFloat = 0
+    static let minimumMediaWidth: CGFloat = 100
+    static let fallbackAspectRatio: CGFloat = 1
+    static let horizontalPlacement: FeedMediaHorizontalPlacement = .leading
+    static let placeholderStyle: FeedMediaPlaceholderStyle = .neutralGray
+
+    static var horizontalAlignment: Alignment {
+        horizontalPlacement.alignment
+    }
+
+    static var placeholderBackground: Color {
+        switch placeholderStyle {
+        case .neutralGray: Color.gray.opacity(0.16)
+        }
+    }
+}
+
+enum FeedMediaScrollGesturePolicy {
+    static let overflowTolerance: CGFloat = 1
+
+    static func shouldCaptureHorizontalDrag(
+        contentWidth: CGFloat,
+        viewportWidth: CGFloat
+    ) -> Bool {
+        guard contentWidth.isFinite,
+              viewportWidth.isFinite,
+              contentWidth > 0,
+              viewportWidth > 0
+        else {
+            return false
+        }
+
+        return contentWidth > viewportWidth + overflowTolerance
+    }
+}
+
+struct FeedMediaMetrics: Equatable {
+    let mediaHeight: CGFloat
+    let minimumMediaWidth: CGFloat
+    let spacing: CGFloat
+
+    init(
+        mediaHeight: CGFloat,
+        minimumMediaWidth: CGFloat = FeedMediaStyle.minimumMediaWidth,
+        spacing: CGFloat = FeedMediaStyle.itemSpacing
+    ) {
+        self.mediaHeight = mediaHeight
+        self.minimumMediaWidth = minimumMediaWidth
+        self.spacing = spacing
+    }
+
+    static let forum = FeedMediaMetrics(mediaHeight: 190)
+    static let secondhand = FeedMediaMetrics(mediaHeight: 210)
 }
 
 struct FeedMediaItemLayout: Equatable {
     let width: CGFloat
     let height: CGFloat
-    let displayAspectRatio: CGFloat
-    let requiresCrop: Bool
+    let renderMode: FeedMediaRenderMode
 }
 
 struct FeedMediaLayoutEngine {
-    let metrics: FeedMediaMetrics
-
-    init(metrics: FeedMediaMetrics = .forum) {
-        self.metrics = metrics
-    }
-
     func sourceAspectRatio(width: CGFloat, height: CGFloat) -> CGFloat? {
         guard width.isFinite,
               height.isFinite,
@@ -61,61 +131,42 @@ struct FeedMediaLayoutEngine {
         return ratio.isFinite && ratio > 0 ? ratio : nil
     }
 
-    func constrainedAspectRatio(_ sourceAspectRatio: CGFloat?) -> CGFloat {
-        let sourceRatio = validAspectRatio(sourceAspectRatio)
-            ?? metrics.fallbackAspectRatio
-        return min(
-            max(sourceRatio, metrics.minimumDisplayAspectRatio),
-            metrics.maximumDisplayAspectRatio
+    func itemLayout(
+        sourceWidth: CGFloat,
+        sourceHeight: CGFloat,
+        metrics: FeedMediaMetrics
+    ) -> FeedMediaItemLayout {
+        itemLayout(
+            sourceAspectRatio: sourceAspectRatio(
+                width: sourceWidth,
+                height: sourceHeight
+            ),
+            metrics: metrics
         )
     }
 
-    func singleImageLayout(
+    func itemLayout(
         sourceAspectRatio: CGFloat?,
-        availableWidth: CGFloat
+        metrics: FeedMediaMetrics
     ) -> FeedMediaItemLayout {
-        let safeAvailableWidth = max(availableWidth, 1)
-        let sourceRatio = validAspectRatio(sourceAspectRatio)
-        let displayRatio = constrainedAspectRatio(sourceRatio)
-        let maximumWidth = min(safeAvailableWidth, metrics.singleImageMaxWidth)
+        let mediaHeight = max(metrics.mediaHeight, 1)
+        let minimumMediaWidth = max(metrics.minimumMediaWidth, 1)
+        let ratio = validAspectRatio(sourceAspectRatio)
+            ?? FeedMediaStyle.fallbackAspectRatio
+        let naturalWidth = mediaHeight * ratio
 
-        let size: CGSize
-        if displayRatio < 1 {
-            let height = min(
-                metrics.singleImageMaxHeight,
-                maximumWidth / displayRatio
+        if naturalWidth >= minimumMediaWidth {
+            return FeedMediaItemLayout(
+                width: naturalWidth,
+                height: mediaHeight,
+                renderMode: .fit
             )
-            size = CGSize(width: height * displayRatio, height: height)
-        } else {
-            let width = min(
-                maximumWidth,
-                metrics.singleImageMaxHeight * displayRatio
-            )
-            size = CGSize(width: width, height: width / displayRatio)
         }
 
         return FeedMediaItemLayout(
-            width: size.width,
-            height: size.height,
-            displayAspectRatio: displayRatio,
-            requiresCrop: sourceRatio.map { abs($0 - displayRatio) > 0.001 } ?? false
-        )
-    }
-
-    func multiImageItemLayout(
-        sourceAspectRatio: CGFloat?
-    ) -> FeedMediaItemLayout {
-        let sourceRatio = validAspectRatio(sourceAspectRatio)
-        let displayRatio = constrainedAspectRatio(sourceRatio)
-        let naturalWidth = metrics.multiImageRowHeight * displayRatio
-        let width = min(naturalWidth, metrics.multiImageMaxWidth)
-        let frameRatio = width / metrics.multiImageRowHeight
-
-        return FeedMediaItemLayout(
-            width: width,
-            height: metrics.multiImageRowHeight,
-            displayAspectRatio: frameRatio,
-            requiresCrop: sourceRatio.map { abs($0 - frameRatio) > 0.001 } ?? false
+            width: minimumMediaWidth,
+            height: mediaHeight,
+            renderMode: .centerVerticalCrop(sourceAspectRatio: ratio)
         )
     }
 
@@ -125,36 +176,88 @@ struct FeedMediaLayoutEngine {
     }
 }
 
-/// Forum-only source-aware feed media. Secondhand continues to use its existing
-/// fixed-height carousel until that product surface is changed independently.
-struct ForumFeedMediaView: View {
+/// Shared by Forum, recommended/following, and Secondhand. Single and multiple
+/// images deliberately use the same horizontal strip and sizing calculation.
+struct FeedMediaStrip: View {
     let images: [ImageSource]
+    let metrics: FeedMediaMetrics
+    var targetPixelWidth: Int = 1_024
+    var allowsImagePreview = true
 
     private let engine = FeedMediaLayoutEngine()
-    @State private var aspectRatios: [Int: CGFloat] = [:]
+    @State private var aspectRatios: [FeedMediaImageKey: CGFloat] = [:]
+    @State private var viewportWidth: CGFloat = 0
+
+    private var displayedImages: [ImageSource] {
+        images.isEmpty ? [.placeholder] : images
+    }
 
     private var remoteURLStrings: [String] {
         images.compactMap(\.remoteURL).map(\.absoluteString)
     }
 
+    private var contentWidth: CGFloat {
+        let widths = displayedImages.indices.map { index in
+            let image = displayedImages[index]
+            return engine.itemLayout(
+                sourceAspectRatio: aspectRatios[image.feedMediaKey],
+                metrics: metrics
+            ).width
+        }
+        let gaps = CGFloat(max(widths.count - 1, 0)) * metrics.spacing
+        return widths.reduce(0, +) + gaps
+    }
+
+    private var capturesHorizontalDrag: Bool {
+        FeedMediaScrollGesturePolicy.shouldCaptureHorizontalDrag(
+            contentWidth: contentWidth,
+            viewportWidth: viewportWidth
+        )
+    }
+
     var body: some View {
-        Group {
-            if images.count == 1, let image = images.first {
-                AdaptiveSingleFeedImageLayout(
-                    engine: engine,
-                    sourceAspectRatio: aspectRatios[0]
-                ) {
-                    previewableMediaTile(image: image, index: 0)
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(alignment: .top, spacing: metrics.spacing) {
+                ForEach(
+                    Array(displayedImages.enumerated()),
+                    id: \.offset
+                ) { index, image in
+                    let imageKey = image.feedMediaKey
+                    let layout = engine.itemLayout(
+                        sourceAspectRatio: aspectRatios[imageKey],
+                        metrics: metrics
+                    )
+
+                    previewableItem(
+                        image: image,
+                        imageKey: imageKey,
+                        index: index,
+                        layout: layout
+                    )
+                    .frame(width: layout.width, height: layout.height)
+                    .feedMediaPresentation()
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else if images.count > 1 {
-                HorizontalFeedMediaStrip(
-                    images: images,
-                    aspectRatios: aspectRatios,
-                    engine: engine,
-                    onImageSize: updateAspectRatio
-                )
             }
+            .background {
+                if capturesHorizontalDrag {
+                    HorizontalScrollGestureFence()
+                }
+            }
+        }
+        .contentMargins(
+            .horizontal,
+            FeedMediaStyle.contentInset,
+            for: .scrollContent
+        )
+        .scrollDisabled(!capturesHorizontalDrag)
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .frame(maxWidth: .infinity, alignment: FeedMediaStyle.horizontalAlignment)
+        .frame(height: metrics.mediaHeight)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { width in
+            guard abs(viewportWidth - width) > 0.5 else { return }
+            viewportWidth = width
         }
         .task(id: imageIdentity) {
             hydrateKnownAspectRatios()
@@ -164,40 +267,47 @@ struct ForumFeedMediaView: View {
         }
     }
 
-    private var imageIdentity: [String] {
-        images.enumerated().map { index, image in
-            image.remoteURL?.absoluteString ?? "local-\(index)"
-        }
+    private var imageIdentity: [FeedMediaImageKey] {
+        displayedImages.map(\.feedMediaKey)
     }
 
     @ViewBuilder
-    private func previewableMediaTile(image: ImageSource, index: Int) -> some View {
-        let tile = FeedMediaTile(
+    private func previewableItem(
+        image: ImageSource,
+        imageKey: FeedMediaImageKey,
+        index: Int,
+        layout: FeedMediaItemLayout
+    ) -> some View {
+        let item = FeedMediaItem(
             source: image,
-            cornerRadius: engine.metrics.cornerRadius,
-            onImageSize: { updateAspectRatio(index: index, size: $0) }
+            targetPixelWidth: targetPixelWidth,
+            renderMode: layout.renderMode,
+            onImageSize: { updateAspectRatio(for: imageKey, size: $0) }
         )
 
-        if remoteURLStrings.count == images.count, image.remoteURL != nil {
-            tile.tappableImagePreview(remoteURLStrings, initialIndex: index)
+        if allowsImagePreview,
+           remoteURLStrings.count == images.count,
+           image.remoteURL != nil {
+            item.tappableImagePreview(remoteURLStrings, initialIndex: index)
         } else {
-            tile
+            item
         }
     }
 
     private func hydrateKnownAspectRatios() {
-        var known = aspectRatios
-
-        for (index, image) in images.enumerated() {
-            if let url = image.remoteURL,
-               let ratio = RemoteImageCache.shared.aspectRatio(for: url) {
-                known[index] = ratio
-            } else if let assetSize = image.assetSize,
-                      let ratio = engine.sourceAspectRatio(
-                        width: assetSize.width,
-                        height: assetSize.height
-                      ) {
-                known[index] = ratio
+        let currentKeys = displayedImages.map(\.feedMediaKey)
+        let known = FeedMediaAspectRatioState.reconciling(
+            aspectRatios,
+            currentKeys: currentKeys
+        ) { key in
+            switch key {
+            case .remote(let url):
+                return RemoteImageCache.shared.aspectRatio(for: url)
+            case .asset(let name):
+                guard let size = UIImage(named: name)?.size else { return nil }
+                return engine.sourceAspectRatio(width: size.width, height: size.height)
+            case .placeholder:
+                return nil
             }
         }
 
@@ -209,137 +319,130 @@ struct ForumFeedMediaView: View {
         }
     }
 
-    private func updateAspectRatio(index: Int, size: CGSize) {
+    private func updateAspectRatio(for key: FeedMediaImageKey, size: CGSize) {
         guard let ratio = engine.sourceAspectRatio(
             width: size.width,
             height: size.height
-        ), aspectRatios[index] != ratio else { return }
+        ), aspectRatios[key] != ratio else { return }
 
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            aspectRatios[index] = ratio
+            aspectRatios[key] = ratio
         }
     }
 }
 
-private struct AdaptiveSingleFeedImageLayout: Layout {
-    let engine: FeedMediaLayoutEngine
-    let sourceAspectRatio: CGFloat?
-
-    func sizeThatFits(
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout ()
-    ) -> CGSize {
-        guard !subviews.isEmpty else { return .zero }
-        let availableWidth = proposal.width ?? engine.metrics.singleImageMaxWidth
-        let layout = engine.singleImageLayout(
-            sourceAspectRatio: sourceAspectRatio,
-            availableWidth: availableWidth
-        )
-        return CGSize(width: layout.width, height: layout.height)
-    }
-
-    func placeSubviews(
-        in bounds: CGRect,
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout ()
-    ) {
-        guard let subview = subviews.first else { return }
-        subview.place(
-            at: bounds.origin,
-            anchor: .topLeading,
-            proposal: ProposedViewSize(width: bounds.width, height: bounds.height)
-        )
-    }
-}
-
-private struct HorizontalFeedMediaStrip: View {
-    let images: [ImageSource]
-    let aspectRatios: [Int: CGFloat]
-    let engine: FeedMediaLayoutEngine
-    let onImageSize: (Int, CGSize) -> Void
-
-    private var remoteURLStrings: [String] {
-        images.compactMap(\.remoteURL).map(\.absoluteString)
-    }
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: engine.metrics.spacing) {
-                ForEach(Array(images.enumerated()), id: \.offset) { index, image in
-                    let layout = engine.multiImageItemLayout(
-                        sourceAspectRatio: aspectRatios[index]
-                    )
-
-                    previewableTile(image: image, index: index)
-                        .frame(width: layout.width, height: layout.height)
-                }
-            }
-            .scrollTargetLayout()
-        }
-        .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
-        .contentMargins(.horizontal, 0, for: .scrollContent)
-        .frame(height: engine.metrics.multiImageRowHeight)
-    }
-
-    @ViewBuilder
-    private func previewableTile(image: ImageSource, index: Int) -> some View {
-        let tile = FeedMediaTile(
-            source: image,
-            cornerRadius: engine.metrics.cornerRadius,
-            onImageSize: { onImageSize(index, $0) }
-        )
-
-        if remoteURLStrings.count == images.count, image.remoteURL != nil {
-            tile.tappableImagePreview(remoteURLStrings, initialIndex: index)
-        } else {
-            tile
-        }
-    }
-}
-
-private struct FeedMediaTile: View {
+struct FeedMediaItem: View {
     let source: ImageSource
-    let cornerRadius: CGFloat
-    let onImageSize: (CGSize) -> Void
+    var targetPixelWidth: Int = 1_024
+    var renderMode: FeedMediaRenderMode = .fit
+    var onImageSize: (CGSize) -> Void = { _ in }
 
     var body: some View {
-        Group {
-            switch source {
-            case .asset(let name):
-                Image(name)
-                    .resizable()
-                    .scaledToFill()
+        GeometryReader { proxy in
+            Group {
+                switch source {
+                case .asset(let name):
+                    renderedImage(
+                        Image(name),
+                        containerWidth: proxy.size.width
+                    )
                     .onAppear {
                         if let size = UIImage(named: name)?.size {
                             onImageSize(size)
                         }
                     }
-            case .url(let url):
-                CachedRemoteImage(
-                    url: url,
-                    targetPixelWidth: 1_024,
-                    onImageLoaded: onImageSize
-                ) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    Rectangle().fill(Color.gray.opacity(0.16))
+                case .url(let url):
+                    CachedRemoteImage(
+                        url: url,
+                        targetPixelWidth: targetPixelWidth,
+                        onImageLoaded: onImageSize
+                    ) { image in
+                        renderedImage(
+                            image,
+                            containerWidth: proxy.size.width
+                        )
+                    } placeholder: {
+                        FeedMediaPlaceholder()
+                    }
+                case .placeholder:
+                    FeedMediaPlaceholder()
                 }
-            case .placeholder:
-                Rectangle().fill(Color.gray.opacity(0.16))
             }
+            .frame(
+                width: proxy.size.width,
+                height: proxy.size.height,
+                alignment: .center
+            )
+            .clipped()
         }
-        .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .accessibilityLabel(L10n.tr("Post image", "帖子图片"))
         .accessibilityAddTraits(.isImage)
+    }
+
+    @ViewBuilder
+    private func renderedImage(
+        _ image: Image,
+        containerWidth: CGFloat
+    ) -> some View {
+        switch renderMode {
+        case .fit:
+            image
+                .resizable()
+                .scaledToFit()
+        case .centerVerticalCrop(let sourceAspectRatio):
+            let safeRatio = max(sourceAspectRatio, 0.000_001)
+            image
+                .resizable()
+                .scaledToFit()
+                .frame(
+                    width: containerWidth,
+                    height: containerWidth / safeRatio
+                )
+        }
+    }
+}
+
+struct FeedMediaPlaceholder: View {
+    var body: some View {
+        Rectangle().fill(FeedMediaStyle.placeholderBackground)
+    }
+}
+
+private struct FeedMediaPresentationModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: FeedMediaStyle.cornerRadius,
+                    style: .continuous
+                )
+            )
+            .contentShape(
+                RoundedRectangle(
+                    cornerRadius: FeedMediaStyle.cornerRadius,
+                    style: .continuous
+                )
+            )
+    }
+}
+
+extension View {
+    func feedMediaPresentation() -> some View {
+        modifier(FeedMediaPresentationModifier())
     }
 }
 
 private extension ImageSource {
+    var feedMediaKey: FeedMediaImageKey {
+        switch self {
+        case .url(let url): .remote(url)
+        case .asset(let name): .asset(name)
+        case .placeholder: .placeholder
+        }
+    }
+
     var remoteURL: URL? {
         guard case .url(let url) = self else { return nil }
         return url

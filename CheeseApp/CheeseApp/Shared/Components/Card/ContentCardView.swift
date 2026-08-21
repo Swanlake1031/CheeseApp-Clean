@@ -17,6 +17,8 @@ struct ContentCardView: View {
     let item: HomeCardItem
     var interaction: PostInteractionState?
     var forumHeaderStyle: ForumCardHeaderStyle = .board
+    var presentsSecondhandAsForumBoard = false
+    var usesSecondhandRowSurface = false
     var onTap: (() -> Void)?
     var onBoardTap: (() -> Void)?
     var onAuthorTap: (() -> Void)?
@@ -40,7 +42,10 @@ struct ContentCardView: View {
     }
 
     private var discussionCard: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        VStack(
+            alignment: .leading,
+            spacing: item.category == .forum ? 9 : 13
+        ) {
             if item.category == .forum {
                 switch forumHeaderStyle {
                 case .board:
@@ -55,17 +60,17 @@ struct ContentCardView: View {
             discussionTextSummary
 
             if !item.images.isEmpty {
-                if item.category == .forum {
-                    ForumFeedMediaView(images: item.images)
-                } else {
-                    FeedCardImageCarousel(
-                        images: item.images,
-                        height: 190
-                    )
-                }
+                FeedMediaStrip(
+                    images: item.images,
+                    metrics: .forum
+                )
             }
 
             interactionRow
+                .padding(
+                    .top,
+                    item.category == .forum ? -4 : 0
+                )
         }
         .modifier(
             DiscussionFeedSurfaceModifier(
@@ -75,7 +80,10 @@ struct ContentCardView: View {
     }
 
     private var discussionTextSummary: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        VStack(
+            alignment: .leading,
+            spacing: item.category == .forum ? 8 : 13
+        ) {
             Text(displayTitle)
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(AppColors.textPrimary)
@@ -105,8 +113,8 @@ struct ContentCardView: View {
     }
 
     private var forumBoardHeader: some View {
-        Button(action: { onBoardTap?() }) {
-            HStack(spacing: 10) {
+        HStack(spacing: 10) {
+            Button(action: { onBoardTap?() }) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
                         .fill(AppColors.accent.opacity(0.28))
@@ -116,8 +124,13 @@ struct ContentCardView: View {
                         .foregroundStyle(AppColors.accentStrong)
                 }
                 .frame(width: 38, height: 38)
+            }
+            .buttonStyle(.plain)
+            .disabled(onBoardTap == nil)
+            .accessibilityLabel(forumBoardAccessibilityLabel)
 
-                VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 3) {
+                Button(action: { onBoardTap?() }) {
                     HStack(spacing: 5) {
                         Text(item.badgeText ?? item.category.localizedTitle)
                             .font(.system(size: 15, weight: .bold))
@@ -128,33 +141,23 @@ struct ContentCardView: View {
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(AppColors.textMuted)
                     }
-
-                    HStack(spacing: 5) {
-                        Text(footerName)
-                        if item.isAuthorMcMasterVerified {
-                            McMasterStudentBadge()
-                        }
-                        if let timeText = item.timeText, !timeText.isEmpty {
-                            Text("·")
-                            Text(timeText)
-                        }
-                    }
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(AppColors.textMuted)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                 }
+                .buttonStyle(.plain)
+                .disabled(onBoardTap == nil)
+                .accessibilityLabel(forumBoardAccessibilityLabel)
 
-                Spacer(minLength: 0)
+                boardMetadataRow
             }
-            .contentShape(Rectangle())
+
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
-        .disabled(onBoardTap == nil)
-        .accessibilityLabel(
-            L10n.tr(
-                "Open \(item.badgeText ?? "forum") board",
-                "进入\(item.badgeText ?? "论坛")板块"
-            )
+    }
+
+    private var forumBoardAccessibilityLabel: String {
+        L10n.tr(
+            "Open \(item.badgeText ?? "forum") board",
+            "进入\(item.badgeText ?? "论坛")板块"
         )
     }
 
@@ -191,17 +194,46 @@ struct ContentCardView: View {
 
     private var secondhandCard: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Button(action: { onAuthorTap?() }) {
-                metadataRow
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(onAuthorTap == nil)
+            secondhandHeader
 
-            Text(item.title)
+            secondhandTitleAndPrice
+
+            if !displaySubtitle.isEmpty {
+                Text(displaySubtitle)
+                    .font(.system(size: 14))
+                    .foregroundStyle(AppColors.textMuted)
+                    .lineLimit(2)
+                    .lineSpacing(2)
+            }
+
+            if !item.images.isEmpty {
+                FeedMediaStrip(
+                    images: item.images,
+                    metrics: .secondhand,
+                    targetPixelWidth: 900
+                )
+            }
+
+            interactionRow
+        }
+        .modifier(
+            SecondhandFeedSurfaceModifier(
+                usesRowPresentation: presentsSecondhandAsForumBoard
+                    || usesSecondhandRowSurface
+            )
+        )
+    }
+
+    private var secondhandTitleAndPrice: some View {
+        VStack(
+            alignment: .leading,
+            spacing: presentsSecondhandAsForumBoard ? 7 : 13
+        ) {
+            Text(displayTitle)
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(AppColors.textPrimary)
                 .lineLimit(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             if let priceText = item.priceText {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -218,25 +250,86 @@ struct ContentCardView: View {
                     }
                 }
             }
-
-            if !displaySubtitle.isEmpty {
-                Text(displaySubtitle)
-                    .font(.system(size: 14))
-                    .foregroundStyle(AppColors.textMuted)
-                    .lineLimit(2)
-                    .lineSpacing(2)
-            }
-
-            if !item.images.isEmpty {
-                FeedCardImageCarousel(
-                    images: item.images,
-                    height: 210
-                )
-            }
-
-            interactionRow
         }
-        .feedCardSurface()
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var secondhandHeader: some View {
+        if presentsSecondhandAsForumBoard {
+            secondhandBoardHeader
+        } else {
+            Button(action: { onAuthorTap?() }) {
+                metadataRow
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(onAuthorTap == nil)
+        }
+    }
+
+    /// Recommended is a mixed feed, so marketplace posts identify their product
+    /// surface exactly where forum posts identify their board. The existing
+    /// marketplace capsule remains on the trailing edge as a quick content-type
+    /// marker, while seller and timestamp occupy the secondary line.
+    private var secondhandBoardHeader: some View {
+        HStack(spacing: 10) {
+            Button(action: { onBoardTap?() }) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(AppColors.accent.opacity(0.28))
+
+                    Image(systemName: "bag.fill")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(AppColors.accentStrong)
+                }
+                .frame(width: 38, height: 38)
+            }
+            .buttonStyle(.plain)
+            .disabled(onBoardTap == nil)
+            .accessibilityLabel(L10n.tr("Open Secondhand", "进入二手板块"))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Button(action: { onBoardTap?() }) {
+                    HStack(spacing: 5) {
+                        Text(item.category.localizedTitle)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(AppColors.textPrimary)
+                            .lineLimit(1)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(AppColors.textMuted)
+                    }
+                    .fixedSize(horizontal: true, vertical: false)
+                }
+                .buttonStyle(.plain)
+                .disabled(onBoardTap == nil)
+                .accessibilityLabel(L10n.tr("Open Secondhand", "进入二手板块"))
+
+                boardMetadataRow
+            }
+
+            Spacer(minLength: 8)
+
+            categoryCapsule
+        }
+    }
+
+    private var boardMetadataRow: some View {
+        HStack(spacing: 5) {
+            Text(footerName)
+            if item.isAuthorMcMasterVerified {
+                McMasterStudentBadge()
+            }
+            if let timeText = item.timeText, !timeText.isEmpty {
+                Text("·")
+                Text(timeText)
+            }
+        }
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(AppColors.textMuted)
+        .lineLimit(1)
     }
 
     private var seatRadarCard: some View {
@@ -302,14 +395,18 @@ struct ContentCardView: View {
 
             Spacer()
 
-            Text(item.category.localizedTitle)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(AppColors.textPrimary.opacity(0.76))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(AppColors.accent.opacity(0.2))
-                .clipShape(Capsule())
+            categoryCapsule
         }
+    }
+
+    private var categoryCapsule: some View {
+        Text(item.category.localizedTitle)
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(AppColors.textPrimary.opacity(0.76))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(AppColors.accent.opacity(0.2))
+            .clipShape(Capsule())
     }
 
     private var interactionRow: some View {
@@ -388,51 +485,17 @@ struct ContentCardView: View {
     }
 }
 
-/// Dcard-style inline media: media follows the text and remains an independent
-/// horizontal pager. With multiple photos the next card peeks in, making the
-/// swipe affordance visible without turning the feed row into a fixed mosaic.
-private struct FeedCardImageCarousel: View {
-    let images: [ImageSource]
-    let height: CGFloat
-
-    private let spacing: CGFloat = 6
-
-    var body: some View {
-        GeometryReader { proxy in
-            let itemWidth = images.count > 1
-                ? max(proxy.size.width * 0.88, 1)
-                : max(proxy.size.width, 1)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: spacing) {
-                    ForEach(Array(images.enumerated()), id: \.offset) { _, image in
-                        image.view(targetPixelWidth: 900)
-                            .frame(width: itemWidth, height: height)
-                            .clipped()
-                            .clipShape(
-                                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            )
-                            .scrollTransition(.interactive, axis: .horizontal) { content, phase in
-                                content.opacity(phase.isIdentity ? 1 : 0.94)
-                            }
-                    }
-                }
-                .scrollTargetLayout()
-            }
-            .scrollTargetBehavior(.viewAligned)
-            .contentMargins(.horizontal, 0, for: .scrollContent)
-        }
-        .frame(height: height)
-    }
-}
-
 private extension View {
-    func feedCardSurface() -> some View {
+    func plainFeedCardSurface() -> some View {
         self
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    func feedCardSurface() -> some View {
+        plainFeedCardSurface()
             .cheeseCardChrome(cornerRadius: 20)
     }
 }
@@ -444,7 +507,7 @@ private struct DiscussionFeedSurfaceModifier: ViewModifier {
     func body(content: Content) -> some View {
         if isForum {
             content
-                .padding(.vertical, 10)
+                .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .overlay(alignment: .bottom) {
                     Divider()
@@ -452,6 +515,25 @@ private struct DiscussionFeedSurfaceModifier: ViewModifier {
                 }
         } else {
             content.feedCardSurface()
+        }
+    }
+}
+
+private struct SecondhandFeedSurfaceModifier: ViewModifier {
+    let usesRowPresentation: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if usesRowPresentation {
+            content
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .bottom) {
+                    Divider()
+                        .overlay(AppColors.divider)
+                }
+        } else {
+            content.plainFeedCardSurface()
         }
     }
 }

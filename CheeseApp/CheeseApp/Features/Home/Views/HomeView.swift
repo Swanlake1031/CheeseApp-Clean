@@ -42,6 +42,9 @@ struct HomeView: View {
     @State private var shareActionToastMessage: String?
     @State private var postOpenErrorMessage: String?
     @State private var selectedFeaturedCategory: HomeFeedTab = .recommended
+    @State private var featuredPagerPosition: HomeFeedTab? = .recommended
+    @State private var pendingFeaturedCategory: HomeFeedTab?
+    @State private var isFeaturedPagerScrolling = false
     @State private var selectedSecondhandCategory: SecondhandPost.Category?
     @State private var featuredPageHeights: [HomeFeedTab: CGFloat] = [:]
     @State private var contentScrollResetID = UUID()
@@ -50,6 +53,9 @@ struct HomeView: View {
     @State private var createdPostHighlightToken = UUID()
 
     private static let featuredCategories = HomeFeedTab.allCases
+    private static let featuredPagerHorizontalInset: CGFloat = 8
+    private static let featuredPageHorizontalInset: CGFloat = 12
+    private static let secondhandCategoryStripHorizontalInset: CGFloat = 8
 
     var body: some View {
         ZStack {
@@ -61,7 +67,7 @@ struct HomeView: View {
                 homeTopNavigationBar
                     .padding(.horizontal, 16)
                     .padding(.top, 14)
-                    .padding(.bottom, 18)
+                    .padding(.bottom, 8)
                     .background(AppColors.pageBackground)
                     .zIndex(40)
 
@@ -78,7 +84,10 @@ struct HomeView: View {
                             )
                             .zIndex(30)
                         }
-                        .padding(.horizontal, 16)
+                        .padding(
+                            .horizontal,
+                            Self.featuredPagerHorizontalInset
+                        )
                         .padding(
                             .bottom,
                             CheeseTabBarLayout.contentBottomClearance
@@ -166,6 +175,9 @@ struct HomeView: View {
             await viewModel.loadIfNeeded(userID: authService.currentUser?.id)
             await boards
         }
+        .onChange(of: authService.accountTransitionGeneration) { _, _ in
+            viewModel.cancelPendingRefreshes()
+        }
         .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { notification in
             handlePostChange(notification)
         }
@@ -212,7 +224,12 @@ struct HomeView: View {
     }
 
     private var homeLoadScopeKey: String {
-        authService.currentUser?.id.uuidString ?? "signed-out"
+        let userID = authService.currentUser?.id.uuidString ?? "signed-out"
+        let transition = authService.isAccountTransitionInProgress
+            ? "transitioning"
+            : "stable"
+        let loading = authService.isLoading ? "loading" : "idle"
+        return "\(userID)-\(authService.accountTransitionGeneration)-\(transition)-\(loading)"
     }
 
     private func loadForumBoardsIfNeeded() async {
@@ -238,15 +255,24 @@ struct HomeView: View {
         )
 
         return VStack(alignment: .leading, spacing: 10) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                // This is a small fixed set of pages. Keeping them eagerly laid out is intentional:
-                // a lazy horizontal stack can report only the viewport height while a page's
-                // asynchronously loaded cards extend below it, which clips the remaining feed.
-                HStack(alignment: .top, spacing: 0) {
-                    ForEach(Self.featuredCategories, id: \.self) { category in
-                        featuredCategoryPage(category)
+            GeometryReader { pagerProxy in
+                let pageWidth = max(pagerProxy.size.width, 0)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    // This is a small fixed set of pages. Keeping them eagerly laid out is intentional:
+                    // a lazy horizontal stack can report only the viewport height while a page's
+                    // asynchronously loaded cards extend below it, which clips the remaining feed.
+                    HStack(alignment: .top, spacing: 0) {
+                        ForEach(Self.featuredCategories, id: \.self) { category in
+                            featuredCategoryPage(
+                                category,
+                                pageWidth: pageWidth
+                            )
                             .fixedSize(horizontal: false, vertical: true)
-                            .containerRelativeFrame(.horizontal)
+                            // Use the actual pager viewport instead of measuring an offscreen
+                            // page and feeding that width back into the grid. Every page and every
+                            // paging step now has exactly the same deterministic width.
+                            .frame(width: pageWidth, alignment: .topLeading)
                             // Read each page's intrinsic height before it is expanded to the
                             // current pager height. `onGeometryChange` only invokes the action
                             // when the transformed value changes, avoiding the old bound-
@@ -261,24 +287,41 @@ struct HomeView: View {
                                 alignment: .top
                             )
                             // 与页面同色，不绘制任何辅助框；它只让空白位置也能
-                            // 命中系统原生分页手势。
+                            // 命中系统原生分页手势。单页裁切防止卡片或阴影渗入相邻页。
                             .background(AppColors.pageBackground)
                             .contentShape(Rectangle())
+                            .clipped()
                             .id(category)
+                        }
                     }
+                    .scrollTargetLayout()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .scrollTargetLayout()
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: $featuredPagerPosition)
+                .frame(height: pagerHeight, alignment: .top)
+                .padding(.vertical, 4)
+                .background(AppColors.pageBackground)
+                .clipped()
+                .contentShape(Rectangle())
+                .modifier(
+                    FeaturedPagerScrollPhaseModifier(
+                        isScrolling: $isFeaturedPagerScrolling
+                    )
+                )
             }
-            .scrollTargetBehavior(.paging)
-            .scrollPosition(id: selectedFeaturedCategoryBinding)
-            .frame(height: pagerHeight, alignment: .top)
-            .padding(.vertical, 4)
-            .background(AppColors.pageBackground)
-            .clipped()
-            .contentShape(Rectangle())
+            .frame(height: pagerHeight + 8, alignment: .top)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onChange(of: featuredPagerPosition) { _, category in
+            guard let category else { return }
+            pendingFeaturedCategory = category
+            commitPendingFeaturedCategoryIfSettled()
+        }
+        .onChange(of: isFeaturedPagerScrolling) { _, isScrolling in
+            guard !isScrolling else { return }
+            commitPendingFeaturedCategoryIfSettled()
+        }
     }
 
     private func featuredCards(for category: HomeFeedTab) -> [HomeCardItem] {
@@ -453,56 +496,100 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private func featuredCategoryPage(_ category: HomeFeedTab) -> some View {
-        featuredStandardCategoryPage(category)
+    private func featuredCategoryPage(
+        _ category: HomeFeedTab,
+        pageWidth: CGFloat
+    ) -> some View {
+        featuredStandardCategoryPage(category, pageWidth: pageWidth)
     }
 
-    private func featuredStandardCategoryPage(_ category: HomeFeedTab) -> some View {
+    private func featuredStandardCategoryPage(
+        _ category: HomeFeedTab,
+        pageWidth: CGFloat
+    ) -> some View {
         let cards = featuredCards(for: category)
         let loadState = featuredLoadState(for: category)
+        let horizontalInset: CGFloat = category == .secondhand
+            ? 0
+            : Self.featuredPageHorizontalInset
 
-        return VStack(spacing: category == .forum ? 4 : 12) {
+        return VStack(
+            alignment: .leading,
+            spacing: category == .secondhand ? 12 : 4
+        ) {
             if category == .forum {
                 forumCategoryStrip
             } else if category == .secondhand {
                 secondhandCategoryStrip
+                    .padding(
+                        .horizontal,
+                        Self.secondhandCategoryStripHorizontalInset
+                    )
             }
 
-            switch loadState {
-            case .unresolved, .initialLoading:
-                featuredLoadingStateCard
-            case .empty:
-                featuredEmptyStateCard(for: category)
-            case .loaded:
-                if cards.isEmpty {
+            Group {
+                switch loadState {
+                case .unresolved, .initialLoading:
+                    featuredLoadingStateCard
+                case .empty:
                     featuredEmptyStateCard(for: category)
-                } else if category == .secondhand {
-                    compactSecondhandGrid(cards)
-                } else {
-                    ForEach(cards) { card in
-                        featuredCard(card)
+                case .loaded:
+                    if cards.isEmpty {
+                        featuredEmptyStateCard(for: category)
+                    } else if category == .secondhand {
+                        compactSecondhandGrid(
+                            cards,
+                            availableWidth: max(
+                                pageWidth
+                                    - horizontalInset * 2,
+                                0
+                            )
+                        )
+                    } else {
+                        ForEach(cards) { card in
+                            featuredCard(card, in: category)
+                        }
+                    }
+
+                case .error(let message):
+                    ErrorView(message) {
+                        retryFeaturedCategoryLoad(category)
                     }
                 }
-
-            case .error(let message):
-                ErrorView(message) {
-                    retryFeaturedCategoryLoad(category)
-                }
             }
+            .padding(.top, category == .forum ? 8 : 0)
         }
-        .padding(.top, 6)
+        .padding(.top, category == .forum ? 2 : 6)
         .padding(.bottom, 12)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, horizontalInset)
         .contentShape(Rectangle())
     }
 
-    private func compactSecondhandGrid(_ cards: [HomeCardItem]) -> some View {
-        LazyVGrid(
-            columns: [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ],
-            spacing: 12
+    private func compactSecondhandGrid(
+        _ cards: [HomeCardItem],
+        availableWidth: CGFloat
+    ) -> some View {
+        let spacing: CGFloat = 8
+        let safeAvailableWidth = max(availableWidth, 0)
+        let cardWidth = safeAvailableWidth > spacing
+            ? floor((safeAvailableWidth - spacing) / 2)
+            : nil
+        let columns: [GridItem]
+        if let cardWidth {
+            columns = [
+                GridItem(.fixed(cardWidth), spacing: spacing),
+                GridItem(.fixed(cardWidth), spacing: spacing)
+            ]
+        } else {
+            columns = [
+                GridItem(.flexible(minimum: 0), spacing: spacing),
+                GridItem(.flexible(minimum: 0), spacing: spacing)
+            ]
+        }
+
+        return LazyVGrid(
+            columns: columns,
+            spacing: spacing
         ) {
             ForEach(cards) { card in
                 if let postID = card.postId,
@@ -512,7 +599,7 @@ struct HomeView: View {
                     SecondhandCardView(
                         item: item,
                         isOwnPost: item.isOwned(by: authService.currentUser?.id),
-                        allowsImagePreview: false,
+                        constrainedWidth: cardWidth,
                         onOpenTap: { openFeaturedCard(card) },
                         onAuthorTap: item.canOpenSellerProfile ? {
                             selectedProfileRoute = HomeProfileRoute(id: item.sellerId)
@@ -524,6 +611,7 @@ struct HomeView: View {
                 }
             }
         }
+        .frame(width: safeAvailableWidth, alignment: .leading)
     }
 
     private func compactSecondhandItem(
@@ -559,14 +647,19 @@ struct HomeView: View {
         )
     }
 
-    private func featuredCard(_ card: HomeCardItem) -> some View {
+    private func featuredCard(
+        _ card: HomeCardItem,
+        in category: HomeFeedTab
+    ) -> some View {
         ContentCardView(
             item: card,
             interaction: viewModel.interactionState(for: card),
+            presentsSecondhandAsForumBoard: category == .recommended
+                && card.category == .secondhand,
+            usesSecondhandRowSurface: category == .following
+                && card.category == .secondhand,
             onTap: { openFeaturedCard(card) },
-            onBoardTap: card.category == .forum && card.boardID != nil ? {
-                openForumBoard(card)
-            } : nil,
+            onBoardTap: boardTapAction(for: card, in: category),
             onAuthorTap: card.authorId.map { authorID in
                 { selectedProfileRoute = HomeProfileRoute(id: authorID) }
             },
@@ -582,7 +675,8 @@ struct HomeView: View {
         )
         .overlay {
             if highlightedCreatedPostID == card.postId {
-                if card.category == .forum {
+                if card.category == .forum
+                    || (category == .recommended && card.category == .secondhand) {
                     VStack(spacing: 0) {
                         Rectangle()
                             .fill(AppColors.accent)
@@ -618,6 +712,24 @@ struct HomeView: View {
             }
         }
         .animation(.easeInOut(duration: 0.24), value: highlightedCreatedPostID)
+    }
+
+    private func boardTapAction(
+        for card: HomeCardItem,
+        in category: HomeFeedTab
+    ) -> (() -> Void)? {
+        if card.category == .forum, card.boardID != nil {
+            return { openForumBoard(card) }
+        }
+
+        if category == .recommended, card.category == .secondhand {
+            return {
+                selectedSecondhandCategory = nil
+                selectFeaturedCategory(.secondhand)
+            }
+        }
+
+        return nil
     }
 
     private func sharePayload(for card: HomeCardItem) -> PostSharePayload? {
@@ -681,16 +793,6 @@ struct HomeView: View {
         }
     }
 
-    private var selectedFeaturedCategoryBinding: Binding<HomeFeedTab?> {
-        Binding(
-            get: { selectedFeaturedCategory },
-            set: { category in
-                guard let category else { return }
-                selectedFeaturedCategory = category
-            }
-        )
-    }
-
     private func selectedFeaturedPageHeight(minimum: CGFloat) -> CGFloat {
         max(
             featuredPageHeights[selectedFeaturedCategory] ?? minimum,
@@ -702,12 +804,44 @@ struct HomeView: View {
         guard height > 0,
               abs((featuredPageHeights[category] ?? 0) - height) > 0.5
         else { return }
-        featuredPageHeights[category] = height
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            featuredPageHeights[category] = height
+        }
     }
 
     private func selectFeaturedCategory(_ category: HomeFeedTab) {
+        guard category != selectedFeaturedCategory
+                || category != featuredPagerPosition
+        else { return }
+
+        updateSelectedFeaturedCategoryWithoutAnimation(category)
+        pendingFeaturedCategory = nil
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            featuredPagerPosition = category
+        }
+    }
+
+    private func commitPendingFeaturedCategoryIfSettled() {
+        guard !isFeaturedPagerScrolling,
+              let category = pendingFeaturedCategory,
+              featuredPagerPosition == category
+        else { return }
+
+        pendingFeaturedCategory = nil
         guard category != selectedFeaturedCategory else { return }
-        withAnimation(.easeInOut(duration: 0.24)) {
+        updateSelectedFeaturedCategoryWithoutAnimation(category)
+    }
+
+    private func updateSelectedFeaturedCategoryWithoutAnimation(
+        _ category: HomeFeedTab
+    ) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
             selectedFeaturedCategory = category
         }
     }
@@ -726,15 +860,13 @@ struct HomeView: View {
             return
         }
 
-        withAnimation(.easeInOut(duration: 0.24)) {
-            promotedCreatedPostID = postID
-            highlightedCreatedPostID = nil
-            showForumList = false
-            selectedForumBoardID = nil
-            selectedSecondhandCategory = nil
-            selectedFeaturedCategory = .recommended
-            contentScrollResetID = UUID()
-        }
+        promotedCreatedPostID = postID
+        highlightedCreatedPostID = nil
+        showForumList = false
+        selectedForumBoardID = nil
+        selectedSecondhandCategory = nil
+        selectFeaturedCategory(.recommended)
+        contentScrollResetID = UUID()
 
         ShareFeedbackPresenter.show(
             kind == .forum ? "论坛帖子发布成功，已显示在推荐" : "二手商品发布成功，已显示在推荐"
@@ -851,6 +983,53 @@ struct HomeView: View {
     }
 
     // MARK: - 处理快捷操作点击
+}
+
+/// `scrollPosition` starts reporting the destination page near the middle of an
+/// interactive swipe. Keep that provisional value away from the selected tab and
+/// its height-dependent layout until the pager has actually stopped scrolling.
+private struct FeaturedPagerScrollPhaseModifier: ViewModifier {
+    @Binding var isScrolling: Bool
+    @State private var fallbackReleaseTask: Task<Void, Never>?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content
+                .onScrollPhaseChange { _, phase in
+                    isScrolling = phase != .idle
+                }
+        } else {
+            content
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 6)
+                        .onChanged { value in
+                            guard abs(value.translation.width)
+                                    > abs(value.translation.height)
+                            else { return }
+
+                            fallbackReleaseTask?.cancel()
+                            if !isScrolling {
+                                isScrolling = true
+                            }
+                        }
+                        .onEnded { _ in
+                            fallbackReleaseTask?.cancel()
+                            fallbackReleaseTask = Task { @MainActor in
+                                try? await Task.sleep(
+                                    nanoseconds: 280_000_000
+                                )
+                                guard !Task.isCancelled else { return }
+                                isScrolling = false
+                            }
+                        }
+                )
+                .onDisappear {
+                    fallbackReleaseTask?.cancel()
+                    fallbackReleaseTask = nil
+                }
+        }
+    }
 }
 
 enum HomeFeedTab: CaseIterable, Hashable {

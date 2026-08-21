@@ -75,6 +75,7 @@ struct ForumCommentItem: Identifiable, Hashable {
     let authorAvatar: String?
     let isAuthorOfficial: Bool
     var isAuthorMcMasterVerified: Bool = false
+    var isAuthorDeactivated: Bool = false
 }
 
 struct ForumCreateInput {
@@ -1039,6 +1040,38 @@ class ForumService: ObservableObject {
     }
 
     // MARK: - 获取评论
+    func observeCommentChanges(
+        postId: UUID,
+        onChange: @escaping @MainActor () async -> Void
+    ) -> () -> Void {
+        let channel = supabase.client.channel(
+            "forum-comments-\(postId.uuidString)-\(UUID().uuidString)"
+        )
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "comments",
+            filter: .eq("post_id", value: postId)
+        )
+        let task = Task {
+            do {
+                try await channel.subscribeWithError()
+                for await _ in changes {
+                    guard !Task.isCancelled else { break }
+                    await onChange()
+                }
+            } catch {
+                // Pull-to-refresh and the next detail appearance remain
+                // authoritative fallbacks for temporary realtime disconnects.
+            }
+        }
+
+        return { [supabase] in
+            task.cancel()
+            Task { await supabase.client.removeChannel(channel) }
+        }
+    }
+
     func fetchComments(postId: UUID) async throws -> [ForumCommentItem] {
         let rows: [DBCommentRow] = try await supabase
             .database("comments")
@@ -1065,7 +1098,10 @@ class ForumService: ObservableObject {
         let mapped = rows.map { row in
             let profile = profileMap[row.userId]
             let authorName: String = {
-                if row.isAnonymous { return "Anonymous" }
+                if row.isAnonymous {
+                    return L10n.tr("Anonymous comment", "匿名评论")
+                }
+                if row.authorIsDeactivated == true { return "已注销" }
                 if let fullName = profile?.fullName, !fullName.isEmpty { return fullName }
                 if let email = profile?.email, let localPart = email.split(separator: "@").first, !localPart.isEmpty {
                     return String(localPart)
@@ -1084,9 +1120,16 @@ class ForumService: ObservableObject {
                 createdAt: row.createdAt,
                 timeAgo: Formatters.formatCompactTimeAgo(row.createdAt, useJustNow: true),
                 authorName: authorName,
-                authorAvatar: row.isAnonymous ? nil : profile?.avatarUrl,
-                isAuthorOfficial: !row.isAnonymous && profile?.isOfficial == true,
-                isAuthorMcMasterVerified: !row.isAnonymous && profile?.isMcMasterVerified == true
+                authorAvatar: row.isAnonymous || row.authorIsDeactivated == true
+                    ? nil
+                    : profile?.avatarUrl,
+                isAuthorOfficial: !row.isAnonymous
+                    && row.authorIsDeactivated != true
+                    && profile?.isOfficial == true,
+                isAuthorMcMasterVerified: !row.isAnonymous
+                    && row.authorIsDeactivated != true
+                    && profile?.isMcMasterVerified == true,
+                isAuthorDeactivated: row.authorIsDeactivated == true
             )
         }
         return mapped
@@ -1484,6 +1527,7 @@ struct DBCommentRow: Codable, Identifiable {
     let parentId: UUID?
     let content: String
     let isAnonymous: Bool
+    let authorIsDeactivated: Bool?
     let likeCount: Int
     let createdAt: Date
 
@@ -1494,6 +1538,7 @@ struct DBCommentRow: Codable, Identifiable {
         case parentId = "parent_id"
         case content
         case isAnonymous = "is_anonymous"
+        case authorIsDeactivated = "author_is_deactivated"
         case likeCount = "like_count"
         case createdAt = "created_at"
     }

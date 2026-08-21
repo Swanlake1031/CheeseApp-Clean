@@ -82,12 +82,10 @@ struct ChatMessageContentView: View {
             )
 
             VStack(alignment: .leading, spacing: 8) {
-                if let requesterName, !requesterName.isEmpty {
-                    Text(
-                        isMine
-                            ? L10n.tr("Card sent with the original post preview", "已附上帖子卡片，方便对方快速识别")
-                            : "\(requesterName) 想联系你"
-                    )
+                if !isMine,
+                   let requesterName,
+                   !requesterName.isEmpty {
+                    Text("\(requesterName) 想联系你")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(AppColors.textMuted)
                 }

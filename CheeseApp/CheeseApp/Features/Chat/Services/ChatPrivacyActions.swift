@@ -16,7 +16,7 @@ struct ChatPrivacyActions {
     ) async throws -> ChatConversationListSettingsSnapshot {
         let rows: [ConversationListSettingsRow] = try await supabase
             .database("user_conversation_settings")
-            .select("conversation_id,is_muted,manual_unread,hide_until_at,clear_before_at")
+            .select("conversation_id,is_muted,is_pinned,manual_unread,hide_until_at,clear_before_at")
             .eq("user_id", value: userId.uuidString)
             .execute()
             .value
@@ -24,6 +24,9 @@ struct ChatPrivacyActions {
         return ChatConversationListSettingsSnapshot(
             mutedConversationIDs: Set(
                 rows.lazy.filter(\.isMuted).map(\.conversationId)
+            ),
+            pinnedConversationIDs: Set(
+                rows.lazy.filter(\.isPinned).map(\.conversationId)
             ),
             manualUnreadConversationIDs: Set(
                 rows.lazy.filter(\.manualUnread).map(\.conversationId)
@@ -41,11 +44,21 @@ struct ChatPrivacyActions {
         )
     }
 
-    func fetchMutedGroupIDs(userId: UUID) async throws -> Set<UUID> {
-        try await fetchGroupSettingsIDSet(
-            userId: userId,
-            flagColumn: "is_muted"
-        )
+    func fetchGroupListSettings(userId: UUID) async throws -> [UUID: GroupConversationSettings] {
+        let rows: [GroupConversationListSettingsRow] = try await supabase
+            .database("user_chat_group_settings")
+            .select("group_id,is_muted,is_pinned,clear_before_at,hide_until_at")
+            .eq("user_id", value: userId.uuidString)
+            .execute()
+            .value
+        return Dictionary(uniqueKeysWithValues: rows.map {
+            ($0.groupId, GroupConversationSettings(
+                isMuted: $0.isMuted,
+                isPinned: $0.isPinned,
+                clearBeforeAt: $0.clearBeforeAt,
+                hideUntilAt: $0.hideUntilAt
+            ))
+        })
     }
 
     func fetchDirectConversationSettings(conversationId: UUID) async -> DirectConversationSettings {
@@ -59,7 +72,7 @@ struct ChatPrivacyActions {
         do {
             let rows: [ConversationSettingsRow] = try await supabase
                 .database("user_conversation_settings")
-                .select("is_muted,clear_before_at,manual_unread,hide_until_at")
+                .select("is_muted,is_pinned,clear_before_at,manual_unread,hide_until_at")
                 .eq("user_id", value: userId.uuidString)
                 .eq("conversation_id", value: conversationId.uuidString)
                 .limit(1)
@@ -72,6 +85,7 @@ struct ChatPrivacyActions {
 
             return DirectConversationSettings(
                 isMuted: row.isMuted,
+                isPinned: row.isPinned,
                 clearBeforeAt: row.clearBeforeAt,
                 manualUnread: row.manualUnread,
                 hideUntilAt: row.hideUntilAt
@@ -92,7 +106,7 @@ struct ChatPrivacyActions {
         do {
             let rows: [GroupConversationSettingsRow] = try await supabase
                 .database("user_chat_group_settings")
-                .select("is_muted")
+                .select("is_muted,is_pinned,clear_before_at,hide_until_at")
                 .eq("user_id", value: userId.uuidString)
                 .eq("group_id", value: groupId.uuidString)
                 .limit(1)
@@ -102,7 +116,12 @@ struct ChatPrivacyActions {
             guard let row = rows.first else {
                 return .default
             }
-            return GroupConversationSettings(isMuted: row.isMuted)
+            return GroupConversationSettings(
+                isMuted: row.isMuted,
+                isPinned: row.isPinned,
+                clearBeforeAt: row.clearBeforeAt,
+                hideUntilAt: row.hideUntilAt
+            )
         } catch {
             return .default
         }
@@ -113,6 +132,19 @@ struct ChatPrivacyActions {
         try await saveConversationSettings(
             conversationId: conversationId,
             isMuted: isMuted,
+            isPinned: settings.isPinned,
+            clearBeforeAt: settings.clearBeforeAt,
+            manualUnread: settings.manualUnread,
+            hideUntilAt: settings.hideUntilAt
+        )
+    }
+
+    func persistConversationPin(conversationId: UUID, isPinned: Bool) async throws {
+        let settings = await fetchDirectConversationSettings(conversationId: conversationId)
+        try await saveConversationSettings(
+            conversationId: conversationId,
+            isMuted: settings.isMuted,
+            isPinned: isPinned,
             clearBeforeAt: settings.clearBeforeAt,
             manualUnread: settings.manualUnread,
             hideUntilAt: settings.hideUntilAt
@@ -125,6 +157,7 @@ struct ChatPrivacyActions {
         try await saveConversationSettings(
             conversationId: conversationId,
             isMuted: settings.isMuted,
+            isPinned: settings.isPinned,
             clearBeforeAt: clearedAt,
             manualUnread: false,
             hideUntilAt: settings.hideUntilAt
@@ -163,6 +196,7 @@ struct ChatPrivacyActions {
         try await saveConversationSettings(
             conversationId: conversationId,
             isMuted: settings.isMuted,
+            isPinned: settings.isPinned,
             clearBeforeAt: settings.clearBeforeAt,
             manualUnread: false,
             hideUntilAt: hideUntilAt
@@ -175,6 +209,7 @@ struct ChatPrivacyActions {
         try await saveConversationSettings(
             conversationId: conversationId,
             isMuted: settings.isMuted,
+            isPinned: settings.isPinned,
             clearBeforeAt: deleteAt,
             manualUnread: false,
             hideUntilAt: deleteAt
@@ -182,11 +217,54 @@ struct ChatPrivacyActions {
     }
 
     func persistGroupConversationMute(groupId: UUID, isMuted: Bool) async throws {
+        let settings = await fetchGroupConversationSettings(groupId: groupId)
         do {
-            try await saveGroupConversationSettings(groupId: groupId, isMuted: isMuted)
+            try await saveGroupConversationSettings(
+                groupId: groupId,
+                isMuted: isMuted,
+                isPinned: settings.isPinned,
+                clearBeforeAt: settings.clearBeforeAt,
+                hideUntilAt: settings.hideUntilAt
+            )
         } catch {
             throw normalizedGroupDetailsError(from: error)
         }
+    }
+
+    func persistGroupConversationPin(groupId: UUID, isPinned: Bool) async throws {
+        let settings = await fetchGroupConversationSettings(groupId: groupId)
+        try await saveGroupConversationSettings(
+            groupId: groupId,
+            isMuted: settings.isMuted,
+            isPinned: isPinned,
+            clearBeforeAt: settings.clearBeforeAt,
+            hideUntilAt: settings.hideUntilAt
+        )
+    }
+
+    func clearGroupConversationHistory(groupId: UUID) async throws -> Date {
+        let clearedAt = Date()
+        let settings = await fetchGroupConversationSettings(groupId: groupId)
+        try await saveGroupConversationSettings(
+            groupId: groupId,
+            isMuted: settings.isMuted,
+            isPinned: settings.isPinned,
+            clearBeforeAt: clearedAt,
+            hideUntilAt: settings.hideUntilAt
+        )
+        return clearedAt
+    }
+
+    func deleteGroupConversation(groupId: UUID) async throws {
+        let deletedAt = Date()
+        let settings = await fetchGroupConversationSettings(groupId: groupId)
+        try await saveGroupConversationSettings(
+            groupId: groupId,
+            isMuted: settings.isMuted,
+            isPinned: settings.isPinned,
+            clearBeforeAt: deletedAt,
+            hideUntilAt: deletedAt
+        )
     }
 
     func saveGroupConversationReadMarker(groupId: UUID, lastReadAt: Date) async throws {
@@ -379,6 +457,7 @@ struct ChatPrivacyActions {
     private func saveConversationSettings(
         conversationId: UUID,
         isMuted: Bool,
+        isPinned: Bool,
         clearBeforeAt: Date?,
         manualUnread: Bool,
         hideUntilAt: Date?
@@ -388,6 +467,7 @@ struct ChatPrivacyActions {
             userId: userId,
             conversationId: conversationId,
             isMuted: isMuted,
+            isPinned: isPinned,
             clearBeforeAt: clearBeforeAt,
             manualUnread: manualUnread,
             hideUntilAt: hideUntilAt
@@ -397,6 +477,7 @@ struct ChatPrivacyActions {
             insertPayload: insertPayload,
             updatePayload: ConversationSettingsUpdate(
                 isMuted: isMuted,
+                isPinned: isPinned,
                 clearBeforeAt: clearBeforeAt,
                 manualUnread: manualUnread,
                 hideUntilAt: hideUntilAt
@@ -412,19 +493,28 @@ struct ChatPrivacyActions {
 
     private func saveGroupConversationSettings(
         groupId: UUID,
-        isMuted: Bool
+        isMuted: Bool,
+        isPinned: Bool,
+        clearBeforeAt: Date?,
+        hideUntilAt: Date?
     ) async throws {
         let userId = try await AuthService.shared.requireAuthUserId()
         let insertPayload = GroupConversationSettingsInsert(
             userId: userId,
             groupId: groupId,
-            isMuted: isMuted
+            isMuted: isMuted,
+            isPinned: isPinned,
+            clearBeforeAt: clearBeforeAt,
+            hideUntilAt: hideUntilAt
         )
         try await insertOrUpdateByUserTarget(
             table: "user_chat_group_settings",
             insertPayload: insertPayload,
             updatePayload: GroupConversationSettingsUpdate(
-                isMuted: isMuted
+                isMuted: isMuted,
+                isPinned: isPinned,
+                clearBeforeAt: clearBeforeAt,
+                hideUntilAt: hideUntilAt
             ),
             userId: userId,
             targetColumn: "group_id",
@@ -465,6 +555,21 @@ struct ChatPrivacyActions {
         targetId: UUID,
         normalizeError: (Error) -> Error
     ) async throws {
+        if table == "user_conversation_settings" {
+            do {
+                try await supabase
+                    .database(table)
+                    .upsert(
+                        insertPayload,
+                        onConflict: "user_id,conversation_id"
+                    )
+                    .execute()
+                return
+            } catch {
+                throw normalizeError(error)
+            }
+        }
+
         do {
             try await supabase
                 .database(table)

@@ -69,6 +69,7 @@ enum ChatRoomAlertDestination: Identifiable, Equatable {
 
 enum ChatRoomSettingsAction {
     case setMuted(Bool)
+    case setPinned(Bool)
     case saveRemark(String?)
     case report
     case clearHistory
@@ -107,6 +108,7 @@ final class ChatRoomViewModel: ObservableObject {
     @Published private(set) var mediaProgress: ChatRoomMediaProgress?
     @Published private(set) var isCancellingMediaSend = false
     @Published private(set) var isMuted = false
+    @Published private(set) var isPinned = false
     @Published private(set) var clearBeforeAt: Date?
     @Published private(set) var blockRelation: UserBlockRelation = .none
     @Published private(set) var isApplyingPrivacyAction = false
@@ -130,6 +132,7 @@ final class ChatRoomViewModel: ObservableObject {
     private var currentUserID: UUID?
     private var failedSend: ChatRoomPendingSend?
     private var messageStateObservation: AnyCancellable?
+    private var secondhandTransactionSignalObservation: AnyCancellable?
     private var mediaPreparationTask: Task<Void, Never>?
     private var sendTask: Task<Void, Never>?
     private var presentationTask: Task<Void, Never>?
@@ -163,6 +166,23 @@ final class ChatRoomViewModel: ObservableObject {
         messageStateObservation = self.roomState.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }
+        secondhandTransactionSignalObservation = self.roomState.$messages
+            .map { messages in
+                messages.last(where: { message in
+                    message.metadata?.secondhandTransactionEvent != nil
+                        || message.metadata?.postContactCard.map {
+                            PostKind(remoteValue: $0.postKind) == .secondhand
+                        } == true
+                })?.id
+            }
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] signalID in
+                guard signalID != nil else { return }
+                Task { @MainActor [weak self] in
+                    self?.refreshSecondhandPurchaseIntentAfterTimelineSignal()
+                }
+            }
     }
 
     deinit {
@@ -170,6 +190,7 @@ final class ChatRoomViewModel: ObservableObject {
         sendTask?.cancel()
         presentationTask?.cancel()
         secondhandTransactionRefreshTask?.cancel()
+        secondhandTransactionSignalObservation?.cancel()
     }
 
     var messages: [Message] { roomState.messages }
@@ -196,15 +217,6 @@ final class ChatRoomViewModel: ObservableObject {
             : "你已拉黑对方，当前会话仅可查看历史消息。"
     }
     var hasNestedDestinationPresented: Bool { navigationDestination != nil }
-    var latestSecondhandTransactionSignalMessageID: UUID? {
-        messages.last(where: { message in
-            message.metadata?.secondhandTransactionEvent != nil
-                || message.metadata?.postContactCard.map {
-                    PostKind(remoteValue: $0.postKind) == .secondhand
-                } == true
-        })?.id
-    }
-
     func bootstrap(currentUserID: UUID?) async {
         self.currentUserID = currentUserID
         await roomState.bootstrap { [weak self] in
@@ -236,6 +248,10 @@ final class ChatRoomViewModel: ObservableObject {
             await self.refreshSecondhandPurchaseIntent()
             self.secondhandTransactionRefreshTask = nil
         }
+    }
+
+    func reconcileSecondhandPurchaseIntent() {
+        refreshSecondhandPurchaseIntentAfterTimelineSignal()
     }
 
     func requestCancelSecondhandPurchaseIntent() {
@@ -503,6 +519,7 @@ final class ChatRoomViewModel: ObservableObject {
     func handleSettingsAction(_ action: ChatRoomSettingsAction) {
         switch action {
         case .setMuted(let isMuted): setConversationMuted(isMuted)
+        case .setPinned(let isPinned): setConversationPinned(isPinned)
         case .saveRemark(let remark): saveRemark(remark)
         case .report: requestReport()
         case .clearHistory: requestClearHistory()
@@ -517,6 +534,16 @@ final class ChatRoomViewModel: ObservableObject {
                 isMuted: newValue
             )
             isMuted = newValue
+        }
+    }
+
+    private func setConversationPinned(_ newValue: Bool) {
+        runPrivacyAction { [self] in
+            try await chatService.setConversationPinned(
+                conversationId: conversation.id,
+                isPinned: newValue
+            )
+            isPinned = newValue
         }
     }
 
@@ -723,6 +750,7 @@ final class ChatRoomViewModel: ObservableObject {
             conversationId: conversation.id
         )
         isMuted = settings.isMuted
+        isPinned = settings.isPinned
         clearBeforeAt = settings.clearBeforeAt
         blockRelation = await chatService.fetchBlockRelation(with: conversation.otherUserId)
     }

@@ -25,6 +25,17 @@ struct ChatConversationStateUpdater {
         }
     }
 
+    func applyPinState(
+        to previews: [ChatConversationPreview],
+        pinnedConversationIDs: Set<UUID>
+    ) -> [ChatConversationPreview] {
+        sortDirectConversations(previews.map { preview in
+            var updated = preview
+            updated.isPinned = pinnedConversationIDs.contains(preview.id)
+            return updated
+        })
+    }
+
     func applyConversationListState(
         to previews: [ChatConversationPreview],
         manualUnreadConversationIDs: Set<UUID>,
@@ -64,7 +75,8 @@ struct ChatConversationStateUpdater {
                 lastMessageAt: preview.lastMessageAt,
                 lastMessagePreview: nil,
                 unreadCount: 0,
-                isMuted: preview.isMuted
+                isMuted: preview.isMuted,
+                isPinned: preview.isPinned
             )
         }
     }
@@ -97,6 +109,17 @@ struct ChatConversationStateUpdater {
         }
     }
 
+    func setConversationPinned(
+        conversationId: UUID,
+        isPinned: Bool,
+        conversations: inout [ChatConversationPreview]
+    ) {
+        if let index = conversations.firstIndex(where: { $0.id == conversationId }) {
+            conversations[index].isPinned = isPinned
+            conversations = sortDirectConversations(conversations)
+        }
+    }
+
     func clearConversationPreview(
         conversationId: UUID,
         conversations: inout [ChatConversationPreview]
@@ -120,6 +143,7 @@ struct ChatConversationStateUpdater {
         var preview = preview
         if let existing = conversations.first(where: { $0.id == preview.id }) {
             preview.isMuted = existing.isMuted
+            preview.isPinned = existing.isPinned
         }
 
         if let index = conversations.firstIndex(where: { $0.id == preview.id }) {
@@ -128,9 +152,7 @@ struct ChatConversationStateUpdater {
             conversations.insert(preview, at: 0)
         }
 
-        conversations.sort { lhs, rhs in
-            lhs.lastMessageAt > rhs.lastMessageAt
-        }
+        conversations = sortDirectConversations(conversations)
     }
 
     func applyGroupMuteState(
@@ -144,6 +166,28 @@ struct ChatConversationStateUpdater {
         })
     }
 
+    func applyGroupListSettings(
+        to previews: [ChatGroupPreview],
+        settingsByGroupID: [UUID: GroupConversationSettings]
+    ) -> [ChatGroupPreview] {
+        sortGroupConversations(previews.compactMap { preview in
+            var updated = preview
+            let settings = settingsByGroupID[preview.id]
+            if let hiddenUntil = settings?.hideUntilAt,
+               preview.lastMessageAt <= hiddenUntil.addingTimeInterval(timestampTolerance) {
+                return nil
+            }
+            updated.isMuted = settings?.isMuted ?? false
+            updated.isPinned = settings?.isPinned ?? false
+            if let clearedAt = settings?.clearBeforeAt,
+               preview.lastMessageAt <= clearedAt.addingTimeInterval(timestampTolerance) {
+                updated.lastMessagePreview = nil
+                updated.unreadCount = 0
+            }
+            return updated
+        })
+    }
+
     func setGroupConversationMuted(
         groupId: UUID,
         isMuted: Bool,
@@ -151,6 +195,27 @@ struct ChatConversationStateUpdater {
     ) {
         if let index = groupConversations.firstIndex(where: { $0.id == groupId }) {
             groupConversations[index].isMuted = isMuted
+        }
+    }
+
+    func setGroupConversationPinned(
+        groupId: UUID,
+        isPinned: Bool,
+        groupConversations: inout [ChatGroupPreview]
+    ) {
+        if let index = groupConversations.firstIndex(where: { $0.id == groupId }) {
+            groupConversations[index].isPinned = isPinned
+            groupConversations = sortGroupConversations(groupConversations)
+        }
+    }
+
+    func clearGroupConversationPreview(
+        groupId: UUID,
+        groupConversations: inout [ChatGroupPreview]
+    ) {
+        if let index = groupConversations.firstIndex(where: { $0.id == groupId }) {
+            groupConversations[index].lastMessagePreview = nil
+            groupConversations[index].unreadCount = 0
         }
     }
 
@@ -167,6 +232,12 @@ struct ChatConversationStateUpdater {
         _ preview: ChatGroupPreview,
         groupConversations: inout [ChatGroupPreview]
     ) {
+        var preview = preview
+        if let existing = groupConversations.first(where: { $0.id == preview.id }) {
+            preview.isMuted = existing.isMuted
+            preview.isPinned = existing.isPinned
+        }
+
         if let index = groupConversations.firstIndex(where: { $0.id == preview.id }) {
             groupConversations[index] = preview
         } else {
@@ -190,11 +261,25 @@ struct ChatConversationStateUpdater {
             lastMessageAt: preview.lastMessageAt,
             lastMessagePreview: nil,
             unreadCount: 0,
-            isMuted: preview.isMuted
+            isMuted: preview.isMuted,
+            isPinned: preview.isPinned
         )
     }
 
+    private func sortDirectConversations(
+        _ previews: [ChatConversationPreview]
+    ) -> [ChatConversationPreview] {
+        previews.sorted { lhs, rhs in
+            if lhs.isPinned != rhs.isPinned { return lhs.isPinned && !rhs.isPinned }
+            if lhs.lastMessageAt != rhs.lastMessageAt { return lhs.lastMessageAt > rhs.lastMessageAt }
+            return lhs.id.uuidString > rhs.id.uuidString
+        }
+    }
+
     private func compareGroupConversations(_ lhs: ChatGroupPreview, _ rhs: ChatGroupPreview) -> Bool {
+        if lhs.isPinned != rhs.isPinned {
+            return lhs.isPinned && !rhs.isPinned
+        }
         if lhs.lastMessageAt != rhs.lastMessageAt {
             return lhs.lastMessageAt > rhs.lastMessageAt
         }

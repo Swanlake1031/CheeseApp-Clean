@@ -7,6 +7,21 @@
 
 import SwiftUI
 
+enum HomeFeedAuthFailurePolicy {
+    static func shouldRetry(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.code == 401 || nsError.code == 403 || nsError.code == 42_501 {
+            return true
+        }
+
+        let message = nsError.localizedDescription.lowercased()
+        return message.contains("unauthorized")
+            || message.contains("not authenticated")
+            || message.contains("jwt")
+            || message.contains("permission denied")
+    }
+}
+
 struct HomeFeaturedForumItem: Identifiable, Hashable {
     let configuration: HomeFeaturedPost
     let post: ForumPostItem
@@ -179,7 +194,11 @@ class HomeViewModel: ObservableObject {
         now: Date = Date()
     ) async {
         establishAccountScope(for: userID)
-        guard Self.shouldReload(
+        guard let userID,
+              await AuthService.shared.prepareAuthenticatedRequest(
+                expectedUserID: userID
+              ),
+              Self.shouldReload(
             hasResolvedData: hasResolvedInitialData,
             lastSuccessfulRefreshAt: lastSuccessfulRefreshAt,
             now: now,
@@ -194,6 +213,12 @@ class HomeViewModel: ObservableObject {
         now: Date = Date()
     ) async {
         establishAccountScope(for: userID)
+        guard let userID,
+              await AuthService.shared.prepareAuthenticatedRequest(
+                expectedUserID: userID
+              )
+        else { return }
+
         if let activeRefreshTask {
             _ = await activeRefreshTask.value
             return
@@ -354,6 +379,12 @@ class HomeViewModel: ObservableObject {
 
     func refreshFollowing(userID: UUID?) async {
         establishAccountScope(for: userID)
+        guard let userID,
+              await AuthService.shared.prepareAuthenticatedRequest(
+                expectedUserID: userID
+              )
+        else { return }
+
         followingRequestGeneration &+= 1
         let requestGeneration = followingRequestGeneration
         let requestScopeKey = accountScopeKey
@@ -365,10 +396,14 @@ class HomeViewModel: ObservableObject {
             }
         }
 
-        guard let snapshot = await fetchFollowingSnapshot(userID: userID),
+        guard let snapshot = await fetchFollowingSnapshot(
+                userID: userID,
+                expectedUserID: userID
+              ),
               !Task.isCancelled,
               requestGeneration == followingRequestGeneration,
-              requestScopeKey == accountScopeKey
+              requestScopeKey == accountScopeKey,
+              AuthService.shared.isAuthenticatedRequestReady(for: userID)
         else { return }
 
         let interactionUpdates = await fetchPostInteractionUpdates(
@@ -514,7 +549,12 @@ class HomeViewModel: ObservableObject {
         accountScopeKey = newScopeKey
     }
 
-    private func performRefresh(userID: UUID?) async -> Bool {
+    private func performRefresh(userID: UUID) async -> Bool {
+        guard await AuthService.shared.prepareAuthenticatedRequest(
+            expectedUserID: userID
+        ) else { return false }
+
+        let accountTransitionGeneration = AuthService.shared.accountTransitionGeneration
         followingRequestGeneration &+= 1
         let requestGeneration = followingRequestGeneration
         let requestScopeKey = accountScopeKey
@@ -536,10 +576,13 @@ class HomeViewModel: ObservableObject {
             }
         }
 
-        async let featuredTask = fetchFeaturedSnapshot()
-        async let forumTask = fetchForumSnapshot()
-        async let homeFeaturedTask = fetchHomeFeaturedSnapshot()
-        async let followingTask = fetchFollowingSnapshot(userID: userID)
+        async let featuredTask = fetchFeaturedSnapshot(expectedUserID: userID)
+        async let forumTask = fetchForumSnapshot(expectedUserID: userID)
+        async let homeFeaturedTask = fetchHomeFeaturedSnapshot(expectedUserID: userID)
+        async let followingTask = fetchFollowingSnapshot(
+            userID: userID,
+            expectedUserID: userID
+        )
         let (featured, forum, homeFeatured, following) = await (
             featuredTask,
             forumTask,
@@ -548,7 +591,9 @@ class HomeViewModel: ObservableObject {
         )
         guard !Task.isCancelled,
               requestGeneration == followingRequestGeneration,
-              requestScopeKey == accountScopeKey
+              requestScopeKey == accountScopeKey,
+              accountTransitionGeneration == AuthService.shared.accountTransitionGeneration,
+              AuthService.shared.isAuthenticatedRequestReady(for: userID)
         else { return false }
         guard featured != nil || forum != nil || homeFeatured != nil || following != nil else {
             return false
@@ -582,7 +627,9 @@ class HomeViewModel: ObservableObject {
         )
         guard !Task.isCancelled,
               requestGeneration == followingRequestGeneration,
-              requestScopeKey == accountScopeKey
+              requestScopeKey == accountScopeKey,
+              accountTransitionGeneration == AuthService.shared.accountTransitionGeneration,
+              AuthService.shared.isAuthenticatedRequestReady(for: userID)
         else { return false }
 
         var nextSnapshot = contentSnapshot
@@ -675,125 +722,158 @@ class HomeViewModel: ObservableObject {
         }
     }
 
-    private func fetchHomeFeaturedSnapshot() async -> HomeFeaturedSnapshot? {
+    private func fetchHomeFeaturedSnapshot(
+        expectedUserID: UUID
+    ) async -> HomeFeaturedSnapshot? {
         do {
-            let configurations = try await feedService.fetchHomeFeaturedPosts()
-            let posts = try await ForumService.shared.fetchPosts(
-                postIDs: configurations.map(\.postID)
-            )
-            guard !Task.isCancelled else { return nil }
-            let postsByID = Dictionary(uniqueKeysWithValues: posts.map { ($0.id, $0) })
-            return HomeFeaturedSnapshot(
-                items: HomeFeaturedForumItem.resolve(
-                    configurations: configurations,
+            return try await withAuthenticatedRetry(expectedUserID: expectedUserID) {
+                let configurations = try await self.feedService.fetchHomeFeaturedPosts()
+                let posts = try await ForumService.shared.fetchPosts(
+                    postIDs: configurations.map(\.postID)
+                )
+                try Task.checkCancellation()
+                let postsByID = Dictionary(uniqueKeysWithValues: posts.map { ($0.id, $0) })
+                return HomeFeaturedSnapshot(
+                    items: HomeFeaturedForumItem.resolve(
+                        configurations: configurations,
+                        postsByID: postsByID
+                    ),
                     postsByID: postsByID
-                ),
-                postsByID: postsByID
-            )
-        } catch {
-            return nil
-        }
-    }
-
-    private func fetchFeaturedSnapshot() async -> FeaturedSnapshot? {
-        do {
-            let bundle = try await feedService.fetchFeaturedBundle(secondhandLimit: 36)
-            guard !Task.isCancelled else { return nil }
-            let secondhandItems = await SecondhandService.shared.resolveItems(
-                from: bundle.secondhandRows,
-                seedInteractions: false
-            )
-            guard !Task.isCancelled else { return nil }
-            let itemsByID = Dictionary(
-                uniqueKeysWithValues: secondhandItems.map { ($0.id, $0) }
-            )
-            return FeaturedSnapshot(
-                cards: bundle.secondhandPosts
-                    .filter { itemsByID[$0.id] != nil }
-                    .map(makeSecondhandCard),
-                itemsByID: itemsByID
-            )
-        } catch {
-            return nil
-        }
-    }
-
-    private func fetchForumSnapshot() async -> ForumSnapshot? {
-        do {
-            let previews = try await feedService.fetchForumPreview(limit: 36)
-            let posts = try await ForumService.shared.fetchPosts(
-                postIDs: previews.map(\.id)
-            )
-            guard !Task.isCancelled else { return nil }
-            let postsByID = Dictionary(uniqueKeysWithValues: posts.map { ($0.id, $0) })
-            return ForumSnapshot(
-                cards: previews.compactMap { preview in
-                    postsByID[preview.id].map { post in
-                        makeForumCard(post, saveCount: preview.saveCount)
-                    }
-                },
-                postsByID: postsByID
-            )
-        } catch {
-            return nil
-        }
-    }
-
-    private func fetchFollowingSnapshot(userID: UUID?) async -> FollowingSnapshot? {
-        guard let userID else {
-            return FollowingSnapshot(
-                cards: [],
-                followedAuthorIDs: [],
-                forumPostsByID: [:],
-                secondhandItemsByID: [:]
-            )
-        }
-
-        do {
-            let bundle = try await feedService.fetchFollowingFeed(userID: userID)
-            async let forumPosts = ForumService.shared.fetchPosts(
-                postIDs: bundle.forumPosts.map(\.id)
-            )
-            async let secondhandItems = SecondhandService.shared.resolveItems(
-                from: bundle.secondhandRows,
-                seedInteractions: false
-            )
-            let (resolvedForumPosts, resolvedSecondhandItems) = try await (
-                forumPosts,
-                secondhandItems
-            )
-            guard !Task.isCancelled else { return nil }
-
-            let forumPostsByID = Dictionary(
-                uniqueKeysWithValues: resolvedForumPosts.map { ($0.id, $0) }
-            )
-            let secondhandItemsByID = Dictionary(
-                uniqueKeysWithValues: resolvedSecondhandItems.map { ($0.id, $0) }
-            )
-            let forumEntries: [(card: HomeCardItem, createdAt: Date)] = bundle.forumPosts.compactMap { preview in
-                forumPostsByID[preview.id].map {
-                    (card: makeForumCard($0), createdAt: preview.createdAt)
-                }
+                )
             }
-            let secondhandEntries: [(card: HomeCardItem, createdAt: Date)] = bundle.secondhandPosts.compactMap { preview in
-                guard secondhandItemsByID[preview.id] != nil else { return nil }
-                return (card: makeSecondhandCard(from: preview), createdAt: preview.createdAt)
+        } catch {
+            return nil
+        }
+    }
+
+    private func fetchFeaturedSnapshot(
+        expectedUserID: UUID
+    ) async -> FeaturedSnapshot? {
+        do {
+            return try await withAuthenticatedRetry(expectedUserID: expectedUserID) {
+                let bundle = try await self.feedService.fetchFeaturedBundle(secondhandLimit: 36)
+                try Task.checkCancellation()
+                let secondhandItems = await SecondhandService.shared.resolveItems(
+                    from: bundle.secondhandRows,
+                    seedInteractions: false
+                )
+                try Task.checkCancellation()
+                let itemsByID = Dictionary(
+                    uniqueKeysWithValues: secondhandItems.map { ($0.id, $0) }
+                )
+                return FeaturedSnapshot(
+                    cards: bundle.secondhandPosts
+                        .filter { itemsByID[$0.id] != nil }
+                        .map(self.makeSecondhandCard),
+                    itemsByID: itemsByID
+                )
             }
-            return FollowingSnapshot(
-                cards: (forumEntries + secondhandEntries)
-                    .sorted { lhs, rhs in
-                        if lhs.createdAt != rhs.createdAt {
-                            return lhs.createdAt > rhs.createdAt
+        } catch {
+            return nil
+        }
+    }
+
+    private func fetchForumSnapshot(
+        expectedUserID: UUID
+    ) async -> ForumSnapshot? {
+        do {
+            return try await withAuthenticatedRetry(expectedUserID: expectedUserID) {
+                let previews = try await self.feedService.fetchForumPreview(limit: 36)
+                let posts = try await ForumService.shared.fetchPosts(
+                    postIDs: previews.map(\.id)
+                )
+                try Task.checkCancellation()
+                let postsByID = Dictionary(uniqueKeysWithValues: posts.map { ($0.id, $0) })
+                return ForumSnapshot(
+                    cards: previews.compactMap { preview in
+                        postsByID[preview.id].map { post in
+                            self.makeForumCard(post, saveCount: preview.saveCount)
                         }
-                        return lhs.card.id.uuidString > rhs.card.id.uuidString
-                    }
-                    .map(\.card),
-                followedAuthorIDs: bundle.followedAuthorIDs,
-                forumPostsByID: forumPostsByID,
-                secondhandItemsByID: secondhandItemsByID
-            )
+                    },
+                    postsByID: postsByID
+                )
+            }
         } catch {
             return nil
+        }
+    }
+
+    private func fetchFollowingSnapshot(
+        userID: UUID,
+        expectedUserID: UUID
+    ) async -> FollowingSnapshot? {
+        do {
+            return try await withAuthenticatedRetry(expectedUserID: expectedUserID) {
+                let bundle = try await self.feedService.fetchFollowingFeed(userID: userID)
+                async let forumPosts = ForumService.shared.fetchPosts(
+                    postIDs: bundle.forumPosts.map(\.id)
+                )
+                async let secondhandItems = SecondhandService.shared.resolveItems(
+                    from: bundle.secondhandRows,
+                    seedInteractions: false
+                )
+                let (resolvedForumPosts, resolvedSecondhandItems) = try await (
+                    forumPosts,
+                    secondhandItems
+                )
+                try Task.checkCancellation()
+
+                let forumPostsByID = Dictionary(
+                    uniqueKeysWithValues: resolvedForumPosts.map { ($0.id, $0) }
+                )
+                let secondhandItemsByID = Dictionary(
+                    uniqueKeysWithValues: resolvedSecondhandItems.map { ($0.id, $0) }
+                )
+                let forumEntries: [(card: HomeCardItem, createdAt: Date)] = bundle.forumPosts.compactMap { preview in
+                    forumPostsByID[preview.id].map {
+                        (card: self.makeForumCard($0), createdAt: preview.createdAt)
+                    }
+                }
+                let secondhandEntries: [(card: HomeCardItem, createdAt: Date)] = bundle.secondhandPosts.compactMap { preview in
+                    guard secondhandItemsByID[preview.id] != nil else { return nil }
+                    return (card: self.makeSecondhandCard(from: preview), createdAt: preview.createdAt)
+                }
+                return FollowingSnapshot(
+                    cards: (forumEntries + secondhandEntries)
+                        .sorted { lhs, rhs in
+                            if lhs.createdAt != rhs.createdAt {
+                                return lhs.createdAt > rhs.createdAt
+                            }
+                            return lhs.card.id.uuidString > rhs.card.id.uuidString
+                        }
+                        .map(\.card),
+                    followedAuthorIDs: bundle.followedAuthorIDs,
+                    forumPostsByID: forumPostsByID,
+                    secondhandItemsByID: secondhandItemsByID
+                )
+            }
+        } catch {
+            return nil
+        }
+    }
+
+    private func withAuthenticatedRetry<T>(
+        expectedUserID: UUID,
+        operation: @escaping () async throws -> T
+    ) async throws -> T {
+        guard await AuthService.shared.prepareAuthenticatedRequest(
+            expectedUserID: expectedUserID
+        ) else {
+            throw CancellationError()
+        }
+
+        do {
+            return try await operation()
+        } catch {
+            guard !Task.isCancelled,
+                  HomeFeedAuthFailurePolicy.shouldRetry(error),
+                  await AuthService.shared.recoverAuthenticatedRequest(
+                    expectedUserID: expectedUserID
+                  )
+            else {
+                throw error
+            }
+            return try await operation()
         }
     }
 
