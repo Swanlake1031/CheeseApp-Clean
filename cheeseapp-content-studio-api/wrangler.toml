@@ -1,0 +1,14 @@
+name = "cheeseapp-content-studio-api"
+main = "src/index.js"
+compatibility_date = "2026-08-18"
+workers_dev = false
+
+[vars]
+# The only public browser origin allowed to call this Worker. Production
+# traffic reaches it through the Content Studio site's service binding.
+CONTENT_STUDIO_ORIGIN = "https://studio.cheeseapp.org"
+SUPABASE_URL = "https://zeuivahkowbxmfzsnagt.supabase.co"
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_29EL6LWWqeED8kLtLDk6_A_Ez8OXwf1"
+
+# Configure this as a Worker secret, never as a [vars] value and never in the browser:
+# SUPABASE_SERVICE_ROLE_KEY

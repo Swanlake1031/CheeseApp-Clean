@@ -1,0 +1,13 @@
+{
+  "name": "cheeseapp-content-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/index.js && node --check public/app.js",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.10.0"
+  }
+}

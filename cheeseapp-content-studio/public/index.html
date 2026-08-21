@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Cheese Content Studio</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="login-screen" class="login-screen">
+      <section class="login-card" aria-labelledby="login-title">
+        <div class="cheese-mark" aria-hidden="true">🧀</div>
+        <p class="eyebrow">CHEESE INTERNAL</p>
+        <h1 id="login-title">Content Studio</h1>
+        <p class="muted">仅限已授权的 Cheese 团队成员。</p>
+        <button id="google-login" class="google-login" type="button">
+          <span aria-hidden="true">G</span> 使用 Google 登录
+        </button>
+        <p class="login-divider"><span>或使用邮箱密码</span></p>
+        <form id="login-form" class="stack-form">
+          <label>邮箱<input id="login-email" type="email" autocomplete="email" required /></label>
+          <label>密码<input id="login-password" type="password" autocomplete="current-password" required /></label>
+          <button class="primary" type="submit">登录后台</button>
+          <p id="login-error" class="form-error" role="alert"></p>
+        </form>
+      </section>
+    </main>
+
+    <div id="studio" class="studio hidden">
+      <aside class="sidebar">
+        <div class="brand"><span class="brand-mark">🧀</span><span>Content Studio</span></div>
+        <nav aria-label="内容管理">
+          <button class="nav-item active" data-screen="overview">概览</button>
+          <button class="nav-item" data-screen="create">新建内容</button>
+          <button class="nav-item" data-screen="drafts">草稿</button>
+          <button class="nav-item" data-screen="published">已发布</button>
+        </nav>
+        <div class="sidebar-footer">
+          <span id="viewer-email" class="viewer-email"></span>
+          <button id="logout-button" class="quiet-button">退出登录</button>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div><p class="eyebrow">INTERNAL PUBLISHING</p><h1 id="page-title">概览</h1></div>
+          <button id="top-create" class="primary compact">＋ 新建内容</button>
+        </header>
+        <p id="toast" class="toast" role="status"></p>
+
+        <section id="overview-screen" class="screen active">
+          <div class="hero-card">
+            <div><p class="eyebrow">CHEESE CONTENT STUDIO</p><h2>统一发布论坛与二手内容。</h2><p>沿用 App 的正式发布、图片与可见性规则；所有操作均以你的真实账号身份记录。</p></div>
+            <button class="primary" data-go="create">开始发布</button>
+          </div>
+          <div class="metric-grid">
+            <article class="metric"><span>论坛草稿</span><strong id="forum-draft-count">—</strong></article>
+            <article class="metric"><span>二手草稿</span><strong id="market-draft-count">—</strong></article>
+            <article class="metric"><span>你的权限</span><strong id="role-label">—</strong></article>
+          </div>
+        </section>
+
+        <section id="create-screen" class="screen">
+          <div class="section-heading"><div><h2>新建内容</h2><p>图片会以正式发布链路写入，不会产生独立帖子模型。</p></div><button id="save-draft" class="secondary">保存草稿</button></div>
+          <form id="editor-form" class="editor-layout">
+            <article class="editor-card">
+              <div class="content-type-tabs" role="tablist">
+                <button type="button" class="type-tab active" data-kind="forum">论坛帖子</button>
+                <button type="button" class="type-tab" data-kind="secondhand">二手商品</button>
+              </div>
+              <input id="draft-id" type="hidden" />
+              <label>标题<input id="title" maxlength="120" placeholder="写一个清晰的标题" required /></label>
+              <label>正文<textarea id="description" rows="7" maxlength="5000" placeholder="补充内容、信息或交易说明"></textarea></label>
+              <div id="forum-fields" class="field-grid">
+                <label>论坛板块<select id="board-id" required></select></label>
+                <label class="toggle-row"><input id="forum-anonymous" type="checkbox" />匿名发布</label>
+              </div>
+              <div id="secondhand-fields" class="field-grid hidden">
+                <label>售价（CAD）<input id="price" type="number" min="0" max="99999999.99" step="0.01" /></label>
+                <label>原价（选填）<input id="original-price" type="number" min="0" max="99999999.99" step="0.01" /></label>
+                <label>分类<select id="category"></select></label>
+                <label>成色<select id="condition"></select></label>
+                <label class="toggle-row"><input id="market-anonymous" type="checkbox" />匿名发布</label>
+                <label class="toggle-row"><input id="negotiable" type="checkbox" />可议价</label>
+              </div>
+              <div class="form-actions"><button id="publish-button" class="primary" type="submit">发布内容</button><span id="editor-status" class="muted"></span></div>
+            </article>
+            <aside class="media-card">
+              <div class="section-heading slim"><div><h3>图片</h3><p>最多 6 张；浏览器会转换为 JPEG。</p></div><span id="media-count" class="chip">0 / 6</span></div>
+              <label class="upload-zone" for="media-input"><span>＋</span><strong>选择图片</strong><small>JPEG · 最长边 2048px</small></label>
+              <input id="media-input" type="file" accept="image/*" multiple hidden />
+              <div id="media-grid" class="media-grid"></div>
+              <div class="preview-divider"></div>
+              <div class="preview-heading"><h3>发布预览</h3><span id="preview-type" class="chip">论坛</span></div>
+              <article class="post-preview">
+                <p id="preview-context" class="preview-context">选择一个论坛板块</p>
+                <h4 id="preview-title">未命名标题</h4>
+                <p id="preview-description">正文预览会显示在这里。</p>
+                <div id="preview-media" class="preview-media">暂无图片</div>
+              </article>
+            </aside>
+          </form>
+        </section>
+
+        <section id="drafts-screen" class="screen">
+          <div class="section-heading"><div><h2>草稿</h2><p>草稿只属于当前已授权账号。</p></div><button class="secondary" data-refresh="drafts">刷新</button></div>
+          <div id="draft-list" class="content-list"></div>
+        </section>
+
+        <section id="published-screen" class="screen">
+          <div class="section-heading"><div><h2>已发布内容</h2><p>管理你通过 Content Studio 发布的同一套论坛与二手帖子。</p></div><div class="segmented"><button class="segment active" data-post-kind="forum">论坛</button><button class="segment" data-post-kind="secondhand">二手</button></div></div>
+          <div id="published-list" class="content-list"></div>
+        </section>
+      </section>
+    </div>
+
+    <template id="empty-template"><div class="empty-state"><strong>这里还没有内容</strong><span>可以新建一条内容，或稍后再刷新。</span></div></template>
+    <script src="./config.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
