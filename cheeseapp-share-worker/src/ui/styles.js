@@ -499,92 +499,82 @@ export const pageStyles = `
       .download-card {
         padding: 22px 18px;
       }
-      .open-flow-card {
-        position: relative;
+      .wechat-intercept-alert {
+        margin: 0 0 12px;
+        padding: 18px;
+        border-radius: 22px;
+        color: #4f2c00;
+        background: linear-gradient(145deg, #ffd86b 0%, #ffedb4 100%);
+        box-shadow: 0 12px 28px rgba(122, 57, 0, 0.18);
       }
-      .open-state {
+      .wechat-alert-heading {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .wechat-alert-icon {
+        width: 42px;
+        height: 42px;
+        flex: 0 0 42px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        margin: 10px 0 6px;
-        padding: 7px 12px;
-        border-radius: 999px;
-        background: #f3ead0;
-        color: #7d6220;
+        border-radius: 14px;
+        color: #ffffff;
+        background: #a83f00;
+        font-size: 26px;
+        font-weight: 900;
+      }
+      .wechat-alert-kicker {
+        margin-bottom: 2px;
+        color: #8a4b00;
         font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+      }
+      .wechat-alert-title {
+        color: #2f1b00;
+        font-size: 21px;
+        font-weight: 900;
+        line-height: 1.2;
+      }
+      .wechat-intercept-alert p {
+        margin: 14px 0 12px;
+        font-size: 15px;
+        font-weight: 650;
+        line-height: 1.55;
+      }
+      .wechat-browser-instruction {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 12px;
+        border-radius: 15px;
+        color: #ffffff;
+        background: #111827;
+        font-size: 14px;
         font-weight: 800;
-        letter-spacing: 0.03em;
+        text-align: center;
       }
-      body[data-open-state="opening"] .open-state {
-        background: #e7efff;
-        color: #1d4ed8;
+      .wechat-browser-instruction strong {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 42px;
+        padding: 2px 9px 5px;
+        border-radius: 999px;
+        color: #111827;
+        background: #ffffff;
+        font-size: 20px;
+        line-height: 1;
       }
-      body[data-open-state="wechat-ready"] .open-state {
-        background: #e8f7ec;
-        color: #17803d;
-      }
-      body[data-open-state="opened"] .open-state {
-        background: #e7f7ef;
-        color: #0f8f53;
-      }
-      .wechat-open-tag-card {
-        margin-bottom: 12px;
-        padding: 14px;
-        border-radius: 18px;
-        background: #f8f6f1;
-      }
-      .wechat-open-copy {
-        margin: 0 0 12px;
-      }
-      .wechat-open-tag-host {
-        width: 100%;
-      }
-      .wechat-open-tag-host wx-open-launch-app {
-        display: block;
-        width: 100%;
-      }
-      .wechat-help-card {
+      .wechat-open-actions {
         margin-top: 14px;
-        margin-bottom: 8px;
-        padding: 14px;
-        border-radius: 18px;
-        background: #f8f6f1;
       }
       .is-hidden {
         display: none !important;
-      }
-      .helper-steps {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-bottom: 12px;
-      }
-      .helper-step {
-        display: flex;
-        align-items: flex-start;
-        gap: 10px;
-        color: var(--text);
-        font-size: 14px;
-        line-height: 1.5;
-      }
-      .helper-index {
-        width: 22px;
-        height: 22px;
-        flex-shrink: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 999px;
-        background: #efe1a9;
-        color: #6e5714;
-        font-size: 12px;
-        font-weight: 800;
-      }
-      .copy-link-button {
-        appearance: none;
-        border: none;
-        cursor: pointer;
-        font: inherit;
       }
       .download-actions {
         display: flex;

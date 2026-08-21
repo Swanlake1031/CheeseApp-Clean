@@ -7,6 +7,7 @@ import {
   normalizeText
 } from "../utils/format.js";
 import { buildOpenPageURL } from "../utils/routes.js";
+import { renderOpenGuidance } from "./open.js";
 import { pageShell } from "../ui/shell.js";
 
 export function renderGenericPostPage({
@@ -15,13 +16,15 @@ export function renderGenericPostPage({
   config,
   metadata,
   previewImageURL,
-  detailImageURL = ""
+  detailImageURL = "",
+  showOpenGuidance = false
 }) {
   const title = metadata.title || fallbackTitle(kind);
   const description = metadata.description || fallbackDescription(kind);
   const canonicalURL = `https://${config.canonicalHost}/posts/${kind}/${postID}`;
   const deepLinkURL = `${config.appScheme}/${kind}/${postID}`;
   const openPageURL = buildOpenPageURL({ config, kind, postID });
+  const openActionURL = showOpenGuidance ? deepLinkURL : openPageURL;
   const kindLabel = kindDisplayLabel(kind);
   const chips = Array.isArray(metadata.chips) ? metadata.chips.filter(Boolean) : [];
   const detailRows = Array.isArray(metadata.detailRows)
@@ -31,14 +34,14 @@ export function renderGenericPostPage({
   const heroImageURL = detailImageURL || previewImageURL;
   const eyebrow =
     metadata.status === "unavailable"
-      ? `${config.siteName} 內容不可用`
+      ? `${config.siteName} 内容不可用`
       : `${config.siteName} ${kindLabel}`;
   const actionLabel =
-    metadata.status === "unavailable" ? "打開 Cheese" : "在 Cheese 中打開";
+    metadata.status === "unavailable" ? "打开 Cheese" : "在 Cheese 中打开";
   const subtext =
     metadata.status === "unavailable"
-      ? "這篇分享的貼文目前不可用，你仍然可以打開 Cheese 查看相關內容。"
-      : "如果沒有自動打開 App，請留在這個頁面，或回到訊息與備忘錄重新打開連結。";
+      ? "这篇分享的帖子目前不可用，你仍然可以打开 Cheese 查看相关内容。"
+      : "如果没有自动打开 App，请留在这个页面，或回到消息与备忘录重新打开链接。";
   const media = heroImageURL
     ? `
         <div class="hero-media">
@@ -61,7 +64,7 @@ export function renderGenericPostPage({
   const detailRowsMarkup = detailRows.length
     ? `
         <section class="section-card">
-          <div class="section-title">資訊</div>
+          <div class="section-title">信息</div>
           <div class="detail-grid">
             ${detailRows
               .map(
@@ -99,11 +102,12 @@ export function renderGenericPostPage({
           <div class="app-icon">🧀</div>
           <div>
             <div class="app-name">${escapeHTML(config.siteName)}</div>
-            <div class="app-subtitle">在「Cheese」App 中打開</div>
+            <div class="app-subtitle">在「Cheese」App 中打开</div>
           </div>
         </div>
-        <a class="app-open-button" href="${escapeHTML(openPageURL)}">打開</a>
+        <a class="app-open-button" href="${escapeHTML(openActionURL)}">打开</a>
       </div>
+      ${showOpenGuidance ? renderOpenGuidance({ deepLinkURL }) : ""}
       <div class="card">
         ${media}
         <div class="eyebrow">${escapeHTML(eyebrow)}</div>
@@ -111,15 +115,11 @@ export function renderGenericPostPage({
         <p class="lead-copy">${escapeHTML(description)}</p>
         ${chipsMarkup}
         <div class="cta-row">
-          <a class="button" href="${escapeHTML(openPageURL)}">${escapeHTML(actionLabel)}</a>
+          <a class="button" href="${escapeHTML(openActionURL)}">${escapeHTML(actionLabel)}</a>
         </div>
         <p class="subtle">${escapeHTML(subtext)}</p>
         ${detailRowsMarkup}
         ${bodyMarkup}
-        <div class="meta">
-          <span>貼文 ID</span>
-          <code>${escapeHTML(postID)}</code>
-        </div>
       </div>
     `
   });

@@ -43,7 +43,7 @@ export async function fetchForumMetadata({
     title: row.title || fallbackTitle("forum"),
     description: buildDescription([
       row.board_name,
-      row.is_anonymous ? "匿名貼文" : null,
+      row.is_anonymous ? "匿名帖子" : null,
       row.description
     ], fallbackDescription("forum")),
     imageURL: firstImageURL(row.images),

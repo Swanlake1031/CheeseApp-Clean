@@ -147,12 +147,12 @@ export function formatRelativeTimeText(value) {
 
   if (diffMs < hour) {
     const minutes = Math.max(1, Math.floor(diffMs / minute));
-    return `${minutes} 分鐘前`;
+    return `${minutes} 分钟前`;
   }
 
   if (diffMs < day) {
     const hours = Math.floor(diffMs / hour);
-    return `${hours} 小時前`;
+    return `${hours} 小时前`;
   }
 
   if (diffMs < week) {
@@ -165,7 +165,7 @@ export function formatRelativeTimeText(value) {
 
 export function formatAbsoluteDateText(date) {
   try {
-    return new Intl.DateTimeFormat("zh-Hant-CA", {
+    return new Intl.DateTimeFormat("zh-Hans-CA", {
       year: "numeric",
       month: "numeric",
       day: "numeric"
@@ -221,9 +221,9 @@ export function capitalize(value) {
 export function fallbackTitle(kind) {
   switch (kind) {
     case "secondhand":
-      return "Cheese 二手貼文";
+      return "Cheese 二手帖子";
     case "forum":
-      return "Cheese 論壇貼文";
+      return "Cheese 论坛帖子";
     default:
       return "Cheese 帖子";
   }
@@ -232,11 +232,11 @@ export function fallbackTitle(kind) {
 export function fallbackDescription(kind) {
   switch (kind) {
     case "secondhand":
-      return "在 Cheese 中打開這篇二手貼文。";
+      return "在 Cheese 中打开这篇二手帖子。";
     case "forum":
-      return "在 Cheese 中打開這篇論壇貼文。";
+      return "在 Cheese 中打开这篇论坛帖子。";
     default:
-      return "在 Cheese 中打開這篇貼文。";
+      return "在 Cheese 中打开这篇帖子。";
   }
 }
 
@@ -250,7 +250,7 @@ export function formatDateTimeText(value) {
   }
 
   try {
-    return new Intl.DateTimeFormat("zh-Hant-CA", {
+    return new Intl.DateTimeFormat("zh-Hans-CA", {
       year: "numeric",
       month: "numeric",
       day: "numeric",

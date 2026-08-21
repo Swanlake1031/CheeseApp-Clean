@@ -5,24 +5,27 @@ import {
   normalizeText
 } from "../utils/format.js";
 import { buildDownloadPageURL, buildOpenPageURL } from "../utils/routes.js";
+import { renderOpenGuidance } from "./open.js";
 import { pageShell } from "../ui/shell.js";
 
 export function renderForumDetailPage({
   postID,
   config,
   metadata,
-  previewImageURL
+  previewImageURL,
+  showOpenGuidance = false
 }) {
   const title = metadata.title || fallbackTitle("forum");
   const description = metadata.description || fallbackDescription("forum");
   const canonicalURL = `https://${config.canonicalHost}/posts/forum/${postID}`;
   const deepLinkURL = `${config.appScheme}/forum/${postID}`;
   const openPageURL = buildOpenPageURL({ config, kind: "forum", postID });
+  const openActionURL = showOpenGuidance ? deepLinkURL : openPageURL;
   const boardLabel = normalizeText(metadata.boardLabel) || "论坛";
   const postedAtText = normalizeText(metadata.postedAtText);
   const authorName = normalizeText(metadata.authorName) || "Cheese 用户";
   const authorAvatarURL = normalizeText(metadata.authorAvatarURL);
-  const bodyText = normalizeText(metadata.bodyText) || "這篇貼文暫時沒有內文。";
+  const bodyText = normalizeText(metadata.bodyText) || "这篇帖子暂时没有正文。";
   const likeText = normalizeText(metadata.likeText);
   const commentText = normalizeText(metadata.commentText);
   const viewText = normalizeText(metadata.viewText);
@@ -52,11 +55,12 @@ export function renderForumDetailPage({
           <div class="app-icon">🧀</div>
           <div>
             <div class="app-name">${escapeHTML(config.siteName)}</div>
-            <div class="app-subtitle">在「Cheese」App 中打開</div>
+            <div class="app-subtitle">在「Cheese」App 中打开</div>
           </div>
         </div>
-        <a class="app-open-button" href="${escapeHTML(openPageURL)}">打開</a>
+        <a class="app-open-button" href="${escapeHTML(openActionURL)}">打开</a>
       </div>
+      ${showOpenGuidance ? renderOpenGuidance({ deepLinkURL }) : ""}
       <div class="market-detail-page">
         <section class="card section-surface forum-header-card">
           <div class="top-pill-row">
@@ -71,7 +75,7 @@ export function renderForumDetailPage({
                   <div class="seller-avatar"><div class="seller-avatar-fallback">匿</div></div>
                   <div class="seller-copy">
                     <div class="seller-name">匿名</div>
-                    <div class="seller-caption">此貼文以匿名方式發佈</div>
+                    <div class="seller-caption">此帖子以匿名方式发布</div>
                   </div>
                 </div>
               `
@@ -81,7 +85,7 @@ export function renderForumDetailPage({
                     <div class="seller-avatar">${authorAvatar}</div>
                     <div class="seller-copy">
                       <div class="seller-name">${escapeHTML(authorName)}</div>
-                      <div class="seller-caption">點擊在 Cheese 中查看個人頁</div>
+                      <div class="seller-caption">点击在 Cheese 中查看个人主页</div>
                     </div>
                     <div class="seller-chevron" aria-hidden="true">›</div>
                   </div>
@@ -116,7 +120,7 @@ export function renderForumDetailPage({
           </div>
         </section>
         <section class="sticky-open-bar">
-          <a class="button sticky-open-button" href="${escapeHTML(openPageURL)}">在 Cheese 中打開</a>
+          <a class="button sticky-open-button" href="${escapeHTML(openActionURL)}">在 Cheese 中打开</a>
         </section>
       </div>
     `

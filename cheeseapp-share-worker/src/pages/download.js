@@ -32,16 +32,16 @@ export function renderDownloadPageFromData({
     kind && postID ? buildOpenPageURL({ config, kind, postID }) : deepLinkURL;
   const title =
     target === "profile"
-      ? "請在 Cheese App 中查看個人頁"
-      : "請在 Cheese App 中繼續查看";
+      ? "请在 Cheese App 中查看个人主页"
+      : "请在 Cheese App 中继续查看";
   const description =
     target === "profile"
-      ? "賣家個人頁、互動與更多內容只在 Cheese App 內提供。"
-      : "完整內容與互動功能只在 Cheese App 內提供。";
+      ? "卖家个人主页、互动与更多内容仅在 Cheese App 内提供。"
+      : "完整内容与互动功能仅在 Cheese App 内提供。";
   const secondaryLabel =
     config.appDownloadURL === `https://${config.canonicalHost}/`
       ? "了解 Cheese"
-      : "下載 Cheese";
+      : "下载 Cheese";
 
   return pageShell({
     title,
@@ -56,23 +56,23 @@ export function renderDownloadPageFromData({
           <div class="app-icon">🧀</div>
           <div>
             <div class="app-name">${escapeHTML(config.siteName)}</div>
-            <div class="app-subtitle">在「Cheese」App 中打開</div>
+            <div class="app-subtitle">在「Cheese」App 中打开</div>
           </div>
         </div>
-        <a class="app-open-button" href="${escapeHTML(openPageURL)}">打開</a>
+        <a class="app-open-button" href="${escapeHTML(openPageURL)}">打开</a>
       </div>
       <div class="card download-card">
         <div class="eyebrow">Cheese App</div>
         <h1>${escapeHTML(title)}</h1>
         <p class="lead-copy">${escapeHTML(description)}</p>
         <div class="download-actions">
-          <a class="button full-width-button" href="${escapeHTML(openPageURL)}">在 Cheese 中打開</a>
+          <a class="button full-width-button" href="${escapeHTML(openPageURL)}">在 Cheese 中打开</a>
           <a class="secondary-button full-width-button" href="${escapeHTML(config.appDownloadURL)}">${escapeHTML(secondaryLabel)}</a>
         </div>
-        <p class="subtle">如果沒有自動打開 App，請先安裝或回到分享來源重新打開這個連結。</p>
+        <p class="subtle">如果没有自动打开 App，请先安装或回到分享来源重新打开这个链接。</p>
         <div class="meta compact-meta">
-          <span>目標頁面</span>
-          <code>${escapeHTML(target === "profile" ? "個人頁 / Profile" : "貼文詳情 / Post")}</code>
+          <span>目标页面</span>
+          <code>${escapeHTML(target === "profile" ? "个人主页 / Profile" : "帖子详情 / Post")}</code>
         </div>
       </div>
     `

@@ -5,6 +5,7 @@ import {
   normalizeText
 } from "../utils/format.js";
 import { buildDownloadPageURL, buildOpenPageURL } from "../utils/routes.js";
+import { renderOpenGuidance } from "./open.js";
 import { pageShell } from "../ui/shell.js";
 
 export function renderSecondhandDetailPage({
@@ -12,13 +13,15 @@ export function renderSecondhandDetailPage({
   config,
   metadata,
   previewImageURL,
-  detailImageURL = ""
+  detailImageURL = "",
+  showOpenGuidance = false
 }) {
   const title = metadata.title || fallbackTitle("secondhand");
   const description = metadata.description || fallbackDescription("secondhand");
   const canonicalURL = `https://${config.canonicalHost}/posts/secondhand/${postID}`;
   const deepLinkURL = `${config.appScheme}/secondhand/${postID}`;
   const openPageURL = buildOpenPageURL({ config, kind: "secondhand", postID });
+  const openActionURL = showOpenGuidance ? deepLinkURL : openPageURL;
   const heroImageURL = detailImageURL;
   const sellerName = normalizeText(metadata.sellerName) || "Cheese 用户";
   const sellerAvatarURL = normalizeText(metadata.sellerAvatarURL);
@@ -41,7 +44,7 @@ export function renderSecondhandDetailPage({
         </div>
       `
     : "";
-  const sellerCaption = "點擊在 Cheese 中查看個人頁";
+  const sellerCaption = "点击在 Cheese 中查看个人主页";
   const postedMetaLine = [postedAt].filter(Boolean).join(" · ");
   const profileDownloadURL = buildDownloadPageURL({
     config,
@@ -63,11 +66,12 @@ export function renderSecondhandDetailPage({
           <div class="app-icon">🧀</div>
           <div>
             <div class="app-name">${escapeHTML(config.siteName)}</div>
-            <div class="app-subtitle">在「Cheese」App 中打開</div>
+            <div class="app-subtitle">在「Cheese」App 中打开</div>
           </div>
         </div>
-        <a class="app-open-button" href="${escapeHTML(openPageURL)}">打開</a>
+        <a class="app-open-button" href="${escapeHTML(openActionURL)}">打开</a>
       </div>
+      ${showOpenGuidance ? renderOpenGuidance({ deepLinkURL }) : ""}
       <div class="market-detail-page">
       <section class="market-media-card">
         ${
@@ -80,13 +84,13 @@ export function renderSecondhandDetailPage({
                   loading="eager"
                   onerror="this.closest('.market-media-shell')?.classList.add('market-media-failed'); this.remove();"
                 />
-                <div class="market-media-fallback">暫無圖片</div>
+                <div class="market-media-fallback">暂无图片</div>
                 <div class="category-pill category-pill-overlay">${escapeHTML(category || "二手")}</div>
               </div>
             `
             : `
               <div class="market-media market-media-rect market-media-shell market-media-failed">
-                <div class="market-media-fallback">暫無圖片</div>
+                <div class="market-media-fallback">暂无图片</div>
                 <div class="category-pill category-pill-overlay">${escapeHTML(category || "二手")}</div>
               </div>
             `
@@ -103,7 +107,7 @@ export function renderSecondhandDetailPage({
         <div class="description-block">${escapeHTML(descriptionText)}</div>
       </section>
       <section class="card section-surface">
-        <div class="section-title">賣家</div>
+        <div class="section-title">卖家</div>
         <a class="seller-link" href="${escapeHTML(profileDownloadURL)}">
           <div class="seller-row">
             <div class="seller-avatar">${sellerAvatar}</div>
@@ -116,7 +120,7 @@ export function renderSecondhandDetailPage({
         </a>
       </section>
       <section class="sticky-open-bar">
-        <a class="button sticky-open-button" href="${escapeHTML(openPageURL)}">在 Cheese 中打開</a>
+        <a class="button sticky-open-button" href="${escapeHTML(openActionURL)}">在 Cheese 中打开</a>
       </section>
       </div>
     `

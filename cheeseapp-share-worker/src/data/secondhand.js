@@ -19,10 +19,11 @@ export async function fetchSecondhandMetadata({
 }) {
   const row = await fetchSingleRow({
     config,
-    table: "secondhand_posts_view",
+    table: "rpc/get_public_secondhand_share_post",
     select:
       "id,title,description,price,condition,images,category,is_negotiable,created_at,user_name,user_avatar",
-    postID
+    postID,
+    idParameter: "p_post_id"
   });
 
   if (!row) {

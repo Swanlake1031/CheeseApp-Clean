@@ -20,7 +20,6 @@ import {
   renderDownloadPage,
   renderDownloadPageFromData
 } from "./pages/download.js";
-import { renderOpenAppPage } from "./pages/open.js";
 import { renderForumDetailPage } from "./pages/forum.js";
 import { renderSecondhandDetailPage } from "./pages/secondhand.js";
 import { renderGenericPostPage } from "./pages/post.js";
@@ -66,11 +65,26 @@ export default {
 
     const openPageMatch = matchOpenPath(url.pathname);
     if (openPageMatch) {
+      const metadata = await fetchPostMetadata({
+        kind: openPageMatch.kind,
+        postID: openPageMatch.postID,
+        config
+      });
+      const previewImageURL = buildPreviewImageURL(
+        config,
+        openPageMatch.kind,
+        openPageMatch.postID,
+        metadata.imageURL || ""
+      );
       return html(
-        renderOpenAppPage({
+        renderPostPage({
           config,
           kind: openPageMatch.kind,
-          postID: openPageMatch.postID
+          postID: openPageMatch.postID,
+          metadata,
+          previewImageURL,
+          detailImageURL: metadata.imageURL || "",
+          showOpenGuidance: true
         }),
         {
           "Cache-Control": "public, max-age=300"
@@ -303,8 +317,8 @@ function renderHomePage(config) {
     body: `
       <div class="card">
         <div class="eyebrow">Cheese 分享入口</div>
-        <h1>Cheese 公開分享頁已上線。</h1>
-        <p>這個網域負責 Cheese 的分享貼文、通用連結驗證，以及未安裝 App 時的網頁內容頁。</p>
+        <h1>Cheese 公开分享页已上线。</h1>
+        <p>这个域名用于 Cheese 的帖子分享、通用链接验证，以及未安装 App 时的网页内容页。</p>
       </div>
     `
   });
@@ -317,7 +331,8 @@ function renderPostPage({
   config,
   metadata,
   previewImageURL,
-  detailImageURL = ""
+  detailImageURL = "",
+  showOpenGuidance = false
 }) {
   if (kind === "secondhand" && metadata.status === "ok") {
     return renderSecondhandDetailPage({
@@ -326,7 +341,8 @@ function renderPostPage({
       config,
       metadata,
       previewImageURL,
-      detailImageURL
+      detailImageURL,
+      showOpenGuidance
     });
   }
 
@@ -335,7 +351,8 @@ function renderPostPage({
       postID,
       config,
       metadata,
-      previewImageURL
+      previewImageURL,
+      showOpenGuidance
     });
   }
 
@@ -345,21 +362,22 @@ function renderPostPage({
     config,
     metadata,
     previewImageURL,
-    detailImageURL
+    detailImageURL,
+    showOpenGuidance
   });
 }
 
 
 function renderInvalidPostPage(config) {
   return pageShell({
-    title: "Cheese 連結無效",
-    description: "這個 Cheese 分享連結缺少有效的貼文 ID。",
+    title: "Cheese 链接无效",
+    description: "这个 Cheese 分享链接缺少有效的帖子标识。",
     canonicalURL: `https://${config.canonicalHost}/`,
     body: `
       <div class="card">
         <div class="eyebrow">Cheese</div>
-        <h1>貼文連結無效</h1>
-        <p>這個連結沒有帶上有效的貼文識別碼，請讓發送者重新從 Cheese 分享一次。</p>
+        <h1>帖子链接无效</h1>
+        <p>这个链接没有包含有效的帖子标识，请让发送者重新从 Cheese 分享一次。</p>
       </div>
     `
   });
@@ -368,13 +386,13 @@ function renderInvalidPostPage(config) {
 function renderNotFoundPage(config) {
   return pageShell({
     title: "Cheese",
-    description: "找不到這個 Cheese 網頁。",
+    description: "找不到这个 Cheese 网页。",
     canonicalURL: `https://${config.canonicalHost}/`,
     body: `
       <div class="card">
         <div class="eyebrow">Cheese</div>
-        <h1>頁面不存在</h1>
-        <p>你要打開的 Cheese 頁面目前不存在，可能連結已失效或路徑有誤。</p>
+        <h1>页面不存在</h1>
+        <p>你要打开的 Cheese 页面目前不存在，可能链接已失效或路径有误。</p>
       </div>
     `
   });
@@ -472,12 +490,12 @@ function unavailableMetadata(kind) {
     status: "unavailable",
     title:
       kind === "secondhand"
-        ? "這篇二手貼文暫時不可用"
-        : `這篇${kindDisplayLabel(kind)}貼文暫時不可用`,
+        ? "这篇二手帖子暂时不可用"
+        : `这篇${kindDisplayLabel(kind)}帖子暂时不可用`,
     description:
       kind === "secondhand"
-        ? "這篇分享的 Cheese 二手貼文目前已下架或不可見。"
-        : "這篇分享的 Cheese 貼文目前已下架或不可見。",
+        ? "这篇分享的 Cheese 二手帖子目前已下架或不可见。"
+        : "这篇分享的 Cheese 帖子目前已下架或不可见。",
     imageURL: ""
   };
 }
