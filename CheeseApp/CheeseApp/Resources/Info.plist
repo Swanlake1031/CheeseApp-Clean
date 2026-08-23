@@ -18,6 +18,8 @@
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CheesePushEnvironment</key>
 	<string>$(APS_ENVIRONMENT)</string>
+	<key>CHEESE_AI_TRIGGER_URL</key>
+	<string>$(CHEESE_AI_TRIGGER_URL)</string>
 	<key>SUPABASE_AUTH_REDIRECT_URL</key>
 	<string>$(SUPABASE_AUTH_REDIRECT_URL)</string>
 	<key>SUPABASE_PUBLISHABLE_KEY</key>

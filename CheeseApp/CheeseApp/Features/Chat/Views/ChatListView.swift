@@ -17,7 +17,6 @@ struct ChatListView: View {
     @State private var activeRoute: ChatInboxRoute?
     @State private var rowActionErrorMessage: String?
     @State private var activeSwipeConversationId: UUID?
-    @State private var isSwipeHorizontallyDragging = false
     @State private var isSearchFieldFocused = false
     @State private var optimisticallyDeletedConversationIds: Set<UUID> = []
     @State private var optimisticallyDeletedGroupIds: Set<UUID> = []
@@ -257,16 +256,6 @@ struct ChatListView: View {
             .padding(.top, 4)
         }
         .scrollDismissesKeyboard(.interactively)
-        .scrollDisabled(isSwipeHorizontallyDragging)
-        .overlay {
-            if isSearchFieldFocused {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        dismissSearchKeyboard()
-                    }
-            }
-        }
     }
 
     private var emptyState: some View {
@@ -444,7 +433,6 @@ struct ChatListView: View {
             GroupConversationSwipeActionRow(
                 group: group,
                 activeSwipeConversationId: $activeSwipeConversationId,
-                isAnyRowHorizontallyDragging: $isSwipeHorizontallyDragging,
                 onOpenConversation: { openGroup(group) },
                 onDelete: { deleteGroupOptimistically(group) }
             )
@@ -453,7 +441,6 @@ struct ChatListView: View {
             ConversationSwipeActionRow(
                 conversation: conversation,
                 activeSwipeConversationId: $activeSwipeConversationId,
-                isAnyRowHorizontallyDragging: $isSwipeHorizontallyDragging,
                 onOpenConversation: {
                     openConversation(conversation)
                 },
@@ -512,7 +499,6 @@ private extension ChatListView {
         activeRoute = nil
         rowActionErrorMessage = nil
         activeSwipeConversationId = nil
-        isSwipeHorizontallyDragging = false
         isSearchFieldFocused = false
         optimisticallyDeletedConversationIds = []
         optimisticallyDeletedGroupIds = []

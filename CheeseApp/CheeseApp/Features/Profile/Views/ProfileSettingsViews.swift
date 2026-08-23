@@ -44,7 +44,7 @@ struct SettingsView: View {
                             settingsRow(
                                 icon: "person.crop.circle",
                                 title: L10n.tr("Edit Profile", "编辑个人资料"),
-                                subtitle: L10n.tr("Update your nickname, school and bio", "更新你的昵称、学校与个性签名")
+                                subtitle: L10n.tr("Update your nickname and bio", "更新你的昵称与个性签名")
                             )
                         }
                         .buttonStyle(.plain)
@@ -57,7 +57,7 @@ struct SettingsView: View {
                                 title: "麦马学生认证",
                                 subtitle: authService.currentUser?.hasMcMasterStudentBadge == true
                                     ? "已通过 @mcmaster.ca 邮箱认证"
-                                    : "使用 @mcmaster.ca 邮箱获取学生徽章",
+                                    : "验证后显示学生标志；目前仅开放麦马。",
                                 tint: authService.currentUser?.hasMcMasterStudentBadge == true
                                     ? Color(red: 122 / 255, green: 0, blue: 60 / 255)
                                     : AppColors.link
@@ -283,7 +283,7 @@ struct SettingsView: View {
                             settingsRow(
                                 icon: LegalDocument.acknowledgements.icon,
                                 title: LegalDocument.acknowledgements.title,
-                                subtitle: L10n.tr("Community, inspiration and open source", "社群、设计参考与开源专案")
+                                subtitle: L10n.tr("Thanks to the Cheese community", "感谢 Cheese 社群的每一份帮助")
                             )
                         }
                         .buttonStyle(.plain)

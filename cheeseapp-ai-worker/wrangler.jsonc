@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cheeseapp-ai-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-22",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./public",
+    "run_worker_first": ["/health", "/v1/comment-events"]
+  },
+  "vars": {
+    "CHEESE_AI_USER_ID": "e5983890-95ad-4b6c-814b-863bfde4e4fc",
+    "SUPABASE_URL": "https://zeuivahkowbxmfzsnagt.supabase.co"
+  },
+  "routes": [
+    {
+      "pattern": "ai.cheeseapp.org",
+      "custom_domain": true
+    }
+  ],
+  "triggers": {
+    "crons": ["* * * * *"]
+  }
+}

@@ -989,10 +989,6 @@ private struct ProfileActivityPageView: View {
         if embedsInParentScroll {
             activityRows
                 .padding(.top, 12)
-                .padding(
-                    .bottom,
-                    CheeseTabBarLayout.contentBottomClearance
-                )
         } else {
             ScrollView(showsIndicators: false) {
                 activityRows
@@ -1014,8 +1010,33 @@ private struct ProfileActivityPageView: View {
         }
     }
 
+    @ViewBuilder
     private var standardActivityRows: some View {
-        LazyVStack(spacing: 0) {
+        if embedsInParentScroll {
+            // The embedded profile pager must report its complete intrinsic
+            // height to the outer vertical ScrollView. LazyVStack can publish
+            // an estimated height while forum media is still resolving,
+            // which intermittently clips the final post behind the tab bar.
+            VStack(spacing: 0) {
+                standardActivityRowContent
+            }
+            .animation(
+                .easeInOut(duration: 0.20),
+                value: service.items.map(\.postID)
+            )
+        } else {
+            LazyVStack(spacing: 0) {
+                standardActivityRowContent
+            }
+            .animation(
+                .easeInOut(duration: 0.20),
+                value: service.items.map(\.postID)
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var standardActivityRowContent: some View {
             ForEach(service.items) { item in
                 activityRow(item)
                     .padding(
@@ -1046,11 +1067,6 @@ private struct ProfileActivityPageView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.red)
             }
-        }
-        .animation(
-            .easeInOut(duration: 0.20),
-            value: service.items.map(\.postID)
-        )
     }
 
     private var secondhandGrid: some View {

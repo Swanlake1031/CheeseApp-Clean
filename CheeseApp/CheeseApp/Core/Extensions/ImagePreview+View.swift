@@ -25,6 +25,78 @@ enum ImagePreviewDismissalPolicy {
     }
 }
 
+enum FullscreenImagePagingPolicy {
+    static let snapAnimation = Animation.spring(response: 0.3, dampingFraction: 0.88)
+    static let edgeResistance: CGFloat = 0.2
+
+    static func clampedIndex(_ index: Int, imageCount: Int) -> Int {
+        min(max(index, 0), max(imageCount - 1, 0))
+    }
+
+    static func snappedOffset(
+        index: Int,
+        imageCount: Int,
+        pageWidth: CGFloat
+    ) -> CGFloat {
+        -CGFloat(clampedIndex(index, imageCount: imageCount)) * max(pageWidth, 0)
+    }
+
+    static func isHorizontalIntent(_ translation: CGSize) -> Bool {
+        abs(translation.width) >= max(abs(translation.height) * 1.15, 8)
+    }
+
+    static func interactiveTranslation(
+        _ translation: CGFloat,
+        currentIndex: Int,
+        imageCount: Int,
+        pageWidth: CGFloat
+    ) -> CGFloat {
+        guard imageCount > 1, pageWidth > 0 else { return 0 }
+
+        let index = clampedIndex(currentIndex, imageCount: imageCount)
+        let bounded = min(max(translation, -pageWidth), pageWidth)
+        let isDraggingPastFirst = index == 0 && bounded > 0
+        let isDraggingPastLast = index == imageCount - 1 && bounded < 0
+
+        if isDraggingPastFirst || isDraggingPastLast {
+            return bounded * edgeResistance
+        }
+        return bounded
+    }
+
+    static func destinationIndex(
+        currentIndex: Int,
+        imageCount: Int,
+        pageWidth: CGFloat,
+        translation: CGFloat,
+        predictedEndTranslation: CGFloat
+    ) -> Int {
+        let index = clampedIndex(currentIndex, imageCount: imageCount)
+        guard imageCount > 1, pageWidth > 0 else { return index }
+
+        let threshold = min(max(pageWidth * 0.22, 64), 110)
+        let maximumProjection = min(pageWidth * 0.32, 140)
+        let projectedDelta = min(
+            max(predictedEndTranslation - translation, -maximumProjection),
+            maximumProjection
+        )
+        let controlledProjection = translation + projectedDelta
+        let sameDirection = translation == 0
+            || controlledProjection == 0
+            || (translation < 0) == (controlledProjection < 0)
+        let crossedDistanceThreshold = abs(translation) >= threshold
+        let isControlledFlick = abs(translation) >= 12
+            && sameDirection
+            && abs(controlledProjection) >= threshold
+
+        guard crossedDistanceThreshold || isControlledFlick else { return index }
+
+        let directionSource = crossedDistanceThreshold ? translation : controlledProjection
+        let proposedIndex = directionSource < 0 ? index + 1 : index - 1
+        return clampedIndex(proposedIndex, imageCount: imageCount)
+    }
+}
+
 // MARK: - Image Preview
 
 private struct TapToPreviewImageModifier: ViewModifier {
@@ -101,6 +173,9 @@ private struct RemoteImageGalleryPreviewView: View {
     @State private var dismissOverlayOpacity: Double = 1
     @State private var isDismissingInteractively = false
     @State private var zoomedImageIndices: Set<Int> = []
+    @State private var pagingDragOffset: CGFloat = 0
+    @State private var isPagingDragActive = false
+    @State private var isPagingAnimationLocked = false
 
     init(imageURLs: [URL], initialIndex: Int) {
         self.imageURLs = imageURLs
@@ -115,35 +190,54 @@ private struct RemoteImageGalleryPreviewView: View {
                 .opacity(backgroundOpacity)
                 .ignoresSafeArea()
 
-            TabView(selection: $currentIndex) {
-                ForEach(Array(imageURLs.enumerated()), id: \.offset) { index, imageURL in
-                    ZoomableImageScrollView(
-                        isZoomed: Binding(
-                            get: { zoomedImageIndices.contains(index) },
-                            set: { isZoomed in
-                                if isZoomed {
-                                    zoomedImageIndices.insert(index)
-                                } else {
-                                    zoomedImageIndices.remove(index)
+            GeometryReader { proxy in
+                let pageWidth = max(proxy.size.width, 1)
+                let pageHeight = max(proxy.size.height, 1)
+
+                HStack(spacing: 0) {
+                    ForEach(Array(imageURLs.enumerated()), id: \.offset) { index, imageURL in
+                        ZoomableImageScrollView(
+                            isZoomed: Binding(
+                                get: { zoomedImageIndices.contains(index) },
+                                set: { isZoomed in
+                                    if isZoomed {
+                                        zoomedImageIndices.insert(index)
+                                    } else {
+                                        zoomedImageIndices.remove(index)
+                                    }
                                 }
+                            ),
+                            onSingleTap: { dismiss() }
+                        ) {
+                            CachedRemoteImage(url: imageURL) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFit()
+                            } placeholder: {
+                                ProgressView()
+                                    .tint(.white)
                             }
-                        ),
-                        onSingleTap: { dismiss() }
-                    ) {
-                        CachedRemoteImage(url: imageURL) { image in
-                            image
-                                .resizable()
-                                .scaledToFit()
-                        } placeholder: {
-                            ProgressView()
-                                .tint(.white)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(width: pageWidth, height: pageHeight)
                     }
-                    .tag(index)
                 }
+                .frame(
+                    width: pageWidth * CGFloat(imageURLs.count),
+                    height: pageHeight,
+                    alignment: .leading
+                )
+                .offset(
+                    x: FullscreenImagePagingPolicy.snappedOffset(
+                        index: currentIndex,
+                        imageCount: imageURLs.count,
+                        pageWidth: pageWidth
+                    ) + pagingDragOffset
+                )
+                .contentShape(Rectangle())
+                .simultaneousGesture(pagingGesture(pageWidth: pageWidth))
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+            .clipped()
             .scaleEffect(dismissScale)
             .offset(dismissDragOffset)
             .simultaneousGesture(galleryDismissGesture)
@@ -200,13 +294,74 @@ private struct RemoteImageGalleryPreviewView: View {
         }
     }
 
-    /// Horizontal movement belongs exclusively to the paging `TabView`.
-    /// Keeping gallery dismissal vertical prevents the page gesture and the
-    /// dismissal gesture from translating the same content at once.
+    private func pagingGesture(pageWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in
+                guard !isPagingAnimationLocked else { return }
+                guard !isDismissingInteractively, dismissDragOffset == .zero else { return }
+                guard !isCurrentImageZoomed else { return }
+
+                if !isPagingDragActive {
+                    guard FullscreenImagePagingPolicy.isHorizontalIntent(value.translation) else {
+                        return
+                    }
+                    isPagingDragActive = true
+                }
+
+                pagingDragOffset = FullscreenImagePagingPolicy.interactiveTranslation(
+                    value.translation.width,
+                    currentIndex: currentIndex,
+                    imageCount: imageURLs.count,
+                    pageWidth: pageWidth
+                )
+            }
+            .onEnded { value in
+                guard isPagingDragActive else { return }
+                isPagingDragActive = false
+                guard !isPagingAnimationLocked else { return }
+
+                let targetIndex = FullscreenImagePagingPolicy.destinationIndex(
+                    currentIndex: currentIndex,
+                    imageCount: imageURLs.count,
+                    pageWidth: pageWidth,
+                    translation: value.translation.width,
+                    predictedEndTranslation: value.predictedEndTranslation.width
+                )
+                settlePaging(at: targetIndex)
+            }
+    }
+
+    private func settlePaging(at proposedIndex: Int) {
+        guard !isPagingAnimationLocked else { return }
+        isPagingAnimationLocked = true
+        let targetIndex = FullscreenImagePagingPolicy.clampedIndex(
+            proposedIndex,
+            imageCount: imageURLs.count
+        )
+
+        withAnimation(
+            FullscreenImagePagingPolicy.snapAnimation,
+            completionCriteria: .logicallyComplete
+        ) {
+            currentIndex = targetIndex
+            pagingDragOffset = 0
+        } completion: {
+            currentIndex = FullscreenImagePagingPolicy.clampedIndex(
+                currentIndex,
+                imageCount: imageURLs.count
+            )
+            pagingDragOffset = 0
+            isPagingAnimationLocked = false
+        }
+    }
+
+    /// Gallery dismissal stays vertical so it never translates the same axis
+    /// as the custom pager during a single gesture.
     private var galleryDismissGesture: some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { value in
                 guard !isDismissingInteractively else { return }
+                guard !isPagingAnimationLocked, !isPagingDragActive else { return }
                 guard !isCurrentImageZoomed else { return }
                 guard dismissDragOffset != .zero || canBeginDismissDrag(value.translation) else {
                     return
@@ -214,6 +369,7 @@ private struct RemoteImageGalleryPreviewView: View {
                 dismissDragOffset = dismissTranslation(for: value.translation)
             }
             .onEnded { value in
+                guard !isPagingDragActive else { return }
                 guard dismissDragOffset != .zero else { return }
 
                 if ImagePreviewDismissalPolicy.shouldDismiss(

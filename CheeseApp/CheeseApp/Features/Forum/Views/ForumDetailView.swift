@@ -824,6 +824,11 @@ struct ForumDetailView: View {
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.white)
                     }
+            } else if comment.userId == CheeseAIIdentity.userID {
+                CheeseAIAvatarView(
+                    remoteURLString: comment.authorAvatar,
+                    size: size
+                )
             } else if let avatar = comment.authorAvatar,
                       let url = URL(string: avatar),
                       !avatar.isEmpty {

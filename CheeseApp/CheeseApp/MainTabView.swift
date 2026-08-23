@@ -615,15 +615,13 @@ struct CompleteProfileOnboardingView: View {
     @EnvironmentObject private var authService: AuthService
 
     @State private var fullName: String = ""
-    @State private var school: String = ""
-    @State private var schoolSuggestions: [CheeseUniversityOption] = []
     @State private var gender: String = ""
     @State private var occupation: String = ""
+    @State private var hasHydratedProfileDraft = false
     @State private var didAttemptSave = false
     @State private var isSaving = false
     @State private var isLeaving = false
     @State private var errorMessage: String?
-    @FocusState private var isSchoolFieldFocused: Bool
 
     private let genderOptions: [(value: String, label: String)] = [
         ("male", "男"),
@@ -632,19 +630,9 @@ struct CompleteProfileOnboardingView: View {
         ("prefer_not_to_say", "暂不透露")
     ]
 
-    private var selectedSchoolOption: CheeseUniversityOption? {
-        CheeseUniversityOption.option(matching: school)
-    }
-
     private var canSave: Bool {
         !fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !gender.isEmpty
-    }
-
-    private var shouldShowSchoolValidationError: Bool {
-        didAttemptSave
-            && !school.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && selectedSchoolOption == nil
     }
 
     private var shouldShowNameValidationError: Bool {
@@ -689,7 +677,7 @@ struct CompleteProfileOnboardingView: View {
                             }
                         }
 
-                        Text("首次进入需要补充信息。昵称和性别为必填，学校与职业可选。")
+                        Text("首次进入需要补充信息。昵称和性别为必填，职业可选。")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(AppColors.textMuted)
 
@@ -713,7 +701,7 @@ struct CompleteProfileOnboardingView: View {
                             .padding(.horizontal, 2)
                         }
 
-                        schoolPickerField
+                        studentVerificationInfo
 
                         NavigationLink(destination: McMasterVerificationView()) {
                             HStack(spacing: 12) {
@@ -724,7 +712,7 @@ struct CompleteProfileOnboardingView: View {
                                     Text("麦马学生验证")
                                         .font(.system(size: 15, weight: .semibold))
                                         .foregroundStyle(AppColors.textPrimary)
-                                    Text("验证 McMaster 学生邮箱；也可以稍后在设置里完成。")
+                                    Text("使用 @mcmaster.ca 邮箱完成验证；也可以稍后在设置里完成。")
                                         .font(.system(size: 12))
                                         .foregroundStyle(AppColors.textMuted)
                                 }
@@ -811,40 +799,31 @@ struct CompleteProfileOnboardingView: View {
                 .scrollDismissesKeyboard(.interactively)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    isSchoolFieldFocused = false
                     hideKeyboard()
                 }
             }
             .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .navigationBar)
             .onAppear {
-                if let profile = authService.currentUser {
-                    let existingName = profile.fullName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    fullName = existingName
-                    if let validSchool = CheeseUniversityOption.option(matching: profile.school) {
-                        school = validSchool.name
-                    } else {
-                        school = ""
-                    }
-                    occupation = profile.occupation ?? ""
-                    if let existingGender = profile.gender, !existingGender.isEmpty {
-                        gender = existingGender
-                    }
-                } else {
-                    fullName = ""
-                    school = ""
-                }
+                hydrateProfileDraftIfNeeded()
             }
-            .onChange(of: school) { _, newValue in
-                refreshSchoolSuggestions(for: newValue)
-            }
-            .onChange(of: isSchoolFieldFocused) { _, focused in
-                if focused {
-                    refreshSchoolSuggestions(for: school)
-                } else {
-                    schoolSuggestions = []
-                }
-            }
+        }
+    }
+
+    private func hydrateProfileDraftIfNeeded() {
+        // Returning from McMaster verification triggers onAppear again. Only
+        // hydrate once so the server's still-incomplete profile cannot erase
+        // the nickname, gender, or occupation entered in this onboarding run.
+        guard !hasHydratedProfileDraft,
+              let profile = authService.currentUser
+        else { return }
+
+        hasHydratedProfileDraft = true
+        fullName = profile.fullName?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        occupation = profile.occupation ?? ""
+        if let existingGender = profile.gender, !existingGender.isEmpty {
+            gender = existingGender
         }
     }
 
@@ -854,100 +833,25 @@ struct CompleteProfileOnboardingView: View {
             .foregroundStyle(AppColors.textPrimary)
     }
 
-    private var schoolPickerField: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            fieldTitle("学校（选填）")
-
-            VStack(spacing: 0) {
-                HStack(spacing: 12) {
-                    Image(systemName: "building.columns.fill")
-                        .foregroundStyle(AppColors.textMuted)
-                        .frame(width: 24)
-
-                    TextField("点击输入学校", text: $school)
-                        .focused($isSchoolFieldFocused)
-                        .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled(true)
-                        .foregroundStyle(AppColors.textPrimary)
-
-                    if selectedSchoolOption != nil {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(AppColors.link)
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .profileOnboardingOutline(cornerRadius: 12)
-
-                if isSchoolFieldFocused && !schoolSuggestions.isEmpty {
-                    VStack(spacing: 0) {
-                        ForEach(Array(schoolSuggestions.enumerated()), id: \.element.id) { index, option in
-                            Button {
-                                applySchoolSelection(option)
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "building.columns")
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(.secondary)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(option.name)
-                                            .font(.system(size: 14, weight: .medium))
-                                            .foregroundStyle(AppColors.textPrimary)
-                                            .lineLimit(1)
-                                        Text(option.city)
-                                            .font(.system(size: 12))
-                                            .foregroundStyle(AppColors.textMuted)
-                                            .lineLimit(1)
-                                    }
-                                    Spacer(minLength: 0)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 11)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-
-                            if index < schoolSuggestions.count - 1 {
-                                Divider()
-                                    .padding(.leading, 35)
-                            }
-                        }
-                    }
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .profileOnboardingOutline(cornerRadius: 12)
-                }
-            }
-            if shouldShowSchoolValidationError {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.red)
-                    Text("请选择下拉列表中的正确学校")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.red)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 2)
-            }
+    private var studentVerificationInfo: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("学生验证")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppColors.textPrimary)
+            Text("完成验证后，个人资料会显示学生标志。目前仅开放麦马验证，其他学校将陆续开放。验证是为了提升社区安全与信任；不想验证或已毕业，也欢迎使用 Cheese。")
+                .font(.system(size: 13))
+                .foregroundStyle(AppColors.textMuted)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .padding(14)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .profileOnboardingOutline(cornerRadius: 12)
     }
 
     private func saveProfile() async {
         didAttemptSave = true
         guard !isSaving else { return }
-        let normalizedSchool = school.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !normalizedSchool.isEmpty, selectedSchoolOption == nil {
-            errorMessage = "请选择下拉列表中的正确学校"
-            isSchoolFieldFocused = true
-            return
-        }
         guard canSave else { return }
         if fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             errorMessage = "请填写昵称"
@@ -964,7 +868,7 @@ struct CompleteProfileOnboardingView: View {
         do {
             try await authService.completeProfile(
                 fullName: fullName,
-                school: selectedSchoolOption?.name ?? "",
+                school: authService.currentUser?.school ?? CheeseUniversityOption.defaultSchoolName,
                 gender: gender,
                 occupation: occupation
             )
@@ -976,34 +880,9 @@ struct CompleteProfileOnboardingView: View {
     private func leaveProfileCompletion() async {
         guard !isLeaving, !isSaving else { return }
         isLeaving = true
-        isSchoolFieldFocused = false
         hideKeyboard()
         await authService.leaveProfileCompletion()
         isLeaving = false
-    }
-
-    private func refreshSchoolSuggestions(for rawInput: String) {
-        let query = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else {
-            schoolSuggestions = []
-            return
-        }
-
-        let lower = query.lowercased()
-        schoolSuggestions = Array(
-            CheeseUniversityOption.all.filter { option in
-                option.name.lowercased().contains(lower)
-                    || option.displayText.lowercased().contains(lower)
-                    || option.city.lowercased().contains(lower)
-            }
-            .prefix(12)
-        )
-    }
-
-    private func applySchoolSelection(_ option: CheeseUniversityOption) {
-        school = option.name
-        schoolSuggestions = []
-        isSchoolFieldFocused = false
     }
 
 }

@@ -77,10 +77,7 @@ struct CreateForumView: View {
             hasDraft: CreateDraftStore.hasDraft(.forum),
             installsSwipeBackGesture: true,
             onClose: attemptClose,
-            onSubmit: {
-                dismissKeyboard()
-                Task { await submit() }
-            },
+            onSubmit: attemptSubmit,
             onSaveDraft: {
                 saveDraft(showBanner: false)
                 finishExitNavigation()
@@ -92,6 +89,7 @@ struct CreateForumView: View {
             },
             onBoardSelected: { board in
                 selectedBoardID = board.id
+                errorMessage = nil
                 normalizeAnonymousChoice(
                     for: board,
                     showAutomaticAnonymousBanner: board.requiresAnonymousPosts
@@ -173,8 +171,44 @@ struct CreateForumView: View {
         }
     }
 
+    private func attemptSubmit() {
+        guard !isLoading else { return }
+
+        if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            presentValidationMessage(L10n.tr("Please enter a title", "请填写标题"))
+            isTitleFocused = true
+            isContentFocused = false
+            return
+        }
+
+        guard selectedBoard != nil else {
+            presentValidationMessage(L10n.tr("Please choose a board", "请选择板块"))
+            return
+        }
+
+        errorMessage = nil
+        dismissKeyboard()
+        Task { await submit() }
+    }
+
+    private func presentValidationMessage(_ message: String) {
+        errorMessage = message
+        showDraftBanner(message, duration: 2)
+    }
+
     private func submit() async {
-        guard !isLoading, let board = selectedBoard else { return }
+        guard !isLoading else { return }
+
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            presentValidationMessage(L10n.tr("Please enter a title", "请填写标题"))
+            return
+        }
+        guard let board = selectedBoard else {
+            presentValidationMessage(L10n.tr("Please choose a board", "请选择板块"))
+            return
+        }
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -187,18 +221,18 @@ struct CreateForumView: View {
             }
             let publishedID = try await service.publishPost(
                 input: ForumCreateInput(
-                postId: publishRequestID,
-                userId: userID,
-                schoolId: schoolID,
-                title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-                content: content.trimmingCharacters(in: .whitespacesAndNewlines),
-                isAnonymous: board.requiresAnonymousPosts || isAnonymous,
-                isPrivate: isPrivate,
-                boardID: board.id,
-                mentionedUserIDs: MentionTextLogic.activeUserIDs(
-                    in: content,
-                    selected: selectedMentions
-                )
+                    postId: publishRequestID,
+                    userId: userID,
+                    schoolId: schoolID,
+                    title: trimmedTitle,
+                    content: content.trimmingCharacters(in: .whitespacesAndNewlines),
+                    isAnonymous: board.requiresAnonymousPosts || isAnonymous,
+                    isPrivate: isPrivate,
+                    boardID: board.id,
+                    mentionedUserIDs: MentionTextLogic.activeUserIDs(
+                        in: content,
+                        selected: selectedMentions
+                    )
                 ),
                 images: selectedImages
             )

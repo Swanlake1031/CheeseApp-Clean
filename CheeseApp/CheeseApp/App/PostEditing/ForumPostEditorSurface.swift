@@ -42,6 +42,14 @@ struct ForumPostEditorSurface: View {
             && title.count <= ForumComposerRules.maximumTitleLength
     }
 
+    private var isSubmitEnabled: Bool {
+        !isSubmitting && (!isEditing || isValid)
+    }
+
+    private var usesActiveSubmitStyle: Bool {
+        !isEditing || isValid
+    }
+
     var body: some View {
         ZStack {
             AppColors.pageBackground.ignoresSafeArea()
@@ -141,11 +149,11 @@ struct ForumPostEditorSurface: View {
                 .foregroundStyle(.white)
                 .frame(minWidth: 62)
                 .frame(height: 40)
-                .background(isValid ? AppColors.accentStrong : Color.gray.opacity(0.38))
+                .background(usesActiveSubmitStyle ? AppColors.accentStrong : Color.gray.opacity(0.38))
                 .clipShape(Capsule())
             }
             .buttonStyle(.plain)
-            .disabled(!isValid || isSubmitting)
+            .disabled(!isSubmitEnabled)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

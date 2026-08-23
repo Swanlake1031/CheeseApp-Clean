@@ -11,21 +11,9 @@ import PhotosUI
 
 private enum EditProfileFocusField: Hashable {
     case fullName
-    case school
     case bio
     case occupation
     case phone
-}
-
-private struct EditProfileSchoolFieldFrameKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        let nextValue = nextValue()
-        if nextValue != .zero {
-            value = nextValue
-        }
-    }
 }
 
 struct EditProfileView: View {
@@ -33,8 +21,6 @@ struct EditProfileView: View {
     @EnvironmentObject var authService: AuthService
 
     @State private var fullName: String = ""
-    @State private var school: String = ""
-    @State private var schoolSuggestions: [CheeseUniversityOption] = []
     @State private var phoneNumber: String = ""
     @State private var gender: String = ""
     @State private var isGenderVisible = true
@@ -49,7 +35,6 @@ struct EditProfileView: View {
     @State private var avatarURLString: String = ""
     @State private var saveErrorMessage: String?
     @State private var showingAvatarActionPreview = false
-    @State private var schoolFieldFrame: CGRect = .zero
     @FocusState private var focusedField: EditProfileFocusField?
 
     private let genderOptions: [(value: String, label: String)] = [
@@ -59,37 +44,13 @@ struct EditProfileView: View {
         ("prefer_not_to_say", "暂不透露")
     ]
 
-    private var selectedSchoolOption: CheeseUniversityOption? {
-        CheeseUniversityOption.option(matching: school)
-    }
-
-    private var isSchoolSelectionInvalid: Bool {
-        selectedSchoolOption == nil
-            && !school.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var shouldShowSchoolSuggestions: Bool {
-        focusedField == .school
-            && !schoolSuggestions.isEmpty
-            && schoolFieldFrame.width > 0
-    }
-
-    private var schoolSuggestionDropdownWidth: CGFloat {
-        schoolFieldFrame.width
-    }
-
-    private var schoolSuggestionDropdownHeight: CGFloat {
-        let rowHeight: CGFloat = 58
-        let dividerHeight: CGFloat = 1
-        let count = schoolSuggestions.count
-        guard count > 0 else { return 0 }
-        let contentHeight = CGFloat(count) * rowHeight + CGFloat(max(count - 1, 0)) * dividerHeight
-        return min(contentHeight, 236)
+    private var storedSchoolName: String {
+        authService.currentUser?.school ?? CheeseUniversityOption.defaultSchoolName
     }
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .topLeading) {
+            ZStack {
                 AppColors.pageBackground
                     .ignoresSafeArea()
 
@@ -110,13 +71,13 @@ struct EditProfileView: View {
                                 textInputAutocapitalization: .words,
                                 submitLabel: .next
                             ) {
-                                focusedField = .school
+                                focusedField = .bio
                             }
 
                             Divider()
                                 .padding(.leading, 16)
 
-                            schoolPickerField
+                            studentVerificationInfo
 
                             Divider()
                                 .padding(.leading, 16)
@@ -174,18 +135,6 @@ struct EditProfileView: View {
                     .padding(.bottom, 40)
                 }
                 .scrollDismissesKeyboard(.interactively)
-
-                if shouldShowSchoolSuggestions {
-                    schoolSuggestionDropdown
-                        .frame(width: schoolSuggestionDropdownWidth)
-                        .offset(x: schoolFieldFrame.minX, y: schoolFieldFrame.maxY + 8)
-                        .zIndex(100)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-            }
-            .coordinateSpace(name: "editProfileForm")
-            .onPreferenceChange(EditProfileSchoolFieldFrameKey.self) { frame in
-                schoolFieldFrame = frame
             }
             .navigationTitle(L10n.tr("Edit Profile", "编辑资料"))
             .navigationBarTitleDisplayMode(.inline)
@@ -240,28 +189,9 @@ struct EditProfileView: View {
                     }
                 }
             }
-            .onChange(of: school) { _, newValue in
-                if focusedField == .school {
-                    scheduleSchoolSuggestionRefresh(for: newValue)
-                } else {
-                    schoolSuggestions = []
-                }
-            }
-            .onChange(of: focusedField) { _, newField in
-                if newField == .school {
-                    scheduleSchoolSuggestionRefresh(for: school)
-                } else {
-                    schoolSuggestions = []
-                }
-            }
             .onAppear {
                 guard let user = authService.currentUser else { return }
                 fullName = user.fullName ?? ""
-                if let validSchool = CheeseUniversityOption.option(matching: user.school) {
-                    school = validSchool.name
-                } else {
-                    school = user.school ?? ""
-                }
                 phoneNumber = user.phoneNumber ?? ""
                 let savedGender = user.gender ?? ""
                 gender = genderOptions.contains(where: { $0.value == savedGender }) ? savedGender : ""
@@ -423,7 +353,7 @@ struct EditProfileView: View {
                     Text("麦马学生认证")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(AppColors.textPrimary)
-                    Text("使用 @mcmaster.ca 邮箱获取学生徽章")
+                    Text("使用 @mcmaster.ca 邮箱完成验证")
                         .font(.system(size: 12))
                         .foregroundStyle(AppColors.textMuted)
                 }
@@ -439,122 +369,24 @@ struct EditProfileView: View {
         .buttonStyle(.plain)
     }
 
-    private var schoolPickerField: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Text("学校")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(AppColors.textMuted)
-                .frame(width: 66, alignment: .leading)
+    private var studentVerificationInfo: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "checkmark.seal.fill")
+                .foregroundStyle(AppColors.accentStrong)
+                .frame(width: 24)
 
-            VStack(alignment: .leading, spacing: 8) {
-                TextField("点击输入学校", text: $school)
-                    .focused($focusedField, equals: .school)
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("学生验证")
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(AppColors.textPrimary)
-                    .submitLabel(.done)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                if isSchoolSelectionInvalid && (focusedField != .school || schoolSuggestions.isEmpty) {
-                    Text("请从下拉列表里选择正确学校")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.red)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if selectedSchoolOption != nil {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(AppColors.link)
-                    .padding(.top, 2)
+                Text("完成验证后，个人资料会显示学生标志。目前仅开放麦马验证，其他学校将陆续开放。验证是为了提升社区安全与信任；不想验证或已毕业，也欢迎使用 Cheese。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(AppColors.textMuted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 15)
-        .background {
-            GeometryReader { proxy in
-                Color.clear
-                    .preference(
-                        key: EditProfileSchoolFieldFrameKey.self,
-                        value: proxy.frame(in: .named("editProfileForm"))
-                    )
-            }
-        }
-    }
-
-    private var schoolSuggestionDropdown: some View {
-        ScrollView(showsIndicators: schoolSuggestions.count > 4) {
-            VStack(spacing: 0) {
-                ForEach(Array(schoolSuggestions.enumerated()), id: \.element.id) { index, option in
-                    Button {
-                        applySchoolSelection(option)
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "building.columns")
-                                .font(.system(size: 13))
-                                .foregroundStyle(.secondary)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(option.name)
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(AppColors.textPrimary)
-                                    .lineLimit(1)
-
-                                Text(option.city)
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(AppColors.textMuted)
-                                    .lineLimit(1)
-                            }
-
-                            Spacer(minLength: 0)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 11)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-
-                    if index < schoolSuggestions.count - 1 {
-                        Divider()
-                            .padding(.leading, 38)
-                    }
-                }
-            }
-        }
-        .frame(height: schoolSuggestionDropdownHeight, alignment: .top)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color(.systemGray5), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
-    }
-
-    private func scheduleSchoolSuggestionRefresh(for rawInput: String) {
-        let query = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else {
-            schoolSuggestions = Array(CheeseUniversityOption.all.prefix(8))
-            return
-        }
-
-        let lower = query.lowercased()
-        schoolSuggestions = Array(
-            CheeseUniversityOption.all.filter { option in
-                option.name.lowercased().contains(lower)
-                    || option.displayText.lowercased().contains(lower)
-                    || option.city.lowercased().contains(lower)
-            }
-            .prefix(8)
-        )
-    }
-
-    private func applySchoolSelection(_ option: CheeseUniversityOption) {
-        school = option.name
-        schoolSuggestions = []
-        focusedField = nil
+        .padding(.vertical, 13)
     }
 
     private var avatarEditorView: some View {
@@ -763,13 +595,6 @@ struct EditProfileView: View {
             return
         }
 
-        let normalizedSchool = school.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !normalizedSchool.isEmpty, selectedSchoolOption == nil {
-            saveErrorMessage = "请从下拉列表里选择正确学校"
-            focusedField = .school
-            return
-        }
-
         let userId: UUID
         do {
             userId = try await authService.requireAuthUserId()
@@ -790,7 +615,7 @@ struct EditProfileView: View {
             let input = ProfileUpdateInput(
                 userId: userId,
                 fullName: normalizedFullName,
-                schoolName: selectedSchoolOption?.name ?? "",
+                schoolName: storedSchoolName,
                 avatarURL: avatarURLToSave,
                 gender: gender,
                 isGenderVisible: isGenderVisible,

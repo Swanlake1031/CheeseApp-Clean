@@ -692,6 +692,124 @@ final class PostCorrectnessTests: XCTestCase {
         ))
     }
 
+    func testFullscreenPagingClampsIndicesAndSnapsToExactPageWidth() {
+        XCTAssertEqual(
+            FullscreenImagePagingPolicy.clampedIndex(-3, imageCount: 3),
+            0
+        )
+        XCTAssertEqual(
+            FullscreenImagePagingPolicy.clampedIndex(8, imageCount: 3),
+            2
+        )
+        XCTAssertEqual(
+            FullscreenImagePagingPolicy.snappedOffset(
+                index: 2,
+                imageCount: 3,
+                pageWidth: 390
+            ),
+            -780
+        )
+    }
+
+    func testFullscreenPagingMovesAtMostOnePageForDistanceOrFastFlick() {
+        XCTAssertEqual(
+            FullscreenImagePagingPolicy.destinationIndex(
+                currentIndex: 1,
+                imageCount: 5,
+                pageWidth: 390,
+                translation: -100,
+                predictedEndTranslation: -100
+            ),
+            2
+        )
+        XCTAssertEqual(
+            FullscreenImagePagingPolicy.destinationIndex(
+                currentIndex: 1,
+                imageCount: 5,
+                pageWidth: 390,
+                translation: -24,
+                predictedEndTranslation: -2_000
+            ),
+            2
+        )
+        XCTAssertEqual(
+            FullscreenImagePagingPolicy.destinationIndex(
+                currentIndex: 3,
+                imageCount: 5,
+                pageWidth: 390,
+                translation: 26,
+                predictedEndTranslation: 2_000
+            ),
+            2
+        )
+    }
+
+    func testFullscreenPagingReboundsBelowThresholdAndIgnoresReversedProjection() {
+        XCTAssertEqual(
+            FullscreenImagePagingPolicy.destinationIndex(
+                currentIndex: 1,
+                imageCount: 3,
+                pageWidth: 390,
+                translation: -35,
+                predictedEndTranslation: -44
+            ),
+            1
+        )
+        XCTAssertEqual(
+            FullscreenImagePagingPolicy.destinationIndex(
+                currentIndex: 1,
+                imageCount: 3,
+                pageWidth: 390,
+                translation: 30,
+                predictedEndTranslation: -2_000
+            ),
+            1
+        )
+    }
+
+    func testFullscreenPagingResistsAndClampsOuterEdges() {
+        XCTAssertEqual(
+            FullscreenImagePagingPolicy.interactiveTranslation(
+                100,
+                currentIndex: 0,
+                imageCount: 3,
+                pageWidth: 390
+            ),
+            20,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            FullscreenImagePagingPolicy.interactiveTranslation(
+                -100,
+                currentIndex: 2,
+                imageCount: 3,
+                pageWidth: 390
+            ),
+            -20,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            FullscreenImagePagingPolicy.destinationIndex(
+                currentIndex: 0,
+                imageCount: 3,
+                pageWidth: 390,
+                translation: 180,
+                predictedEndTranslation: 2_000
+            ),
+            0
+        )
+        XCTAssertEqual(
+            FullscreenImagePagingPolicy.destinationIndex(
+                currentIndex: 2,
+                imageCount: 3,
+                pageWidth: 390,
+                translation: -180,
+                predictedEndTranslation: -2_000
+            ),
+            2
+        )
+    }
+
     func testSwipeBackDoesNotRunSimultaneouslyWithScrollViewPan() {
         XCTAssertFalse(SwipeBackGesturePolicy.shouldRecognizeSimultaneously(
             isInteractivePopGesture: true,

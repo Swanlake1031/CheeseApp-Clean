@@ -26,7 +26,7 @@ enum LegalDocument: String, Identifiable {
         case .userAgreement:
             L10n.tr("The terms that apply when you use Cheese", "使用 Cheese 时适用的基本约定")
         case .acknowledgements:
-            L10n.tr("Thanks to the people, communities and technology behind Cheese", "感谢成就 Cheese 的社群、伙伴与技术")
+            L10n.tr("Thanks to everyone who helps build the Cheese community", "感谢每一位让 Cheese 变得更好的人")
         }
     }
 
@@ -49,25 +49,7 @@ enum LegalDocument: String, Identifiable {
     }
 
     var links: [LegalReferenceLink] {
-        guard self == .acknowledgements else { return [] }
-        return [
-            .init(
-                title: .init("Dcard Community Guidelines", "Dcard 社群守则与规范"),
-                destination: "https://support.dcard.in/hc/zh-tw/articles/14747742351631"
-            ),
-            .init(
-                title: .init("Reddit Rules", "Reddit Rules 社群规则"),
-                destination: "https://redditinc.com/policies/reddit-rules"
-            ),
-            .init(
-                title: .init("Supabase Swift", "Supabase Swift"),
-                destination: "https://github.com/supabase/supabase-swift"
-            ),
-            .init(
-                title: .init("Swift open-source projects", "Swift 开源专案"),
-                destination: "https://www.swift.org/community/"
-            )
-        ]
+        []
     }
 
     private static let communityRuleSections: [LegalSection] = [
@@ -418,35 +400,11 @@ enum LegalDocument: String, Identifiable {
             ]
         ),
         .init(
-            title: .init("Community design references", "社群设计参考"),
+            title: .init("People who make Cheese better", "让 Cheese 变得更好的人"),
             paragraphs: [
                 .init(
-                    "Our rule structure and plain-language approach were informed by public community-safety practices from Dcard and Reddit, then rewritten for Cheese's campus, course, housing, marketplace and chat features. Cheese is independent and is not affiliated with, sponsored by or endorsed by Dcard or Reddit.",
-                    "本 App 的规则架构与白话表达，参考了 Dcard 与 Reddit 公开的社群安全实务，再依 Cheese 的校园、课程、租屋、二手与聊天功能重新撰写。Cheese 为独立服务，与 Dcard 或 Reddit 没有隶属、赞助或背书关系。"
-                )
-            ]
-        ),
-        .init(
-            title: .init("Technology", "技术"),
-            paragraphs: [
-                .init(
-                    "Cheese is built with Swift, SwiftUI and Apple platform frameworks. Authentication, database, storage and realtime capabilities use Supabase and its Swift libraries.",
-                    "Cheese 使用 Swift、SwiftUI 与 Apple 平台框架建置；验证、资料库、储存与即时功能使用 Supabase 及其 Swift 函式库。"
-                )
-            ],
-            bullets: [
-                .init("Supabase Swift", "Supabase Swift"),
-                .init("Apple Swift Crypto, Swift ASN.1 and Swift HTTP Types", "Apple Swift Crypto、Swift ASN.1 与 Swift HTTP Types"),
-                .init("Point-Free Swift Clocks and Swift Concurrency Extras", "Point-Free Swift Clocks 与 Swift Concurrency Extras"),
-                .init("XCTest Dynamic Overlay", "XCTest Dynamic Overlay")
-            ]
-        ),
-        .init(
-            title: .init("Licences and trademarks", "授权与商标"),
-            paragraphs: [
-                .init(
-                    "Open-source components are used under their respective licences; copyright notices and licence terms remain with their authors. Apple, Google, Supabase, Dcard, Reddit, school names and other third-party marks belong to their respective owners. Mention does not imply endorsement.",
-                    "开源元件依各自授权条款使用，著作权声明与授权条款仍归其作者所有。Apple、Google、Supabase、Dcard、Reddit、学校名称及其他第三方标志均属各权利人；本文提及不代表其背书。"
+                    "Thank you to everyone who tests, shares clear feedback and helps others feel welcome here. Your time and care help Cheese improve every day.",
+                    "感谢每一位参与测试、提出清楚建议，并帮助他人融入社群的人。你们投入的时间与用心，让 Cheese 每一天都更好。"
                 )
             ]
         ),
@@ -454,8 +412,8 @@ enum LegalDocument: String, Identifiable {
             title: .init("Thank you", "谢谢你"),
             paragraphs: [
                 .init(
-                    "Thank you to the open-source maintainers, testers, early users and everyone who has offered patient, specific feedback. You are helping Cheese become a more useful home for student life.",
-                    "感谢所有开源维护者、测试者、早期用户，以及每一位耐心提供具体回馈的人。你们正让 Cheese 成为更有用的学生生活社群。"
+                    "Thank you for using Cheese, looking out for one another and helping us build a more useful home for student life.",
+                    "感谢你使用 Cheese、关心身边的人，并和我们一起打造更有用的学生生活社区。"
                 )
             ]
         )

@@ -146,19 +146,14 @@ struct UserPostsView: View {
     private var profileHighlights: [ProfileHighlight] {
         guard let profile = service.profile else { return [] }
 
-        var highlights: [ProfileHighlight] = []
-        if let school = compactText(profile.school) {
-            highlights.append(.init(id: "school", icon: "graduationcap.fill", text: school))
-        }
-        highlights.append(
+        return [
             .init(
                 id: "bio",
                 icon: "text.alignleft",
                 text: compactText(profile.bio) ?? "暂无个性签名",
                 lineLimit: 3
             )
-        )
-        return highlights
+        ]
     }
 
     private var initialSurfaceState: CollectionLoadState {
@@ -718,7 +713,12 @@ struct UserPostsView: View {
         isOfficial: Bool
     ) -> some View {
         Group {
-            if isOfficial {
+            if userId == CheeseAIIdentity.userID {
+                CheeseAIAvatarView(
+                    remoteURLString: urlString,
+                    size: 64
+                )
+            } else if isOfficial {
                 OfficialAccountAvatar(size: 64)
             } else if let urlString, let url = URL(string: urlString) {
                 AsyncImage(url: url) { image in

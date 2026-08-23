@@ -62,6 +62,17 @@ struct ProfileView: View {
                                 activityEditingPost = post
                             }
                         )
+
+                        // Keep the custom tab bar clearance outside the
+                        // dynamically measured activity pager. Forum media
+                        // can resolve its height asynchronously; placing the
+                        // clearance inside that pager lets an earlier height
+                        // measurement occasionally clip the final row.
+                        Color.clear
+                            .frame(
+                                height: CheeseTabBarLayout.contentBottomClearance
+                            )
+                            .accessibilityHidden(true)
                     }
                     .frame(
                         width: max(contentProxy.size.width - 32, 0),
@@ -125,7 +136,13 @@ struct ProfileView: View {
     private var userInfoCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                if user?.isOfficialAccount == true {
+                if user?.id == CheeseAIIdentity.userID {
+                    CheeseAIAvatarView(
+                        remoteURLString: user?.avatarUrl,
+                        size: 56
+                    )
+                    .tappableAvatarPreview(user?.avatarUrl)
+                } else if user?.isOfficialAccount == true {
                     OfficialAccountAvatar(size: 56)
                 } else if let avatarUrl = user?.avatarUrl, let url = URL(string: avatarUrl) {
                     CachedRemoteImage(url: url, targetPixelWidth: 192) { image in
@@ -188,10 +205,6 @@ struct ProfileView: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                if let school = user?.school, !school.isEmpty {
-                    profileDetailRow(icon: "graduationcap.fill", text: school)
-                }
-
                 let bio = user?.bio?.trimmingCharacters(in: .whitespacesAndNewlines)
                 profileDetailRow(
                     icon: "text.alignleft",

@@ -246,6 +246,8 @@ struct CheesePostShareBottomSheet: View {
     @State private var statusMessage: String?
     @State private var statusIsError = false
     @State private var selectedTargetIDs: Set<String> = []
+    @State private var selectedTargetIDOrder: [String] = []
+    @State private var searchPriorityTargetIDs: [String] = []
     @State private var shareNote = ""
     @State private var friendProfiles: [MutualFollowProfile] = []
     @State private var discoveredProfileTargets: [PostChatShareTarget] = []
@@ -335,7 +337,13 @@ struct CheesePostShareBottomSheet: View {
     }
 
     private var selectedTargets: [PostChatShareTarget] {
-        availableTargets.filter { selectedTargetIDs.contains($0.id) }
+        let targetsByID = Dictionary(
+            uniqueKeysWithValues: availableTargets.map { ($0.id, $0) }
+        )
+        var seen = Set<String>()
+        let orderedIDs = (searchPriorityTargetIDs + selectedTargetIDOrder)
+            .filter { seen.insert($0).inserted }
+        return orderedIDs.compactMap { targetsByID[$0] }
     }
 
     private var selectedTargetNames: String {
@@ -343,9 +351,13 @@ struct CheesePostShareBottomSheet: View {
     }
 
     private var quickPickerTargets: [PostChatShareTarget] {
-        // Directory-only recipients are not in the original recent-chat
-        // list. Put selected targets first so every selection stays visible.
-        uniquePostShareTargets(selectedTargets + allTargets)
+        // A recipient chosen from the full search is intentionally promoted
+        // once on return. Later quick-picker taps only change checkmarks and
+        // never reorder the row under the user's finger.
+        uniquePostShareTargets(
+            selectedTargets.filter { searchPriorityTargetIDs.contains($0.id) }
+                + allTargets
+        )
     }
 
     private var bottomSafeAreaInset: CGFloat {
@@ -478,11 +490,15 @@ struct CheesePostShareBottomSheet: View {
         .onChange(of: availableTargets.map(\.id)) { _, latestIds in
             selectedTargetIDs = selectedTargetIDs.intersection(Set(latestIds))
         }
+        .onChange(of: selectedTargetIDs) { _, latestIDs in
+            synchronizeSelectedTargetOrder(with: latestIDs)
+        }
         .fullScreenCover(isPresented: $isRecipientPickerPresented) {
             PostShareRecipientPicker(
                 initialTargets: allTargets,
                 discoveredProfileTargets: $discoveredProfileTargets,
-                selectedTargetIDs: $selectedTargetIDs
+                selectedTargetIDs: $selectedTargetIDs,
+                searchPriorityTargetIDs: $searchPriorityTargetIDs
             )
         }
         .sheet(isPresented: $showSystemShareSheet) {
@@ -712,9 +728,22 @@ struct CheesePostShareBottomSheet: View {
     private func toggleTargetSelection(_ target: PostChatShareTarget) {
         if selectedTargetIDs.contains(target.id) {
             selectedTargetIDs.remove(target.id)
+            selectedTargetIDOrder.removeAll { $0 == target.id }
         } else {
             selectedTargetIDs.insert(target.id)
+            selectedTargetIDOrder.append(target.id)
         }
+    }
+
+    private func synchronizeSelectedTargetOrder(with selectedIDs: Set<String>) {
+        selectedTargetIDOrder.removeAll { !selectedIDs.contains($0) }
+        searchPriorityTargetIDs.removeAll { !selectedIDs.contains($0) }
+
+        let recordedIDs = Set(selectedTargetIDOrder)
+        let newlySelectedIDs = availableTargets
+            .map(\.id)
+            .filter { selectedIDs.contains($0) && !recordedIDs.contains($0) }
+        selectedTargetIDOrder.append(contentsOf: newlySelectedIDs)
     }
 
     @MainActor
@@ -933,6 +962,7 @@ private struct PostShareRecipientPicker: View {
     let initialTargets: [PostChatShareTarget]
     @Binding var discoveredProfileTargets: [PostChatShareTarget]
     @Binding var selectedTargetIDs: Set<String>
+    @Binding var searchPriorityTargetIDs: [String]
 
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
@@ -1085,8 +1115,11 @@ private struct PostShareRecipientPicker: View {
     private func toggleSelection(for target: PostChatShareTarget) {
         if selectedTargetIDs.contains(target.id) {
             selectedTargetIDs.remove(target.id)
+            searchPriorityTargetIDs.removeAll { $0 == target.id }
         } else {
             selectedTargetIDs.insert(target.id)
+            searchPriorityTargetIDs.removeAll { $0 == target.id }
+            searchPriorityTargetIDs.append(target.id)
         }
     }
 

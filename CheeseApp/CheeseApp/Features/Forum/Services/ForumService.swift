@@ -1044,32 +1044,63 @@ class ForumService: ObservableObject {
         postId: UUID,
         onChange: @escaping @MainActor () async -> Void
     ) -> () -> Void {
-        let channel = supabase.client.channel(
-            "forum-comments-\(postId.uuidString)-\(UUID().uuidString)"
-        )
-        let changes = channel.postgresChange(
-            AnyAction.self,
-            schema: "public",
-            table: "comments",
-            filter: .eq("post_id", value: postId)
-        )
-        let task = Task {
-            do {
-                try await channel.subscribeWithError()
-                for await _ in changes {
-                    guard !Task.isCancelled else { break }
-                    await onChange()
+        let task = Task { [supabase] in
+            var retryAttempt = 0
+            var hasSubscribed = false
+
+            while !Task.isCancelled {
+                let channel = supabase.client.channel(
+                    "forum-comments-\(postId.uuidString)-\(UUID().uuidString)"
+                )
+                let changes = channel.postgresChange(
+                    AnyAction.self,
+                    schema: "public",
+                    table: "comments",
+                    filter: .eq("post_id", value: postId)
+                )
+
+                await withTaskCancellationHandler {
+                    do {
+                        try await channel.subscribeWithError()
+
+                        let shouldCatchUp = hasSubscribed || retryAttempt > 0
+                        hasSubscribed = true
+                        retryAttempt = 0
+                        if shouldCatchUp {
+                            // Reconcile once after reconnecting so comments
+                            // created during the disconnected window are not lost.
+                            await onChange()
+                        }
+
+                        for await _ in changes {
+                            guard !Task.isCancelled else { break }
+                            await onChange()
+                        }
+                    } catch {
+                        // The retry loop below recreates the channel after
+                        // transient subscription and network failures.
+                    }
+
+                    await supabase.client.removeChannel(channel)
+                } onCancel: {
+                    Task { await supabase.client.removeChannel(channel) }
                 }
-            } catch {
-                // Pull-to-refresh and the next detail appearance remain
-                // authoritative fallbacks for temporary realtime disconnects.
+
+                guard !Task.isCancelled else { break }
+
+                let delaySeconds = min(1 << min(retryAttempt, 3), 8)
+                retryAttempt += 1
+                do {
+                    try await Task.sleep(
+                        nanoseconds: UInt64(delaySeconds) * 1_000_000_000
+                    )
+                } catch {
+                    break
+                }
             }
         }
 
-        return { [supabase] in
-            task.cancel()
-            Task { await supabase.client.removeChannel(channel) }
-        }
+        return { task.cancel() }
     }
 
     func fetchComments(postId: UUID) async throws -> [ForumCommentItem] {
@@ -1247,6 +1278,14 @@ class ForumService: ObservableObject {
 
         if let index = posts.firstIndex(where: { $0.id == postId }) {
             posts[index].comments += 1
+        }
+        // The Worker/database is authoritative for eligibility. Notify for
+        // structured mentions and replies so a direct reply to 奶酪AI can
+        // continue the existing conversation without another @ mention.
+        if !mentionedUserIds.isEmpty || parentId != nil {
+            Task {
+                await CheeseAICommentTrigger.notify(sourceCommentID: createdID)
+            }
         }
         return createdID
     }
@@ -1579,6 +1618,66 @@ struct DBProfileLite: Codable {
         case email
         case isOfficial = "is_official"
         case isMcMasterVerified = "is_mcmaster_verified"
+    }
+}
+
+@MainActor
+private enum CheeseAICommentTrigger {
+    private struct Payload: Encodable {
+        let sourceCommentID: UUID
+
+        enum CodingKeys: String, CodingKey {
+            case sourceCommentID = "source_comment_id"
+        }
+    }
+
+    static func notify(sourceCommentID: UUID) async {
+        guard let endpoint = configuredEndpoint() else { return }
+
+        do {
+            let session = try await SupabaseManager.shared.auth.session
+            var request = URLRequest(url: endpoint)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 5
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(
+                "Bearer \(session.accessToken)",
+                forHTTPHeaderField: "Authorization"
+            )
+            request.httpBody = try JSONEncoder().encode(
+                Payload(sourceCommentID: sourceCommentID)
+            )
+
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200..<300).contains(httpResponse.statusCode) else {
+                debugLog("request_rejected")
+                return
+            }
+        } catch {
+            // AI triggering is best-effort and must never make the already
+            // persisted human comment appear to have failed.
+            debugLog("request_failed")
+        }
+    }
+
+    private static func configuredEndpoint() -> URL? {
+        guard let rawValue = Bundle.main.object(
+            forInfoDictionaryKey: "CHEESE_AI_TRIGGER_URL"
+        ) as? String else { return nil }
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty,
+              !value.hasPrefix("$("),
+              let url = URL(string: value),
+              url.scheme == "https" || url.host == "127.0.0.1" || url.host == "localhost"
+        else { return nil }
+        return url
+    }
+
+    private static func debugLog(_ category: String) {
+#if DEBUG
+        print("[CheeseAITrigger] \(category)")
+#endif
     }
 }
 

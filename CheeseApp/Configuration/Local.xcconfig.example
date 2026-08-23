@@ -5,3 +5,6 @@ SUPABASE_PUBLISHABLE_KEY = your-publishable-key
 
 // Optional; Shared.xcconfig already supplies this default.
 // SUPABASE_AUTH_REDIRECT_URL = cheeseapp:/$()/auth/callback
+
+// Optional local Cheese AI Worker endpoint.
+// CHEESE_AI_TRIGGER_URL = http:/$()/127.0.0.1:8787/v1/comment-events

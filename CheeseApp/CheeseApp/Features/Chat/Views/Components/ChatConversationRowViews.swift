@@ -9,7 +9,6 @@ struct SwipeableDeleteNavigationRow<RowContent: View>: View {
 
     let rowID: UUID
     @Binding var activeSwipeConversationId: UUID?
-    @Binding var isAnyRowHorizontallyDragging: Bool
     let onOpenConversation: () -> Void
     let onDelete: () -> Void
     let rowContent: RowContent
@@ -30,14 +29,12 @@ struct SwipeableDeleteNavigationRow<RowContent: View>: View {
     init(
         rowID: UUID,
         activeSwipeConversationId: Binding<UUID?>,
-        isAnyRowHorizontallyDragging: Binding<Bool>,
         onOpenConversation: @escaping () -> Void,
         onDelete: @escaping () -> Void,
         @ViewBuilder rowContent: () -> RowContent
     ) {
         self.rowID = rowID
         _activeSwipeConversationId = activeSwipeConversationId
-        _isAnyRowHorizontallyDragging = isAnyRowHorizontallyDragging
         self.onOpenConversation = onOpenConversation
         self.onDelete = onDelete
         self.rowContent = rowContent()
@@ -76,9 +73,6 @@ struct SwipeableDeleteNavigationRow<RowContent: View>: View {
             closeActions(resetActive: false)
         }
         .onDisappear {
-            if dragAxis == .horizontal {
-                isAnyRowHorizontallyDragging = false
-            }
             dragAxis = .none
         }
     }
@@ -96,20 +90,17 @@ struct SwipeableDeleteNavigationRow<RowContent: View>: View {
 
                 guard dragAxis == .horizontal else {
                     dragTranslation = 0
-                    isAnyRowHorizontallyDragging = false
                     return
                 }
 
                 if activeSwipeConversationId != rowID {
                     activeSwipeConversationId = rowID
                 }
-                isAnyRowHorizontallyDragging = true
                 dragTranslation = value.translation.width
             }
             .onEnded { value in
                 defer {
                     dragAxis = .none
-                    isAnyRowHorizontallyDragging = false
                 }
 
                 guard dragAxis == .horizontal else {

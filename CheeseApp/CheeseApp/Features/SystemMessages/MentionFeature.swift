@@ -67,6 +67,7 @@ final class MentionService {
     static let shared = MentionService()
 
     private let supabase = SupabaseManager.shared
+    private var cachedCheeseAICandidate: MentionCandidate?
 
     private init() {}
 
@@ -82,7 +83,33 @@ final class MentionService {
             .execute()
             .value
         let currentUserID = AuthService.shared.currentUser?.id
-        return rows.filter { $0.id != currentUserID }
+        var ordered: [MentionCandidate] = []
+
+        if currentUserID != CheeseAIIdentity.userID,
+           let cheeseAI = try? await cheeseAICandidate() {
+            ordered.append(cheeseAI)
+        }
+
+        ordered.append(contentsOf: rows.filter { row in
+            row.id != currentUserID && row.id != CheeseAIIdentity.userID
+        })
+        return Array(ordered.prefix(min(max(limit, 1), 20)))
+    }
+
+    private func cheeseAICandidate() async throws -> MentionCandidate? {
+        if let cachedCheeseAICandidate {
+            return cachedCheeseAICandidate
+        }
+
+        let profiles: [MentionCandidate] = try await supabase
+            .database("profile_public_view")
+            .select("id,full_name,avatar_url,university")
+            .eq("id", value: CheeseAIIdentity.userID.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        cachedCheeseAICandidate = profiles.first
+        return profiles.first
     }
 
     func fetch(
@@ -310,7 +337,12 @@ private struct MentionCandidateRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            if let avatarURL = candidate.avatarURL,
+            if candidate.id == CheeseAIIdentity.userID {
+                CheeseAIAvatarView(
+                    remoteURLString: candidate.avatarURL,
+                    size: 34
+                )
+            } else if let avatarURL = candidate.avatarURL,
                let url = URL(string: avatarURL) {
                 AsyncImage(url: url) { image in
                     image.resizable().scaledToFill()

@@ -74,7 +74,6 @@ struct InlineErrorBanner: View {
 struct ConversationSwipeActionRow: View {
     let conversation: ChatConversationPreview
     @Binding var activeSwipeConversationId: UUID?
-    @Binding var isAnyRowHorizontallyDragging: Bool
     let onOpenConversation: () -> Void
     let onOpenProfile: () -> Void
     let onDelete: () -> Void
@@ -83,7 +82,6 @@ struct ConversationSwipeActionRow: View {
         SwipeableDeleteNavigationRow(
             rowID: conversation.id,
             activeSwipeConversationId: $activeSwipeConversationId,
-            isAnyRowHorizontallyDragging: $isAnyRowHorizontallyDragging,
             onOpenConversation: onOpenConversation,
             onDelete: onDelete
         ) {
@@ -95,7 +93,6 @@ struct ConversationSwipeActionRow: View {
 struct GroupConversationSwipeActionRow: View {
     let group: ChatGroupPreview
     @Binding var activeSwipeConversationId: UUID?
-    @Binding var isAnyRowHorizontallyDragging: Bool
     let onOpenConversation: () -> Void
     let onDelete: () -> Void
 
@@ -103,7 +100,6 @@ struct GroupConversationSwipeActionRow: View {
         SwipeableDeleteNavigationRow(
             rowID: group.id,
             activeSwipeConversationId: $activeSwipeConversationId,
-            isAnyRowHorizontallyDragging: $isAnyRowHorizontallyDragging,
             onOpenConversation: onOpenConversation,
             onDelete: onDelete
         ) {

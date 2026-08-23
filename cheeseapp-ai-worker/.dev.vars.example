@@ -1,0 +1,11 @@
+# Copy to .dev.vars. Never commit real values.
+GEMINI_API_KEY="replace-me"
+CHEESE_AI_USER_ID="00000000-0000-0000-0000-000000000000"
+SUPABASE_URL="https://your-project.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="replace-me"
+CHEESE_AI_ENABLED="true"
+CHEESE_AI_MODEL="gemini-3.5-flash-lite"
+CHEESE_AI_PROMPT_VERSION="cheese-community-v3"
+CHEESE_AI_PER_USER_WINDOW_MINUTES="10"
+CHEESE_AI_PER_USER_WINDOW_LIMIT="5"
+CHEESE_AI_DAILY_SOFT_LIMIT="25"

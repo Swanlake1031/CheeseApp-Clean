@@ -1,5 +1,6 @@
 // Safe defaults shared by every CheeseApp build configuration.
 // Developer-specific Supabase values belong in Local.xcconfig, which Git ignores.
 SUPABASE_AUTH_REDIRECT_URL = cheeseapp:/$()/auth/callback
+CHEESE_AI_TRIGGER_URL = https:/$()/ai.cheeseapp.org/v1/comment-events
 
 #include? "Local.xcconfig"

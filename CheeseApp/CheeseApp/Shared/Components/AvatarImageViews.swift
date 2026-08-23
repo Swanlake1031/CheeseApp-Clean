@@ -1,6 +1,41 @@
 import SwiftUI
 import UIKit
 
+enum CheeseAIIdentity {
+    static let userID = UUID(
+        uuidString: "e5983890-95ad-4b6c-814b-863bfde4e4fc"
+    )!
+}
+
+struct CheeseAIAvatarView: View {
+    let remoteURLString: String?
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let remoteURLString,
+               !remoteURLString.isEmpty,
+               let url = URL(string: remoteURLString) {
+                CachedRemoteImage(url: url, targetPixelWidth: 192) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    bundledAvatar
+                }
+            } else {
+                bundledAvatar
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+    }
+
+    private var bundledAvatar: some View {
+        Image("CheeseAIAvatar")
+            .resizable()
+            .scaledToFill()
+    }
+}
+
 struct AvatarCropView: View {
     let image: UIImage
     let onCancel: () -> Void
