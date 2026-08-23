@@ -15,6 +15,51 @@ struct RemoteImageRequestKey: Hashable {
     }
 }
 
+enum RemoteImageLoadError: Error, Equatable {
+    case httpStatus(Int)
+}
+
+enum RemoteImageRetryPolicy {
+    static let maximumAutomaticAttemptCount = 8
+
+    static func shouldRetry(_ error: Error) -> Bool {
+        if let loadError = error as? RemoteImageLoadError {
+            switch loadError {
+            case .httpStatus(let statusCode):
+                return statusCode == 408
+                    || statusCode == 425
+                    || statusCode == 429
+                    || (500...599).contains(statusCode)
+            }
+        }
+
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .badURL,
+                 .unsupportedURL,
+                 .fileDoesNotExist,
+                 .cannotDecodeContentData,
+                 .appTransportSecurityRequiresSecureConnection:
+                return false
+            default:
+                return true
+            }
+        }
+
+        return true
+    }
+
+    static func delayNanoseconds(afterFailureCount failureCount: Int) -> UInt64 {
+        let exponent = max(min(failureCount - 1, 4), 0)
+        let seconds = min(1 << exponent, 15)
+        return UInt64(seconds) * 1_000_000_000
+    }
+
+    static func canRetry(afterFailureCount failureCount: Int) -> Bool {
+        failureCount < maximumAutomaticAttemptCount
+    }
+}
+
 @MainActor
 final class RemoteImageCache {
     static let shared = RemoteImageCache()
@@ -83,15 +128,25 @@ final class RemoteImageCache {
     func prefetch(
         _ urls: [URL],
         maxPixelSize: Int,
-        limit: Int = 12
+        limit: Int = 4,
+        maxConcurrent: Int = 2
     ) {
         var seenURLs = Set<URL>()
         let uniqueURLs = urls.filter { seenURLs.insert($0).inserted }
 
-        for url in uniqueURLs.prefix(max(limit, 0)) {
+        let candidateURLs = Array(uniqueURLs.prefix(max(limit, 0)))
+        let laneCount = min(max(maxConcurrent, 0), candidateURLs.count)
+        guard laneCount > 0 else { return }
+
+        for lane in 0..<laneCount {
+            let laneURLs = stride(from: lane, to: candidateURLs.count, by: laneCount)
+                .map { candidateURLs[$0] }
             Task(priority: .utility) { [weak self] in
                 guard let self else { return }
-                _ = try? await self.image(for: url, maxPixelSize: maxPixelSize)
+                for url in laneURLs {
+                    guard !Task.isCancelled else { return }
+                    _ = try? await self.image(for: url, maxPixelSize: maxPixelSize)
+                }
             }
         }
     }
@@ -113,6 +168,9 @@ final class RemoteImageCache {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
+            guard RemoteImageRetryPolicy.shouldRetry(error) else {
+                throw error
+            }
             guard generation == requestGeneration else {
                 throw CancellationError()
             }
@@ -140,7 +198,7 @@ final class RemoteImageCache {
         }
         if let httpResponse = response as? HTTPURLResponse,
            !(200...299).contains(httpResponse.statusCode) {
-            throw URLError(.badServerResponse)
+            throw RemoteImageLoadError.httpStatus(httpResponse.statusCode)
         }
         guard let image = await Self.downsampledImage(
             from: data,
@@ -218,7 +276,7 @@ struct CachedRemoteImage<Content: View, Placeholder: View>: View {
 
     @State private var loadedImage: UIImage?
     @State private var loadedURL: URL?
-    @State private var isLoading = false
+    @State private var activeLoadID: UUID?
 
     init(
         url: URL,
@@ -266,32 +324,58 @@ struct CachedRemoteImage<Content: View, Placeholder: View>: View {
     }
 
     private func loadImage() async {
-        guard !isLoading, !Task.isCancelled else { return }
-        isLoading = true
-        defer { isLoading = false }
+        guard !Task.isCancelled else { return }
 
-        for attempt in 0..<3 {
+        let loadKey = requestKey
+        let loadID = UUID()
+        activeLoadID = loadID
+        defer {
+            if activeLoadID == loadID {
+                activeLoadID = nil
+            }
+        }
+
+        var failureCount = 0
+        while !Task.isCancelled {
+            guard activeLoadID == loadID,
+                  requestKey == loadKey
+            else { return }
+
             do {
                 let image = try await RemoteImageCache.shared.image(
-                    for: url,
-                    maxPixelSize: requestKey.maxPixelSize
+                    for: loadKey.url,
+                    maxPixelSize: loadKey.maxPixelSize
                 )
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled,
+                      activeLoadID == loadID,
+                      requestKey == loadKey
+                else { return }
                 loadedImage = image
-                loadedURL = url
+                loadedURL = loadKey.url
                 onImageLoaded?(image.size)
                 return
             } catch is CancellationError {
                 return
             } catch {
-                guard attempt < 2 else { return }
+                guard RemoteImageRetryPolicy.shouldRetry(error),
+                      activeLoadID == loadID,
+                      requestKey == loadKey
+                else { return }
+
+                failureCount += 1
+                guard RemoteImageRetryPolicy.canRetry(
+                    afterFailureCount: failureCount
+                ) else { return }
                 do {
                     try await Task.sleep(
-                        nanoseconds: UInt64(attempt + 1) * 1_000_000_000
+                        nanoseconds: RemoteImageRetryPolicy.delayNanoseconds(
+                            afterFailureCount: failureCount
+                        )
                     )
                 } catch {
                     return
                 }
+                guard activeLoadID == loadID else { return }
             }
         }
     }

@@ -224,6 +224,46 @@ final class ChatAccountIsolationTests: XCTestCase {
         )
     }
 
+    func testRemoteImageRetryPolicyRetriesOnlyTransientFailures() {
+        XCTAssertTrue(
+            RemoteImageRetryPolicy.shouldRetry(RemoteImageLoadError.httpStatus(429))
+        )
+        XCTAssertTrue(
+            RemoteImageRetryPolicy.shouldRetry(RemoteImageLoadError.httpStatus(503))
+        )
+        XCTAssertTrue(
+            RemoteImageRetryPolicy.shouldRetry(URLError(.timedOut))
+        )
+        XCTAssertFalse(
+            RemoteImageRetryPolicy.shouldRetry(RemoteImageLoadError.httpStatus(404))
+        )
+        XCTAssertFalse(
+            RemoteImageRetryPolicy.shouldRetry(URLError(.cannotDecodeContentData))
+        )
+    }
+
+    func testRemoteImageRetryPolicyUsesCappedExponentialBackoff() {
+        XCTAssertEqual(
+            RemoteImageRetryPolicy.delayNanoseconds(afterFailureCount: 1),
+            1_000_000_000
+        )
+        XCTAssertEqual(
+            RemoteImageRetryPolicy.delayNanoseconds(afterFailureCount: 4),
+            8_000_000_000
+        )
+        XCTAssertEqual(
+            RemoteImageRetryPolicy.delayNanoseconds(afterFailureCount: 20),
+            15_000_000_000
+        )
+    }
+
+    func testRemoteImageRetryPolicyStopsAfterEightAutomaticAttempts() {
+        XCTAssertEqual(RemoteImageRetryPolicy.maximumAutomaticAttemptCount, 8)
+        XCTAssertTrue(RemoteImageRetryPolicy.canRetry(afterFailureCount: 7))
+        XCTAssertFalse(RemoteImageRetryPolicy.canRetry(afterFailureCount: 8))
+        XCTAssertFalse(RemoteImageRetryPolicy.canRetry(afterFailureCount: 9))
+    }
+
     func testAccountTransitionDiscardsOnlyChatNotificationRoute() {
         let router = AppNotificationRouter()
         router.enqueue(.conversation(UUID()))

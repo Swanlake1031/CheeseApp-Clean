@@ -800,7 +800,6 @@ class SecondhandService: ObservableObject {
             guard isCurrentAccountRequest(generation: requestGeneration),
                   latestItemFetchID == fetchID
             else { return }
-            prefetchPreviewImages(from: dbPosts)
             let favoritePostIds = await PostFavoriteService.shared.fetchFavoritePostIds(
                 postIds: dbPosts.map(\.id)
             )
@@ -812,6 +811,7 @@ class SecondhandService: ObservableObject {
             }
             seedInteractionStates(for: refreshedItems)
             items = refreshedItems
+            prefetchPreviewImages(from: dbPosts)
             itemCursor = dbPosts.last.map {
                 SecondhandPageCursor(createdAt: $0.createdAt, id: $0.id)
             }
@@ -848,7 +848,6 @@ class SecondhandService: ObservableObject {
             guard isCurrentAccountRequest(generation: requestGeneration),
                   latestItemFetchID == expectedFetchID
             else { return }
-            prefetchPreviewImages(from: dbPosts, limit: 8)
             let favoritePostIds = await PostFavoriteService.shared.fetchFavoritePostIds(
                 postIds: dbPosts.map(\.id)
             )
@@ -865,6 +864,7 @@ class SecondhandService: ObservableObject {
             }
             seedInteractionStates(for: newItems)
             items.append(contentsOf: newItems)
+            prefetchPreviewImages(from: dbPosts)
             itemCursor = dbPosts.last.map {
                 SecondhandPageCursor(createdAt: $0.createdAt, id: $0.id)
             } ?? itemCursor
@@ -934,8 +934,6 @@ class SecondhandService: ObservableObject {
         from dbPosts: [DBSecondhandPost],
         seedInteractions: Bool = true
     ) async -> [SecondhandItem] {
-        prefetchPreviewImages(from: dbPosts)
-
         let favoritePostIDs = await PostFavoriteService.shared.fetchFavoritePostIds(
             postIds: dbPosts.map(\.id)
         )
@@ -949,12 +947,13 @@ class SecondhandService: ObservableObject {
         if seedInteractions {
             seedInteractionStates(for: resolvedItems)
         }
+        prefetchPreviewImages(from: dbPosts)
         return resolvedItems
     }
 
     private func prefetchPreviewImages(
         from dbPosts: [DBSecondhandPost],
-        limit: Int = 12
+        limit: Int = 4
     ) {
         let urls = dbPosts.compactMap { post -> URL? in
             guard let imageURLString = post.images?
@@ -968,7 +967,8 @@ class SecondhandService: ObservableObject {
         RemoteImageCache.shared.prefetch(
             urls,
             maxPixelSize: 640,
-            limit: limit
+            limit: limit,
+            maxConcurrent: 2
         )
     }
 
