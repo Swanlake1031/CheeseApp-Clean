@@ -5,8 +5,10 @@ import type {
   ForumPostRecord,
   InteractionRecord,
   PostImageRecord,
+  PostEmbeddingJob,
   PostRecord,
   RateLimitResult,
+  SecondhandImageReference,
   ThreadContext,
 } from "./types";
 import { runtimeFetch } from "./runtimeFetch";
@@ -172,6 +174,20 @@ export class SupabaseRepository {
     return { post, source, ancestors, nearby, images };
   }
 
+  async getOwnedSecondhandImages(
+    ownerId: string,
+    references: readonly SecondhandImageReference[],
+  ): Promise<readonly PostImageRecord[]> {
+    const images: PostImageRecord[] = [];
+    for (const reference of references) {
+      const image = await this.restOne<PostImageRecord>(
+        `post_media_staging?select=id,post_id,url,bucket,object_path,order_index&owner_id=eq.${encodeURIComponent(ownerId)}&post_type=eq.secondhand&bucket=eq.post-images&object_path=eq.${encodeURIComponent(reference.object_path)}&status=in.(uploaded,finalized)&limit=1`,
+      );
+      if (image) images.push(image);
+    }
+    return images;
+  }
+
   enqueue(
     sourceCommentId: string,
     aiUserId: string,
@@ -264,5 +280,67 @@ export class SupabaseRepository {
           (row.next_attempt_at !== null && Date.parse(row.next_attempt_at) <= now),
       )
       .map((row) => row.source_comment_id);
+  }
+
+  backfillForumEmbeddingJobs(limit = 100): Promise<number> {
+    return this.rpc<number>("backfill_forum_embedding_jobs", { p_limit: limit });
+  }
+
+  claimPostEmbeddingJobs(limit = 8): Promise<readonly PostEmbeddingJob[]> {
+    return this.rpc<readonly PostEmbeddingJob[]>("claim_post_embedding_jobs", {
+      p_limit: limit,
+    });
+  }
+
+  completePostEmbeddingJob(
+    jobId: string,
+    inputHash: string,
+    embedding: readonly number[],
+    norm: number,
+  ): Promise<boolean> {
+    return this.rpc<boolean>("complete_post_embedding_job", {
+      p_job_id: jobId,
+      p_input_hash: inputHash,
+      p_embedding: embedding,
+      p_norm: norm,
+    });
+  }
+
+  failPostEmbeddingJob(
+    jobId: string,
+    category: string,
+    retryable: boolean,
+  ): Promise<void> {
+    return this.rpc<void>("fail_post_embedding_job", {
+      p_job_id: jobId,
+      p_error: category,
+      p_retryable: retryable,
+    });
+  }
+
+  refreshRecommendationMetrics(force = false): Promise<boolean> {
+    return this.rpc<boolean>("refresh_post_recommendation_metrics", {
+      p_force: force,
+    });
+  }
+
+  backfillRecommendationSignalState(limit = 500): Promise<number> {
+    return this.rpc<number>("backfill_recommendation_signal_state", {
+      p_limit: limit,
+    });
+  }
+
+  listRecommendationShadowUsers(limit = 20): Promise<readonly string[]> {
+    return this.rpc<readonly string[]>("list_recommendation_shadow_users", {
+      p_limit: limit,
+    });
+  }
+
+  createRecommendationShadowSession(userId: string): Promise<string | null> {
+    return this.rpc<string | null>("create_recommendation_feed_session", {
+      p_force_refresh: true,
+      p_shadow: true,
+      p_user_id: userId,
+    });
   }
 }

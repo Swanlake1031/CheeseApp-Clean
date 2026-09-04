@@ -4,6 +4,68 @@ import UIKit
 
 @MainActor
 final class PostCorrectnessTests: XCTestCase {
+    func testSecondhandImagesUseStableNilLastOrdering() {
+        let firstID = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
+        let images = [
+            DBSecondhandImage(id: nil, url: "https://example.com/nil-b.jpg", orderIndex: nil),
+            DBSecondhandImage(id: firstID, url: "https://example.com/first.jpg", orderIndex: 0),
+            DBSecondhandImage(id: nil, url: "https://example.com/nil-a.jpg", orderIndex: nil)
+        ]
+
+        XCTAssertEqual(
+            DBSecondhandImage.stablySorted(images).map(\.url),
+            [
+                "https://example.com/first.jpg",
+                "https://example.com/nil-a.jpg",
+                "https://example.com/nil-b.jpg"
+            ]
+        )
+    }
+
+    func testPostUploadCompressionConstrainsPhotoAndUsesJPEG() async throws {
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+        let image = UIGraphicsImageRenderer(
+            size: CGSize(width: 3_200, height: 2_400),
+            format: format
+        ).image { context in
+            UIColor.systemOrange.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 3_200, height: 2_400))
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(x: 100, y: 100, width: 1_500, height: 1_000))
+        }
+
+        let prepared = try await ImageUploadService.shared.preparePostImageForUpload(image)
+
+        XCTAssertEqual(prepared.contentType, "image/jpeg")
+        XCTAssertFalse(prepared.preservesTransparency)
+        XCTAssertLessThanOrEqual(max(prepared.pixelSize.width, prepared.pixelSize.height), 2_304)
+        XCTAssertLessThanOrEqual(prepared.data.count, 1_000_000)
+        XCTAssertNotNil(UIImage(data: prepared.data))
+    }
+
+    func testPostUploadCompressionPreservesRealTransparencyAsPNG() async throws {
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = false
+        let image = UIGraphicsImageRenderer(
+            size: CGSize(width: 200, height: 200),
+            format: format
+        ).image { context in
+            UIColor.clear.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 200, height: 200))
+            UIColor.systemYellow.setFill()
+            context.fill(CGRect(x: 50, y: 50, width: 100, height: 100))
+        }
+
+        let prepared = try await ImageUploadService.shared.preparePostImageForUpload(image)
+
+        XCTAssertEqual(prepared.contentType, "image/png")
+        XCTAssertTrue(prepared.preservesTransparency)
+        XCTAssertNotNil(UIImage(data: prepared.data))
+    }
+
     func testPostInteractionStoreIsSharedAcrossListAndDetailFallbacks() {
         let accountID = UUID()
         let postID = UUID()
@@ -548,8 +610,8 @@ final class PostCorrectnessTests: XCTestCase {
 
     func testSecondhandCreateFormDefaultsToFixedPrice() {
         XCTAssertFalse(SecondhandCreateFormRules.defaultIsNegotiable)
-        XCTAssertEqual(SecondhandCreateFormRules.defaultCondition, SecondhandPost.Condition.good.rawValue)
-        XCTAssertEqual(SecondhandCreateFormRules.defaultCategory, .homeAppliances)
+        XCTAssertEqual(SecondhandCreateFormRules.defaultCondition, "")
+        XCTAssertNil(SecondhandCreateFormRules.defaultCategory)
     }
 
     func testSecondhandCreateFormRejectsInvalidPricesAndTrimsRequiredText() {
@@ -575,8 +637,134 @@ final class PostCorrectnessTests: XCTestCase {
     }
 
     func testSecondhandCreateFormRequiresAtLeastOneImage() {
-        XCTAssertFalse(SecondhandCreateFormRules.isValid(title: "Desk", price: "20", imageCount: 0))
-        XCTAssertTrue(SecondhandCreateFormRules.isValid(title: "Desk", price: "20", imageCount: 1))
+        XCTAssertFalse(SecondhandCreateFormRules.isValid(
+            title: "Desk",
+            price: "20",
+            imageCount: 0,
+            category: nil,
+            condition: ""
+        ))
+        XCTAssertFalse(SecondhandCreateFormRules.isValid(
+            title: "Desk",
+            price: "20",
+            imageCount: 1,
+            category: nil,
+            condition: ""
+        ))
+        XCTAssertTrue(SecondhandCreateFormRules.isValid(
+            title: "Desk",
+            price: "20",
+            imageCount: 1,
+            category: .homeAppliances,
+            condition: SecondhandPost.Condition.good.rawValue
+        ))
+    }
+
+    func testSecondhandAIDescriptionRequiresAnImageAndConfirmsOverwrite() {
+        XCTAssertFalse(
+            SecondhandAIDescriptionRules.canGenerate(
+                title: "台灯",
+                price: 20,
+                imageCount: 0,
+                isGenerating: false,
+                isPublishing: false
+            )
+        )
+        XCTAssertTrue(
+            SecondhandAIDescriptionRules.canGenerate(
+                title: "台灯",
+                price: 20,
+                imageCount: 1,
+                isGenerating: false,
+                isPublishing: false
+            )
+        )
+        XCTAssertFalse(
+            SecondhandAIDescriptionRules.canGenerate(
+                title: "台灯",
+                price: 20,
+                imageCount: 1,
+                isGenerating: true,
+                isPublishing: false
+            )
+        )
+        XCTAssertFalse(
+            SecondhandAIDescriptionRules.canGenerate(
+                title: "  ",
+                price: 20,
+                imageCount: 1,
+                isGenerating: false,
+                isPublishing: false
+            )
+        )
+        XCTAssertFalse(
+            SecondhandAIDescriptionRules.canGenerate(
+                title: "台灯",
+                price: nil,
+                imageCount: 1,
+                isGenerating: false,
+                isPublishing: false
+            )
+        )
+        XCTAssertFalse(
+            SecondhandAIDescriptionRules.requiresOverwriteConfirmation("  \n")
+        )
+        XCTAssertTrue(
+            SecondhandAIDescriptionRules.requiresOverwriteConfirmation("已有简介")
+        )
+        XCTAssertTrue(
+            SecondhandAIDescriptionRules.canApplyGeneratedDescription(
+                currentDescription: "",
+                descriptionAtRequestStart: ""
+            )
+        )
+        XCTAssertTrue(
+            SecondhandAIDescriptionRules.canApplyGeneratedDescription(
+                currentDescription: "原简介",
+                descriptionAtRequestStart: "原简介"
+            )
+        )
+        XCTAssertFalse(
+            SecondhandAIDescriptionRules.canApplyGeneratedDescription(
+                currentDescription: "生成期间新写的内容",
+                descriptionAtRequestStart: ""
+            )
+        )
+    }
+
+    func testSecondhandAIDescriptionViewModelTracksLoadingAndSuccess() async {
+        let model = SecondhandAIDescriptionViewModel { _ in
+            try await Task.sleep(for: .milliseconds(30))
+            return "  外观简洁，适合日常使用。  "
+        }
+        let input = makeAIDescriptionInput()
+        let task = Task { await model.generate(input: input) }
+        await Task.yield()
+        XCTAssertTrue(model.isGenerating)
+        let generated = await task.value
+        XCTAssertEqual(generated, "外观简洁，适合日常使用。")
+        XCTAssertFalse(model.isGenerating)
+        XCTAssertNil(model.errorMessage)
+    }
+
+    func testSecondhandAIDescriptionViewModelFailureCanRetry() async {
+        var attempts = 0
+        let model = SecondhandAIDescriptionViewModel { _ in
+            attempts += 1
+            if attempts == 1 {
+                throw SecondhandAIDescriptionError.timedOut
+            }
+            return "第二次生成成功"
+        }
+        let input = makeAIDescriptionInput()
+
+        let firstResult = await model.generate(input: input)
+        XCTAssertNil(firstResult)
+        XCTAssertNotNil(model.errorMessage)
+        let secondResult = await model.generate(input: input)
+        XCTAssertEqual(secondResult, "第二次生成成功")
+        XCTAssertEqual(attempts, 2)
+        XCTAssertNil(model.errorMessage)
     }
 
     func testPostRoutesAlwaysTargetTheHomeNavigationStack() {
@@ -974,6 +1162,18 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertFalse(item.isAuthorOfficial)
     }
 
+    func testAnonymousForumFeedCardPreservesAnonymousAvatarSemantics() {
+        let source = makeForumPost(isAnonymous: true)
+
+        let card = ForumService.makePostItem(
+            source,
+            reaction: nil
+        ).forumFeedCardItem
+
+        XCTAssertTrue(card.isAnonymous)
+        XCTAssertNil(card.authorId)
+    }
+
     func testTrustedOfficialForumFieldDisplaysOfficialIdentity() {
         let source = makeForumPost(isAnonymous: false, isOfficial: true)
 
@@ -998,7 +1198,7 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertFalse(item.isAuthorOfficial)
     }
 
-    func testForumBoardDecodesBackendOwnedPermissionsAndAnonymousPolicy() throws {
+    func testForumHashtagDecodesBackendOwnedPermissionsAndCompatibilityFlag() throws {
         let data = Data(
             """
             {
@@ -1034,7 +1234,7 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertFalse(board.canAdminister)
     }
 
-    func testCanonicalAnonymousBoardRequiresAnonymousPosts() throws {
+    func testAnonymousNamedHashtagUsesTheSameCompatibilityCapability() throws {
         let data = Data(
             """
             {
@@ -1063,7 +1263,8 @@ final class PostCorrectnessTests: XCTestCase {
 
         let board = try JSONDecoder().decode(ForumBoard.self, from: data)
 
-        XCTAssertTrue(board.requiresAnonymousPosts)
+        XCTAssertEqual(board.slug, "anonymous")
+        XCTAssertTrue(board.allowsAnonymousPosts)
     }
 
     func testAggregateForumFeedBreaksUpThreePostsFromTheSameBoardWhenPossible() {
@@ -1766,6 +1967,18 @@ final class PostCorrectnessTests: XCTestCase {
             [UIImage](repeating: UIImage(), count: imageCount),
             plans,
             cleanupItems
+        )
+    }
+
+    private func makeAIDescriptionInput() -> SecondhandAIDescriptionInput {
+        SecondhandAIDescriptionInput(
+            postID: UUID(),
+            images: [UIImage()],
+            title: "台灯",
+            category: .homeAppliances,
+            condition: .good,
+            price: 12,
+            isNegotiable: true
         )
     }
 

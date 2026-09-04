@@ -141,6 +141,27 @@ final class CourseDiscoveryFilterTests: XCTestCase {
         )
     }
 
+    func testExtendedScienceAndEngineeringSubjectsAreDecodable() throws {
+        let values = [
+            "BIOLOGY", "CHEM", "PHYSICS", "PSYCH", "COMPSCI", "SFWRENG",
+            "MECHENG", "ELECENG", "CIVENG", "ENGPHYS", "IBEHS", "CHEMENG",
+            "ENGTECH", "GENTECH", "SFWRTECH", "PROCTECH", "CIVTECH"
+        ]
+
+        for value in values {
+            XCTAssertEqual(CourseSubject(rawValue: value).rawValue, value)
+        }
+    }
+
+    func testAnyOfficialSubjectCanDecodeWithoutAnAppRelease() throws {
+        let decoded = try JSONDecoder().decode(
+            CourseSubject.self,
+            from: Data("\"ANTHROP\"".utf8)
+        )
+
+        XCTAssertEqual(decoded.rawValue, "ANTHROP")
+    }
+
     private var courses: [CourseSummary] {
         [
             makeCourse(

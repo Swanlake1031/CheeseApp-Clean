@@ -418,9 +418,12 @@ struct SecondhandCardView: View {
         ZStack {
             placeholderImage
 
-            if let imageUrl = item.displayImageUrls.first,
-               let url = URL(string: imageUrl) {
-                CachedRemoteImage(url: url, targetPixelWidth: 640) { image in
+            if let url = item.feedThumbnailURL {
+                CachedRemoteImage(
+                    url: url,
+                    targetPixelWidth: RemoteImagePurpose.feedThumbnail.targetPixelWidth,
+                    showsRetryButton: true
+                ) { image in
                     image
                         .resizable()
                         .scaledToFill()
@@ -649,7 +652,9 @@ struct SecondhandDetailView: View {
 
                     DetailMediaCarousel(
                         urlStrings: item.displayImageUrls,
-                        metrics: .secondhand
+                        metrics: .secondhand,
+                        remoteImagePurpose: .detail,
+                        loadsAdjacentPagesOnly: true
                     )
 
                     MentionedProfilesView(postID: item.id)

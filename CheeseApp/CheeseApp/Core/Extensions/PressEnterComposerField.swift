@@ -301,11 +301,14 @@ struct PressEnterComposerField: UIViewRepresentable {
     }
 
     func updateUIView(_ textView: UITextView, context: Context) {
+        context.coordinator.parent = self
         if textView.text != text {
             textView.text = text
         }
         textView.isEditable = true
         textView.isSelectable = true
+        textView.returnKeyType = .send
+        textView.enablesReturnKeyAutomatically = true
     }
 
     func makeCoordinator() -> Coordinator {
@@ -313,7 +316,7 @@ struct PressEnterComposerField: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, UITextViewDelegate {
-        private var parent: PressEnterComposerField
+        var parent: PressEnterComposerField
         private var lastSubmitAt = Date.distantPast
 
         init(parent: PressEnterComposerField) {

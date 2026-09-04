@@ -13,6 +13,16 @@ enum CheeseTabBarLayout {
     static let contentBottomClearance: CGFloat = 104
 }
 
+enum CheeseCreateSheetLayout {
+    static let compactDetent: PresentationDetent = .fraction(0.50)
+}
+
+private struct CreateComposerRoute: Identifiable {
+    let id = UUID()
+    let kind: PostKind
+    let autoRestoreDraft: Bool
+}
+
 enum MainTabNavigationEvents {
     static let openCurrentUserProfile = Notification.Name(
         "cheese.main-tab.open-current-user-profile"
@@ -34,6 +44,10 @@ struct MainTabView: View {
     @State private var selectedTab: TabItem = .home
     @State private var activatedTabs: Set<TabItem> = [.home]
     @State private var showCreatePost = false
+    @State private var createPostDetent = CheeseCreateSheetLayout.compactDetent
+    @State private var isCreatePostBusy = false
+    @State private var pendingCreateComposer: CreateComposerRoute?
+    @State private var activeCreateComposer: CreateComposerRoute?
     @State private var showProfileOnboarding = false
     @State private var homeRootResetID = UUID()
     @State private var courseRootResetID = UUID()
@@ -47,7 +61,6 @@ struct MainTabView: View {
     @StateObject private var homeViewModel = HomeViewModel()
     @StateObject private var chatService = ChatService.shared
     @StateObject private var systemMessageService = SystemMessageService.shared
-    @StateObject private var profileSocialService = ProfileSocialService.shared
     @StateObject private var postShareOverlayCoordinator = CheesePostShareOverlayCoordinator.shared
 
     private var chatUnreadBadgeCount: Int {
@@ -110,7 +123,23 @@ struct MainTabView: View {
 
                 if shouldMount(.profile) {
                     NavigationStack {
-                        ProfileView(isActive: selectedTab == .profile)
+                        ProfileView(
+                            isActive: selectedTab == .profile,
+                            onOpenForum: {
+                                HomeFeedNavigationEvents.post(.forum)
+                                activatedTabs.insert(.home)
+                                selectedTab = .home
+                            },
+                            onOpenSecondhand: { category in
+                                HomeFeedNavigationEvents.post(.secondhand(category))
+                                activatedTabs.insert(.home)
+                                selectedTab = .home
+                            },
+                            onOpenCourses: {
+                                activatedTabs.insert(.courses)
+                                selectedTab = .courses
+                            }
+                        )
                     }
                     .enableSwipeBackGesture()
                     .id(profileRootResetID)
@@ -129,9 +158,10 @@ struct MainTabView: View {
                     CustomTabBar(
                         selectedTab: $selectedTab,
                         chatUnreadBadgeCount: chatUnreadBadgeCount,
-                        showProfileRedDot: profileSocialService.hasUnreadFollowers,
+                        showProfileRedDot: false,
                         onHomeReselect: {
-                            homeRootResetID = UUID()
+                            postDeepLinkCoordinator.dismissActiveRoute()
+                            HomeFeedNavigationEvents.postHomeReselect()
                         },
                         onCourseReselect: {
                             courseRootResetID = UUID()
@@ -143,6 +173,7 @@ struct MainTabView: View {
                             profileRootResetID = UUID()
                         },
                         onCreateTap: {
+                            createPostDetent = CheeseCreateSheetLayout.compactDetent
                             showCreatePost = true
                         }
                     )
@@ -152,6 +183,18 @@ struct MainTabView: View {
             }
             .animation(.easeInOut(duration: 0.2), value: tabBarVisibilityController.isHidden)
             .animation(.easeInOut(duration: 0.2), value: isKeyboardVisible)
+
+            if showCreatePost {
+                Color.black.opacity(0.28)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard !isCreatePostBusy else { return }
+                        showCreatePost = false
+                    }
+                    .transition(.opacity)
+                    .zIndex(900)
+            }
 
             if let presentation = postShareOverlayCoordinator.presentation {
                 CheesePostShareBottomSheet(
@@ -166,8 +209,50 @@ struct MainTabView: View {
                 .zIndex(1_000)
             }
         }
-        .fullScreenCover(isPresented: $showCreatePost) {
-            CreatePostView()
+        .sheet(
+            isPresented: $showCreatePost,
+            onDismiss: {
+                createPostDetent = CheeseCreateSheetLayout.compactDetent
+                isCreatePostBusy = false
+                if let pendingCreateComposer {
+                    self.pendingCreateComposer = nil
+                    activeCreateComposer = pendingCreateComposer
+                }
+            }
+        ) {
+            CreatePostView(
+                onDismiss: {
+                    showCreatePost = false
+                },
+                onOpenComposer: { kind, autoRestoreDraft in
+                    pendingCreateComposer = CreateComposerRoute(
+                        kind: kind,
+                        autoRestoreDraft: autoRestoreDraft
+                    )
+                    showCreatePost = false
+                }
+            )
+            .presentationDetents(
+                [CheeseCreateSheetLayout.compactDetent],
+                selection: $createPostDetent
+            )
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+            .presentationBackground(AppColors.pageBackground)
+            .presentationBackgroundInteraction(
+                .enabled(upThrough: CheeseCreateSheetLayout.compactDetent)
+            )
+        }
+        .fullScreenCover(
+            item: $activeCreateComposer,
+            onDismiss: {
+                isCreatePostBusy = false
+            }
+        ) { route in
+            NavigationStack {
+                createComposerView(for: route)
+            }
+            .interactiveDismissDisabled(isCreatePostBusy)
         }
         .fullScreenCover(isPresented: $showProfileOnboarding) {
             CompleteProfileOnboardingView()
@@ -269,6 +354,37 @@ struct MainTabView: View {
         }
     }
 
+    @ViewBuilder
+    private func createComposerView(for route: CreateComposerRoute) -> some View {
+        switch route.kind {
+        case .forum:
+            CreateForumView(
+                autoRestoreDraft: route.autoRestoreDraft,
+                onCreated: {
+                    CreateComposerSessionStore.clear(.forum)
+                    closeActiveCreateComposer()
+                },
+                onExit: closeActiveCreateComposer,
+                onBusyChanged: { isCreatePostBusy = $0 }
+            )
+        case .secondhand:
+            CreateSecondhandView(
+                autoRestoreDraft: route.autoRestoreDraft,
+                onCreated: {
+                    CreateComposerSessionStore.clear(.secondhand)
+                    closeActiveCreateComposer()
+                },
+                onExit: closeActiveCreateComposer,
+                onBusyChanged: { isCreatePostBusy = $0 }
+            )
+        }
+    }
+
+    private func closeActiveCreateComposer() {
+        isCreatePostBusy = false
+        activeCreateComposer = nil
+    }
+
     @MainActor
     private func refreshLifecycleDataIfNeeded(
         force: Bool,
@@ -290,9 +406,7 @@ struct MainTabView: View {
         isLifecycleRefreshInFlight = true
         defer { isLifecycleRefreshInFlight = false }
 
-        async let followers: Void = profileSocialService.refreshUnreadStatus()
         async let systemMessages: Void = systemMessageService.refreshUnreadCount()
-        await followers
         await systemMessages
 
         if activatedTabs.contains(.chat) {

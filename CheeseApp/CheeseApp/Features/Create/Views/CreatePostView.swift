@@ -10,10 +10,20 @@ import SwiftUI
 
 struct CreatePostView: View {
     @Environment(\.dismiss) private var dismiss
+    var onDismiss: (() -> Void)?
+    var onOpenComposer: ((PostKind, Bool) -> Void)?
     @State private var selectedType: PostKind? = nil
-    @State private var navigateToForm = false
     @State private var showDraftBox = false
-    @State private var autoRestoreDraftKind: PostKind?
+    @State private var pendingDraftKind: PostKind?
+    @State private var hasAppliedSessionResume = false
+
+    init(
+        onDismiss: (() -> Void)? = nil,
+        onOpenComposer: ((PostKind, Bool) -> Void)? = nil
+    ) {
+        self.onDismiss = onDismiss
+        self.onOpenComposer = onOpenComposer
+    }
     
     var body: some View {
         NavigationStack {
@@ -22,19 +32,7 @@ struct CreatePostView: View {
                     .ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        // 标题
-                        VStack(spacing: 8) {
-                            Text(L10n.tr("What would you like to post?", "你想发布什么？"))
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundStyle(AppColors.textPrimary)
-                            
-                            Text(L10n.tr("Choose a category to get started", "先选择一个分类开始"))
-                                .font(.system(size: 15))
-                                .foregroundStyle(AppColors.textMuted)
-                        }
-                        .padding(.top, 20)
-                        
+                    VStack(spacing: 0) {
                         // 发布类型选择
                         VStack(spacing: 14) {
                             ForEach([PostKind.forum, .secondhand], id: \.self) { type in
@@ -47,6 +45,7 @@ struct CreatePostView: View {
                             }
                         }
                         .padding(.horizontal, 16)
+                        .padding(.top, 12)
                         
                         Spacer(minLength: 12)
                     }
@@ -65,7 +64,7 @@ struct CreatePostView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(L10n.tr("Cancel", "取消")) {
-                        dismiss()
+                        closeComposer()
                     }
                     .foregroundStyle(AppColors.accentStrong)
                 }
@@ -76,24 +75,28 @@ struct CreatePostView: View {
                     .foregroundStyle(AppColors.accentStrong)
                 }
             }
-            .navigationDestination(isPresented: $navigateToForm) {
-                if let type = selectedType {
-                    destinationView(for: type)
+            .sheet(
+                isPresented: $showDraftBox,
+                onDismiss: {
+                    guard let pendingDraftKind else { return }
+                    self.pendingDraftKind = nil
+                    openComposer(kind: pendingDraftKind, autoRestoreDraft: true)
+                }
+            ) {
+                CreateDraftBoxSheet { kind in
+                    pendingDraftKind = kind
                 }
             }
-            .sheet(isPresented: $showDraftBox) {
-                CreateDraftBoxSheet { kind in
-                    autoRestoreDraftKind = kind
-                    selectedType = kind
-                    navigateToForm = true
-                }
+            .onAppear {
+                resumeInterruptedComposerIfNeeded()
             }
         }
     }
 
     private var continueButton: some View {
         Button {
-            navigateToForm = true
+            guard let selectedType else { return }
+            openComposer(kind: selectedType, autoRestoreDraft: false)
         } label: {
             Text(L10n.tr("Continue", "继续"))
                 .font(.system(size: 17, weight: .semibold))
@@ -110,30 +113,29 @@ struct CreatePostView: View {
         .background(AppColors.pageBackground)
     }
     
-    // 根据类型返回对应的创建视图
-    @ViewBuilder
-    private func destinationView(for type: PostKind) -> some View {
-        switch type {
-        case .secondhand:
-            let shouldAutoRestore = autoRestoreDraftKind == .secondhand
-            CreateSecondhandView(
-                autoRestoreDraft: shouldAutoRestore,
-                onCreated: finishCreateFlow,
-                onExit: finishCreateFlow
-            )
-        case .forum:
-            let shouldAutoRestore = autoRestoreDraftKind == .forum
-            CreateForumView(
-                autoRestoreDraft: shouldAutoRestore,
-                onCreated: finishCreateFlow,
-                onExit: finishCreateFlow
-            )
+    private func openComposer(kind: PostKind, autoRestoreDraft: Bool) {
+        if let onOpenComposer {
+            onOpenComposer(kind, autoRestoreDraft)
         }
     }
 
-    private func finishCreateFlow() {
-        autoRestoreDraftKind = nil
-        dismiss()
+    private func closeComposer() {
+        if let onDismiss {
+            onDismiss()
+        } else {
+            dismiss()
+        }
+    }
+
+    private func resumeInterruptedComposerIfNeeded() {
+        guard !hasAppliedSessionResume else { return }
+        hasAppliedSessionResume = true
+        guard let kind = CreateComposerSessionStore.resumableKind,
+              CreateDraftStore.hasDraft(kind)
+        else { return }
+
+        selectedType = kind
+        openComposer(kind: kind, autoRestoreDraft: true)
     }
 }
 
@@ -145,13 +147,6 @@ private extension PostKind {
         }
     }
     
-    var createSubtitle: String {
-        switch self {
-        case .secondhand: return L10n.tr("Sell school supplies, electronics, furniture...", "出售学业用品、电子产品、家具等")
-        case .forum: return L10n.tr("Share thoughts, ask questions, confess...", "分享想法、提问、匿名发帖")
-        }
-    }
-
     var createDraftTitle: String {
         switch self {
         case .secondhand: return L10n.tr("Secondhand", "二手")
@@ -190,16 +185,9 @@ struct PostTypeCard: View {
                 }
                 
                 // 文字
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(type.createTitle)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(AppColors.textPrimary)
-                    
-                    Text(type.createSubtitle)
-                        .font(.system(size: 13))
-                        .foregroundStyle(AppColors.textMuted)
-                        .lineLimit(1)
-                }
+                Text(type.createTitle)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AppColors.textPrimary)
                 
                 Spacer()
                 
@@ -295,6 +283,7 @@ struct CreateDraftBoxSheet: View {
                                     .swipeActions {
                                         Button(role: .destructive) {
                                             CreateDraftStore.clear(draft.kind)
+                                            CreateComposerSessionStore.clear(draft.kind)
                                             reloadDrafts()
                                         } label: {
                                             Label(L10n.tr("Delete", "删除"), systemImage: "trash")

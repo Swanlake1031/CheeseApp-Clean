@@ -205,6 +205,10 @@ struct ExpandableCategoryPicker<Option: Hashable>: View {
     let options: [Option]
     let recommendedTitle: String
     let accessibilityTitle: String
+    var expandedTitle = L10n.tr("All categories", "全部分类")
+    var expandedHint = L10n.tr("Tap to choose", "点击选择分类")
+    var collapseLabel = L10n.tr("Collapse categories", "收起分类")
+    var expandLabel = L10n.tr("Expand categories", "展开分类")
     let title: (Option) -> String
     let icon: (Option) -> String
 
@@ -279,11 +283,11 @@ struct ExpandableCategoryPicker<Option: Hashable>: View {
     private var expandedPanel: some View {
         VStack(spacing: 12) {
             HStack(spacing: 8) {
-                Text(L10n.tr("All categories", "全部分类"))
+                Text(expandedTitle)
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(AppColors.textPrimary)
 
-                Text(L10n.tr("Tap to choose", "点击选择分类"))
+                Text(expandedHint)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(AppColors.textMuted)
 
@@ -325,8 +329,8 @@ struct ExpandableCategoryPicker<Option: Hashable>: View {
         .buttonStyle(.plain)
         .accessibilityLabel(
             isExpanded
-                ? L10n.tr("Collapse categories", "收起分类")
-                : L10n.tr("Expand categories", "展开分类")
+                ? collapseLabel
+                : expandLabel
         )
     }
 
@@ -401,17 +405,25 @@ struct ExpandableCategoryPicker<Option: Hashable>: View {
 
 struct PostFormSection<Content: View>: View {
     let title: String
+    let showsTitle: Bool
     let content: Content
 
-    init(title: String, @ViewBuilder content: () -> Content) {
+    init(
+        title: String,
+        showsTitle: Bool = true,
+        @ViewBuilder content: () -> Content
+    ) {
         self.title = title
+        self.showsTitle = showsTitle
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
+            if showsTitle {
+                Text(title)
+                    .font(.headline)
+            }
             content
         }
     }
@@ -595,14 +607,24 @@ struct PostImageSection: View {
             if !selectedImages.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        ForEach(Array(selectedImages.enumerated()), id: \.offset) { _, image in
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 78, height: 78)
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        ForEach(Array(selectedImages.enumerated()), id: \.offset) { index, image in
+                            RemovablePostImageThumbnail(
+                                size: 78,
+                                cornerRadius: 10,
+                                onRemove: {
+                                    guard selectedImages.indices.contains(index) else { return }
+                                    selectedImages.remove(at: index)
+                                }
+                            ) {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .tappableImagePreview(image)
+                            }
                         }
                     }
+                    .padding(.top, 7)
+                    .padding(.trailing, 7)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -615,25 +637,73 @@ struct PostImageSection: View {
     }
 }
 
+struct RemovablePostImageThumbnail<Content: View>: View {
+    let size: CGFloat
+    let cornerRadius: CGFloat
+    let onRemove: () -> Void
+    private let content: Content
+
+    init(
+        size: CGFloat = 84,
+        cornerRadius: CGFloat = 12,
+        onRemove: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.size = size
+        self.cornerRadius = cornerRadius
+        self.onRemove = onRemove
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            content
+                .frame(width: size, height: size)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: cornerRadius,
+                        style: .continuous
+                    )
+                )
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(Color.black.opacity(0.72))
+                    .clipShape(Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .offset(x: 7, y: -7)
+            .accessibilityLabel(L10n.tr("Remove image", "移除图片"))
+        }
+    }
+}
+
 struct PostTextEditorCard: View {
     @Binding var text: String
     let placeholder: String?
     let minHeight: CGFloat
     let font: Font
     let isFirstResponder: Binding<Bool>?
+    let bottomContentInset: CGFloat
 
     init(
         text: Binding<String>,
         placeholder: String? = nil,
         minHeight: CGFloat = 100,
         font: Font = .system(size: 17),
-        isFirstResponder: Binding<Bool>? = nil
+        isFirstResponder: Binding<Bool>? = nil,
+        bottomContentInset: CGFloat = 0
     ) {
         self._text = text
         self.placeholder = placeholder
         self.minHeight = minHeight
         self.font = font
         self.isFirstResponder = isFirstResponder
+        self.bottomContentInset = bottomContentInset
     }
 
     var body: some View {
@@ -644,7 +714,9 @@ struct PostTextEditorCard: View {
                 isFirstResponder: isFirstResponder
             )
                 .frame(minHeight: minHeight)
-                .padding(12)
+                .padding(.horizontal, 12)
+                .padding(.top, 12)
+                .padding(.bottom, 12 + bottomContentInset)
 
             if let placeholder,
                text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

@@ -375,54 +375,55 @@ struct ProfileActivityView: View {
     }
 
     private var embeddedContent: some View {
-        VStack(spacing: 0) {
-            embeddedActivityPicker
+        ProfileRoundedContentSurface {
+            VStack(spacing: 0) {
+                embeddedActivityPicker
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 0) {
-                    ForEach(ProfileActivityKind.allCases) { kind in
-                        activityPage(for: kind, embedsInParentScroll: true)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .containerRelativeFrame(.horizontal)
-                            .background {
-                                // Keep intrinsic height measurement separate
-                                // from the full-height pager hit region.
-                                GeometryReader { proxy in
-                                    Color.clear.preference(
-                                        key: ProfileActivityPageHeightPreferenceKey.self,
-                                        value: [kind: proxy.size.height]
-                                    )
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 0) {
+                        ForEach(ProfileActivityKind.allCases) { kind in
+                            activityPage(for: kind, embedsInParentScroll: true)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .containerRelativeFrame(.horizontal)
+                                .background {
+                                    // Keep intrinsic height measurement separate
+                                    // from the full-height pager hit region.
+                                    GeometryReader { proxy in
+                                        Color.clear.preference(
+                                            key: ProfileActivityPageHeightPreferenceKey.self,
+                                            value: [kind: proxy.size.height]
+                                        )
+                                    }
                                 }
-                            }
-                            .frame(
-                                minHeight: embeddedPagerHeight,
-                                alignment: .top
-                            )
-                            .background(AppColors.pageBackground)
-                            .contentShape(Rectangle())
-                            .id(kind)
+                                .frame(
+                                    minHeight: embeddedPagerHeight,
+                                    alignment: .top
+                                )
+                                .background(AppColors.pageBackground)
+                                .contentShape(Rectangle())
+                                .id(kind)
+                        }
                     }
+                    .scrollTargetLayout()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(ProfileActivityPagerScrollViewConfiguration())
                 }
-                .scrollTargetLayout()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(ProfileActivityPagerScrollViewConfiguration())
-            }
-            .scrollTargetBehavior(.paging)
-            .scrollPosition(id: embeddedSelectedKindBinding)
-            .frame(height: embeddedPagerHeight, alignment: .top)
-            .background(AppColors.pageBackground)
-            .clipped()
-            .contentShape(Rectangle())
-            .onPreferenceChange(ProfileActivityPageHeightPreferenceKey.self) { heights in
-                for (kind, height) in heights where height > 0 {
-                    guard abs((embeddedPageHeights[kind] ?? 0) - height) > 0.5 else {
-                        continue
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: embeddedSelectedKindBinding)
+                .frame(height: embeddedPagerHeight, alignment: .top)
+                .background(AppColors.pageBackground)
+                .clipped()
+                .contentShape(Rectangle())
+                .onPreferenceChange(ProfileActivityPageHeightPreferenceKey.self) { heights in
+                    for (kind, height) in heights where height > 0 {
+                        guard abs((embeddedPageHeights[kind] ?? 0) - height) > 0.5 else {
+                            continue
+                        }
+                        embeddedPageHeights[kind] = height
                     }
-                    embeddedPageHeights[kind] = height
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -452,9 +453,6 @@ struct ProfileActivityView: View {
                 Task { await setPostPrivacy(item, hidden: hidden) }
             },
             onShare: share,
-            onOpenForumBoard: { boardID in
-                destination = .forumBoard(boardID)
-            },
             onActionError: { message in
                 navigationErrorMessage = message
             },
@@ -794,7 +792,6 @@ private struct ProfileActivityPageView: View {
     let onOpenForum: (ForumPostItem, UUID?) -> Void
     let onSetPrivacy: (ProfileActivityItem, Bool) -> Void
     let onShare: (ProfileActivityItem) -> Void
-    let onOpenForumBoard: (UUID) -> Void
     let onActionError: (String) -> Void
     let onPerformAction: (ProfileActivityPostAction, ProfileActivityItem) -> Void
     let onSelectPublishedKind: (PostKind) -> Void
@@ -824,7 +821,6 @@ private struct ProfileActivityPageView: View {
         onOpenForum: @escaping (ForumPostItem, UUID?) -> Void,
         onSetPrivacy: @escaping (ProfileActivityItem, Bool) -> Void,
         onShare: @escaping (ProfileActivityItem) -> Void,
-        onOpenForumBoard: @escaping (UUID) -> Void,
         onActionError: @escaping (String) -> Void,
         onPerformAction: @escaping (ProfileActivityPostAction, ProfileActivityItem) -> Void,
         onSelectPublishedKind: @escaping (PostKind) -> Void
@@ -844,7 +840,6 @@ private struct ProfileActivityPageView: View {
         self.onOpenForum = onOpenForum
         self.onSetPrivacy = onSetPrivacy
         self.onShare = onShare
-        self.onOpenForumBoard = onOpenForumBoard
         self.onActionError = onActionError
         self.onPerformAction = onPerformAction
         self.onSelectPublishedKind = onSelectPublishedKind
@@ -912,7 +907,10 @@ private struct ProfileActivityPageView: View {
                 await forumPostLoader.load(
                     postIDs: forumPostIDs,
                     viewerID: userID,
-                    force: refreshGeneration > 0
+                    // This is the current user's management surface. Feed cache
+                    // may predate an avatar or anonymity change, so profile rows
+                    // must hydrate from the authoritative forum view.
+                    force: true
                 )
             }
             .task(id: secondhandPostLoadTaskID) {
@@ -1185,7 +1183,6 @@ private struct ProfileActivityPageView: View {
                 ProfileForumPostCardView(
                     post: post,
                     onTap: { onOpenForum(post, item.commentID) },
-                    onBoardTap: { onOpenForumBoard(post.boardID) },
                     onShareTap: { onShare(item) },
                     onActionError: onActionError,
                     showsOwnerAnonymousBadge: isPublishedManagement && post.isAnonymous
@@ -1842,7 +1839,6 @@ struct PrivateContentView: View {
 private enum ProfileActivityDestination: Identifiable, Hashable {
     case secondhand(SecondhandItem)
     case forum(ForumPostItem, commentID: UUID?)
-    case forumBoard(UUID)
 
     var id: String {
         switch self {
@@ -1850,8 +1846,6 @@ private enum ProfileActivityDestination: Identifiable, Hashable {
             return "secondhand:\(item.id)"
         case .forum(let post, let commentID):
             return "forum:\(post.id):\(commentID?.uuidString ?? "")"
-        case .forumBoard(let boardID):
-            return "forum-board:\(boardID.uuidString)"
         }
     }
 }
@@ -1868,8 +1862,6 @@ private struct ProfileActivityPostDetailRouter: View {
                 post: post,
                 initialCommentID: commentID
             )
-        case .forumBoard(let boardID):
-            ForumBoardView(boardID: boardID)
         }
     }
 }

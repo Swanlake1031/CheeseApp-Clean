@@ -1,8 +1,45 @@
 import XCTest
 import SwiftUI
+import Supabase
 @testable import CheeseApp
 
 final class HomeFeedServiceTests: XCTestCase {
+    func testRecommendationSessionPaginationKeepsSessionAndAdvancesByPage() {
+        let sessionID = UUID()
+        var state = RecommendationSessionPaginationState(sessionID: sessionID)
+
+        state.recordPage(itemCount: 20)
+        XCTAssertEqual(state.sessionID, sessionID)
+        XCTAssertEqual(state.offset, 20)
+
+        state.recordPage(itemCount: 20)
+        XCTAssertEqual(state.sessionID, sessionID)
+        XCTAssertEqual(state.offset, 40)
+    }
+
+    func testRecommendationVisibilityThresholdsIgnoreFastScrolling() {
+        let fast = ForumRecommendationVisibilityPolicy.qualifies(
+            visibleFraction: 0.8,
+            dwellMilliseconds: 500
+        )
+        XCTAssertFalse(fast.qualifiedImpression)
+        XCTAssertFalse(fast.meaningfulRead)
+
+        let qualified = ForumRecommendationVisibilityPolicy.qualifies(
+            visibleFraction: 0.5,
+            dwellMilliseconds: 1_000
+        )
+        XCTAssertTrue(qualified.qualifiedImpression)
+        XCTAssertFalse(qualified.meaningfulRead)
+
+        let meaningful = ForumRecommendationVisibilityPolicy.qualifies(
+            visibleFraction: 0.5,
+            dwellMilliseconds: 3_000
+        )
+        XCTAssertTrue(meaningful.qualifiedImpression)
+        XCTAssertTrue(meaningful.meaningfulRead)
+    }
+
     @MainActor
     func testFreshResolvedHomeFeedDoesNotReload() {
         let loadedAt = Date(timeIntervalSince1970: 10_000)
@@ -88,6 +125,40 @@ final class HomeFeedServiceTests: XCTestCase {
         )
     }
 
+    func testTransientSessionFailuresPreserveLocalAuth() {
+        XCTAssertFalse(
+            AuthSessionFailurePolicy.shouldResetAuth(
+                for: URLError(.timedOut)
+            )
+        )
+        XCTAssertFalse(
+            AuthSessionFailurePolicy.shouldResetAuth(
+                statusCode: 504,
+                errorCode: .requestTimeout
+            )
+        )
+    }
+
+    func testDefinitiveSessionFailuresResetAuth() {
+        XCTAssertTrue(
+            AuthSessionFailurePolicy.shouldResetAuth(
+                for: AuthError.sessionMissing
+            )
+        )
+        XCTAssertTrue(
+            AuthSessionFailurePolicy.shouldResetAuth(
+                statusCode: 401,
+                errorCode: .unknown
+            )
+        )
+        XCTAssertTrue(
+            AuthSessionFailurePolicy.shouldResetAuth(
+                statusCode: 400,
+                errorCode: .refreshTokenAlreadyUsed
+            )
+        )
+    }
+
     func testHomeFeedRetriesTransientMissingSessionFailures() {
         XCTAssertTrue(
             HomeFeedAuthFailurePolicy.shouldRetry(
@@ -129,7 +200,7 @@ final class HomeFeedServiceTests: XCTestCase {
     func testHomeFeedTabsUseRequestedOrder() {
         XCTAssertEqual(
             HomeFeedTab.allCases,
-            [.recommended, .following, .forum, .secondhand]
+            [.following, .forum, .secondhand]
         )
     }
 

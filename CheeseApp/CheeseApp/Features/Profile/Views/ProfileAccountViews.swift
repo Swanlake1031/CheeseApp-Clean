@@ -227,6 +227,22 @@ struct AddAccountView: View {
     @State private var errorMessage: String?
     @State private var successMessage: String?
 
+    private enum AccountAccessMode: String, CaseIterable, Identifiable {
+        case login
+        case register
+
+        var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .login: "登录已有账号"
+            case .register: "注册新账号"
+            }
+        }
+    }
+
+    @State private var accessMode: AccountAccessMode = .login
+
     private enum SocialProvider {
         case apple
         case google
@@ -244,7 +260,9 @@ struct AddAccountView: View {
             return
         }
         if isGmailInput {
-            errorMessage = "检测到 Gmail 邮箱，请使用下方 Google 登录添加账号。"
+            errorMessage = accessMode == .login
+                ? "检测到 Gmail 邮箱，请使用下方 Google 登录添加账号。"
+                : "检测到 Gmail 邮箱，请使用下方 Google 注册添加账号。"
             successMessage = nil
             return
         }
@@ -255,11 +273,24 @@ struct AddAccountView: View {
         defer { isLoading = false }
 
         do {
-            let addedId = try await authService.addAccount(email: email, password: password)
-            if addedId == authService.currentUser?.id {
-                finishAddAccountFlow(message: "该账号已是当前登录账号。")
-            } else {
-                finishAddAccountFlow(message: "账号已添加成功。")
+            switch accessMode {
+            case .login:
+                let addedId = try await authService.addAccount(email: email, password: password)
+                if addedId == authService.currentUser?.id {
+                    finishAddAccountFlow(message: "该账号已是当前登录账号。")
+                } else {
+                    finishAddAccountFlow(message: "账号已添加成功。")
+                }
+            case .register:
+                let result = try await authService.registerAccount(email: email, password: password)
+                switch result {
+                case .added:
+                    finishAddAccountFlow(message: "新账号已注册并添加成功。")
+                case .emailVerificationRequired:
+                    accessMode = .login
+                    password = ""
+                    successMessage = "注册成功，请先验证邮箱，再回到这里登录添加账号。"
+                }
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -281,7 +312,11 @@ struct AddAccountView: View {
 
         do {
             _ = try await authService.addAccountWithGoogle()
-            finishAddAccountFlow(message: "Google 账号已添加成功。")
+            finishAddAccountFlow(
+                message: accessMode == .login
+                    ? "Google 账号已添加成功。"
+                    : "Google 账号已注册并添加成功。"
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -302,7 +337,11 @@ struct AddAccountView: View {
 
         do {
             _ = try await authService.addAccountWithApple()
-            finishAddAccountFlow(message: "Apple 账号已添加成功。")
+            finishAddAccountFlow(
+                message: accessMode == .login
+                    ? "Apple 账号已添加成功。"
+                    : "Apple 账号已注册并添加成功。"
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -341,8 +380,20 @@ struct AddAccountView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
 
+                    Picker("账号操作", selection: $accessMode) {
+                        ForEach(AccountAccessMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(isLoading || activeSocialProvider != nil || accountLimitReached)
+                    .onChange(of: accessMode) { _, _ in
+                        errorMessage = nil
+                        successMessage = nil
+                    }
+
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("邮箱登录添加")
+                        Text(accessMode == .login ? "邮箱登录添加" : "邮箱注册添加")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(AppColors.textPrimary)
 
@@ -357,7 +408,11 @@ struct AddAccountView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "info.circle.fill")
                                     .foregroundStyle(AppColors.link)
-                                Text("检测到 Gmail 邮箱，请使用下方 Google 登录添加账号。")
+                                Text(
+                                    accessMode == .login
+                                        ? "检测到 Gmail 邮箱，请使用下方 Google 登录添加账号。"
+                                        : "检测到 Gmail 邮箱，请使用下方 Google 注册添加账号。"
+                                )
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(AppColors.textMuted)
                             }
@@ -383,7 +438,11 @@ struct AddAccountView: View {
                                 } else {
                                     Image(systemName: "plus.circle.fill")
                                 }
-                                Text(isLoading ? "添加中..." : "添加账号")
+                                Text(
+                                    isLoading
+                                        ? (accessMode == .login ? "添加中..." : "注册中...")
+                                        : (accessMode == .login ? "登录并添加" : "注册并添加")
+                                )
                                     .font(.system(size: 15, weight: .semibold))
                             }
                             .foregroundStyle(.black)
@@ -402,7 +461,7 @@ struct AddAccountView: View {
                     .cheeseCardChrome(cornerRadius: 16)
 
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("社交账号添加")
+                        Text(accessMode == .login ? "社交账号登录添加" : "社交账号注册添加")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(AppColors.textPrimary)
 
@@ -422,13 +481,19 @@ struct AddAccountView: View {
                                 action: { Task { await addByGoogle() } }
                             )
                         }
+
+                        if accessMode == .register {
+                            Text("使用 Apple 或 Google 时，新用户会自动注册并添加；已有用户会直接登录添加。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(AppColors.textMuted)
+                        }
                     }
                     .padding(16)
                     .background(AppColors.cardBackground)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .cheeseCardChrome(cornerRadius: 16)
 
-                    Text("提示：添加账号不会退出当前账号，最多同时保存 \(authService.maxSavedAccountCount) 个账号。")
+                    Text("提示：登录或注册新账号都不会退出当前账号，最多同时保存 \(authService.maxSavedAccountCount) 个账号。")
                         .font(.system(size: 12))
                         .foregroundStyle(AppColors.textMuted)
                         .frame(maxWidth: .infinity, alignment: .leading)

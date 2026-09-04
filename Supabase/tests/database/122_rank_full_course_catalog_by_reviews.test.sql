@@ -17,8 +17,9 @@ SET LOCAL ROLE authenticated;
 
 SELECT is(
   (SELECT count(*) FROM public.get_course_catalog()),
-  (SELECT count(*) FROM public.courses),
-  'the popular course surface returns the complete course catalog'
+  (SELECT count(*) FROM public.courses
+   WHERE subject IN ('MATH', 'STATS', 'ECON', 'COMMERCE')),
+  'the legacy course surface returns every subject understood by released clients'
 );
 
 SELECT ok(

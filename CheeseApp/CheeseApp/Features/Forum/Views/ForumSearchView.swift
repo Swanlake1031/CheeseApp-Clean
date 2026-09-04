@@ -1,5 +1,9 @@
 import SwiftUI
 
+private struct ForumSearchHashtagRoute: Identifiable, Hashable {
+    let id: UUID
+}
+
 struct ForumSearchView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
@@ -9,6 +13,7 @@ struct ForumSearchView: View {
     @State private var query = ""
     @State private var results: [ForumPostItem] = []
     @State private var selectedPost: ForumPostItem?
+    @State private var selectedHashtag: ForumSearchHashtagRoute?
     @State private var isLoading = false
     @State private var isLoadingMore = false
     @State private var hasMore = false
@@ -34,8 +39,8 @@ struct ForumSearchView: View {
                         CheeseSearchTextField(
                             text: $query,
                             placeholder: initialBoard.map {
-                                L10n.tr("Search \($0.name)", "搜索\($0.name)")
-                            } ?? L10n.tr("Search posts and boards", "搜索帖子和板块"),
+                                L10n.tr("Search #\($0.name)", "搜索 #\($0.name)")
+                            } ?? L10n.tr("Search posts and Hashtags", "搜索帖子和 Hashtag"),
                             isFirstResponder: $isSearchFocused
                         )
                         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 22)
@@ -60,6 +65,9 @@ struct ForumSearchView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(item: $selectedPost) { ForumDetailView(post: $0) }
+        .navigationDestination(item: $selectedHashtag) {
+            ForumBoardView(boardID: $0.id)
+        }
         .task { isSearchFocused = true }
         .task(id: query) {
             do {
@@ -79,8 +87,8 @@ struct ForumSearchView: View {
                 L10n.tr("Search Forum", "搜索论坛"),
                 systemImage: "magnifyingglass",
                 description: Text(L10n.tr(
-                    "Search post titles, content, or board names.",
-                    "可搜索帖子标题、正文或板块名称。"
+                    "Search post titles, content, or Hashtag names.",
+                    "可搜索帖子标题、正文或 Hashtag 名称。"
                 ))
             )
         } else if isLoading {
@@ -93,35 +101,50 @@ struct ForumSearchView: View {
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 0) {
                     ForEach(results, id: \.id) { (post: ForumPostItem) in
-                        Button(action: { selectedPost = post }) {
-                            VStack(alignment: .leading, spacing: 7) {
-                                Label(post.boardName, systemImage: post.boardIcon)
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(AppColors.accentStrong)
-                                Text(post.title)
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(AppColors.textPrimary)
-                                    .lineLimit(2)
-                                Text(post.content)
-                                    .font(.system(size: 13))
+                        VStack(alignment: .leading, spacing: 7) {
+                            Button {
+                                selectedHashtag = ForumSearchHashtagRoute(
+                                    id: post.boardID
+                                )
+                            } label: {
+                                ForumHashtagChip(name: post.boardName)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                L10n.tr(
+                                    "Open #\(post.boardName) hashtag",
+                                    "查看 #\(post.boardName) Hashtag"
+                                )
+                            )
+
+                            Button(action: { selectedPost = post }) {
+                                VStack(alignment: .leading, spacing: 7) {
+                                    Text(post.title)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(AppColors.textPrimary)
+                                        .lineLimit(2)
+                                    Text(post.content)
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(AppColors.textMuted)
+                                        .lineLimit(2)
+                                    HStack {
+                                        Text(post.authorName)
+                                        Spacer()
+                                        Text(post.timeAgo)
+                                    }
+                                    .font(.system(size: 11))
                                     .foregroundStyle(AppColors.textMuted)
-                                    .lineLimit(2)
-                                HStack {
-                                    Text(post.authorName)
-                                    Spacer()
-                                    Text(post.timeAgo)
                                 }
-                                .font(.system(size: 11))
-                                .foregroundStyle(AppColors.textMuted)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 14)
-                            .overlay(alignment: .bottom) {
-                                Divider()
-                                    .overlay(AppColors.divider)
-                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
+                        .padding(.vertical, 14)
+                        .overlay(alignment: .bottom) {
+                            Divider()
+                                .overlay(AppColors.divider)
+                        }
                     }
 
                     if isLoadingMore {

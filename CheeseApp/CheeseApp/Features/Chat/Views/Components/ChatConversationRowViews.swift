@@ -20,6 +20,11 @@ struct SwipeableDeleteNavigationRow<RowContent: View>: View {
     private let deleteActionWidth: CGFloat = 168
     private let swipeOpenThreshold: CGFloat = 62
     private let swipeCloseDistance: CGFloat = 56
+    // Let the enclosing vertical ScrollView begin scrolling before a row can
+    // recognize its optional horizontal delete gesture. A low threshold here
+    // causes the row gesture to capture ordinary vertical drags on iOS.
+    private let swipeGestureActivationDistance: CGFloat = 24
+    private let horizontalIntentRatio: CGFloat = 1.2
     private var maxReveal: CGFloat { deleteActionWidth }
     private var currentOffset: CGFloat {
         let raw = restingOffset + dragTranslation
@@ -78,14 +83,15 @@ struct SwipeableDeleteNavigationRow<RowContent: View>: View {
     }
 
     private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 6)
+        DragGesture(minimumDistance: swipeGestureActivationDistance)
             .onChanged { value in
                 let horizontalDistance = abs(value.translation.width)
                 let verticalDistance = abs(value.translation.height)
 
                 if dragAxis == .none {
-                    guard max(horizontalDistance, verticalDistance) >= 6 else { return }
-                    dragAxis = horizontalDistance > verticalDistance ? .horizontal : .vertical
+                    dragAxis = horizontalDistance >= verticalDistance * horizontalIntentRatio
+                        ? .horizontal
+                        : .vertical
                 }
 
                 guard dragAxis == .horizontal else {

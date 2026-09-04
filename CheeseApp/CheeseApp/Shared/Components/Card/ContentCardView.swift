@@ -8,17 +8,37 @@
 
 import SwiftUI
 
-enum ForumCardHeaderStyle {
-    case board
-    case author
+enum PostPreviewTypography {
+    static let username: Font = .system(size: 15, weight: .bold)
+}
+
+struct ForumHashtagChip: View {
+    let name: String
+
+    private var displayName: String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.hasPrefix("#") ? trimmed : "# \(trimmed)"
+    }
+
+    var body: some View {
+        Text(displayName)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(AppColors.textMuted)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color(.systemGray6))
+            .clipShape(Capsule())
+            .contentShape(Capsule())
+    }
 }
 
 struct ContentCardView: View {
     let item: HomeCardItem
     var interaction: PostInteractionState?
-    var forumHeaderStyle: ForumCardHeaderStyle = .board
     var presentsSecondhandAsForumBoard = false
     var usesSecondhandRowSurface = false
+    var showsCategoryMetadata = true
     var onTap: (() -> Void)?
     var onBoardTap: (() -> Void)?
     var onAuthorTap: (() -> Void)?
@@ -47,12 +67,7 @@ struct ContentCardView: View {
             spacing: item.category == .forum ? 9 : 13
         ) {
             if item.category == .forum {
-                switch forumHeaderStyle {
-                case .board:
-                    forumBoardHeader
-                case .author:
-                    forumAuthorHeader
-                }
+                forumAuthorHeader
             } else {
                 metadataRow
             }
@@ -112,68 +127,19 @@ struct ContentCardView: View {
         item.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var forumBoardHeader: some View {
-        HStack(spacing: 10) {
-            Button(action: { onBoardTap?() }) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .fill(AppColors.accent.opacity(0.28))
-
-                    Image(systemName: item.boardIcon ?? "bubble.left.and.bubble.right.fill")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(AppColors.accentStrong)
-                }
-                .frame(width: 38, height: 38)
-            }
-            .buttonStyle(.plain)
-            .disabled(onBoardTap == nil)
-            .accessibilityLabel(forumBoardAccessibilityLabel)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Button(action: { onBoardTap?() }) {
-                    HStack(spacing: 5) {
-                        Text(item.badgeText ?? item.category.localizedTitle)
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(AppColors.textPrimary)
-                            .lineLimit(1)
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(AppColors.textMuted)
-                    }
-                    .fixedSize(horizontal: true, vertical: false)
-                }
-                .buttonStyle(.plain)
-                .disabled(onBoardTap == nil)
-                .accessibilityLabel(forumBoardAccessibilityLabel)
-
-                boardMetadataRow
-            }
-
-            Spacer(minLength: 0)
-        }
-    }
-
-    private var forumBoardAccessibilityLabel: String {
-        L10n.tr(
-            "Open \(item.badgeText ?? "forum") board",
-            "进入\(item.badgeText ?? "论坛")板块"
-        )
-    }
-
-    /// A board page already establishes the category in its own header, so its
-    /// rows identify the author instead. Mixed feeds keep the board header.
+    /// Every forum preview uses the same author-first header. Hashtags belong to
+    /// the post detail surface instead of creating a second feed-card variant.
     private var forumAuthorHeader: some View {
         HStack(spacing: 10) {
-            footerAvatar
+            tappableFooterAvatar
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
-                    Text(footerName)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(AppColors.textPrimary)
-                        .lineLimit(1)
+                    tappableFooterName(font: PostPreviewTypography.username)
 
+                    if item.isAuthorOfficial {
+                        OfficialVerificationBadge(style: .icon)
+                    }
                     if item.isAuthorMcMasterVerified {
                         McMasterStudentBadge()
                     }
@@ -189,7 +155,6 @@ struct ContentCardView: View {
 
             Spacer(minLength: 0)
         }
-        .contentShape(Rectangle())
     }
 
     private var secondhandCard: some View {
@@ -208,9 +173,11 @@ struct ContentCardView: View {
 
             if !item.images.isEmpty {
                 FeedMediaStrip(
-                    images: item.images,
+                    images: Array(item.images.prefix(1)),
                     metrics: .secondhand,
-                    targetPixelWidth: 900
+                    targetPixelWidth: RemoteImagePurpose.feedThumbnail.targetPixelWidth,
+                    previewURLStrings: item.originalImageURLs.prefix(1).map(\.absoluteString),
+                    showsRetryButton: true
                 )
             }
 
@@ -259,12 +226,7 @@ struct ContentCardView: View {
         if presentsSecondhandAsForumBoard {
             secondhandBoardHeader
         } else {
-            Button(action: { onAuthorTap?() }) {
-                metadataRow
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(onAuthorTap == nil)
+            metadataRow
         }
     }
 
@@ -287,7 +249,7 @@ struct ContentCardView: View {
             }
             .buttonStyle(.plain)
             .disabled(onBoardTap == nil)
-            .accessibilityLabel(L10n.tr("Open Secondhand", "进入二手板块"))
+            .accessibilityLabel(L10n.tr("Open Secondhand", "进入二手"))
 
             VStack(alignment: .leading, spacing: 3) {
                 Button(action: { onBoardTap?() }) {
@@ -305,7 +267,7 @@ struct ContentCardView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(onBoardTap == nil)
-                .accessibilityLabel(L10n.tr("Open Secondhand", "进入二手板块"))
+                .accessibilityLabel(L10n.tr("Open Secondhand", "进入二手"))
 
                 boardMetadataRow
             }
@@ -367,14 +329,13 @@ struct ContentCardView: View {
 
     private var metadataRow: some View {
         HStack(spacing: 8) {
-            footerAvatar
+            tappableFooterAvatar
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
-                    Text(footerName)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(AppColors.textPrimary)
-                        .lineLimit(1)
+                    tappableFooterName(
+                        font: .system(size: 12, weight: .bold)
+                    )
 
                     if item.isAuthorMcMasterVerified {
                         McMasterStudentBadge()
@@ -382,9 +343,13 @@ struct ContentCardView: View {
                 }
 
                 HStack(spacing: 5) {
-                    Text(item.badgeText ?? item.category.localizedTitle)
+                    if showsCategoryMetadata {
+                        Text(item.badgeText ?? item.category.localizedTitle)
+                    }
                     if let timeText = item.timeText, !timeText.isEmpty {
-                        Text("·")
+                        if showsCategoryMetadata {
+                            Text("·")
+                        }
                         Text(timeText)
                     }
                 }
@@ -395,7 +360,9 @@ struct ContentCardView: View {
 
             Spacer()
 
-            categoryCapsule
+            if showsCategoryMetadata {
+                categoryCapsule
+            }
         }
     }
 
@@ -463,14 +430,56 @@ struct ContentCardView: View {
 
     @ViewBuilder
     private var footerAvatar: some View {
-        switch item.footer {
-        case .posted(_, let avatar), .hosted(_, let avatar):
-            AvatarView(source: avatar, size: 32)
-        case .avatars(_, let avatars):
-            AvatarView(source: avatars.first ?? .placeholder, size: 32)
-        case .none:
-            AvatarView(source: .placeholder, size: 32)
+        if item.isAnonymous {
+            AnonymousAvatarView(size: 32)
+        } else {
+            switch item.footer {
+            case .posted(_, let avatar), .hosted(_, let avatar):
+                AvatarView(source: avatar, size: 32)
+            case .avatars(_, let avatars):
+                AvatarView(source: avatars.first ?? .placeholder, size: 32)
+            case .none:
+                AvatarView(source: .placeholder, size: 32)
+            }
         }
+    }
+
+    @ViewBuilder
+    private var tappableFooterAvatar: some View {
+        if let onAuthorTap {
+            Button(action: onAuthorTap) {
+                footerAvatar
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                L10n.tr("Open \(footerName)'s profile", "查看 \(footerName) 的个人主页")
+            )
+        } else {
+            footerAvatar
+        }
+    }
+
+    @ViewBuilder
+    private func tappableFooterName(font: Font) -> some View {
+        if let onAuthorTap {
+            Button(action: onAuthorTap) {
+                footerNameLabel(font: font)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                L10n.tr("Open \(footerName)'s profile", "查看 \(footerName) 的个人主页")
+            )
+        } else {
+            footerNameLabel(font: font)
+        }
+    }
+
+    private func footerNameLabel(font: Font) -> some View {
+        Text(footerName)
+            .font(font)
+            .foregroundStyle(AppColors.textPrimary)
+            .lineLimit(1)
     }
 
     private var footerName: String {
@@ -544,27 +553,42 @@ struct AvatarView: View {
 
     var body: some View {
         Group {
-            if source.isPlaceholder {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [AppColors.accentStrong.opacity(0.95), AppColors.accent],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay {
-                        Image(systemName: "person.fill")
-                            .font(.system(size: size * 0.44, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-            } else {
-                source.view(targetPixelWidth: 160)
+            switch source {
+            case .asset(let name):
+                Image(name)
+                    .resizable()
+                    .scaledToFill()
+            case .url(let url):
+                CachedRemoteImage(url: url, targetPixelWidth: 160) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    avatarPlaceholder
+                }
+            case .placeholder:
+                avatarPlaceholder
             }
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
         .overlay(Circle().stroke(.white, lineWidth: 1))
+    }
+
+    private var avatarPlaceholder: some View {
+        Circle()
+            .fill(
+                LinearGradient(
+                    colors: [AppColors.accentStrong.opacity(0.95), AppColors.accent],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                Image(systemName: "person.fill")
+                    .font(.system(size: size * 0.44, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
     }
 }
 

@@ -20,8 +20,8 @@ private struct SecondhandDraftPayload: Codable {
 enum SecondhandCreateFormRules {
     static let maximumPrice = 99_999_999.99
     static let maximumPriceText = "CAD 99,999,999.99"
-    static let defaultCategory: SecondhandPost.Category = .homeAppliances
-    static let defaultCondition = SecondhandPost.Condition.good.rawValue
+    static let defaultCategory: SecondhandPost.Category? = nil
+    static let defaultCondition = ""
     static let defaultIsNegotiable = false
 
     static func normalizedRequiredText(_ value: String) -> String {
@@ -46,10 +46,18 @@ enum SecondhandCreateFormRules {
         return price > maximumPrice
     }
 
-    static func isValid(title: String, price: String, imageCount: Int) -> Bool {
+    static func isValid(
+        title: String,
+        price: String,
+        imageCount: Int,
+        category: SecondhandPost.Category?,
+        condition: String
+    ) -> Bool {
         !normalizedRequiredText(title).isEmpty
             && validPrice(from: price) != nil
             && imageCount > 0
+            && category != nil
+            && SecondhandPost.Condition(rawValue: condition) != nil
     }
 
     static func validOriginalPrice(from value: String, sellingPrice: Double) -> Double? {
@@ -70,13 +78,14 @@ struct CreateSecondhandView: View {
     var autoRestoreDraft: Bool = false
     var onCreated: (() -> Void)? = nil
     var onExit: (() -> Void)? = nil
+    var onBusyChanged: ((Bool) -> Void)? = nil
     
     // 表单字段
     @State private var title = ""
     @State private var description = ""
     @State private var price = ""
     @State private var originalPrice = ""
-    @State private var category = SecondhandCreateFormRules.defaultCategory
+    @State private var category: SecondhandPost.Category? = SecondhandCreateFormRules.defaultCategory
     @State private var condition = SecondhandCreateFormRules.defaultCondition
     @State private var isNegotiable = SecondhandCreateFormRules.defaultIsNegotiable
     @State private var selectedImages: [UIImage] = []
@@ -86,15 +95,25 @@ struct CreateSecondhandView: View {
     @State private var showExitDraftPrompt = false
     @State private var publishRequestID = UUID()
     @State private var isDescriptionFocused = false
+    @StateObject private var aiDescriptionModel = SecondhandAIDescriptionViewModel()
+    @State private var showAIOverwriteConfirmation = false
+    @State private var showAILateOverwriteConfirmation = false
+    @State private var pendingAIDescription: String?
+    @State private var aiGenerationTask: Task<Void, Never>?
+    @State private var hasFinishedCreateFlow = false
     
     // 状态
     @State private var isLoading = false
     @State private var errorMessage: String?
     
     private var canAttemptPublish: Bool {
-        !SecondhandCreateFormRules.normalizedRequiredText(title).isEmpty
-            && !price.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !selectedImages.isEmpty
+        SecondhandCreateFormRules.isValid(
+            title: title,
+            price: price,
+            imageCount: selectedImages.count,
+            category: category,
+            condition: condition
+        )
     }
 
     private var priceLimitMessage: String? {
@@ -121,32 +140,111 @@ struct CreateSecondhandView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 20) {
-                        SecondhandBasicInfoSection(
-                            title: $title,
-                            price: $price,
-                            originalPrice: $originalPrice
-                        )
-
-                        if let priceLimitMessage {
-                            Label(priceLimitMessage, systemImage: "exclamationmark.triangle.fill")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(Color.red)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                        PostFormSection(
+                            title: L10n.tr("Images (required)", "图片（必填）"),
+                            showsTitle: false
+                        ) {
+                            PostImageSection(selectedImages: $selectedImages)
                         }
 
-                        PostFormSection(title: L10n.tr("Images (required)", "图片（必填）")) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                PostImageSection(selectedImages: $selectedImages)
-                                Text(L10n.tr(
-                                    "Add at least one clear image of the item.",
-                                    "请至少添加一张清晰的商品图片。"
-                                ))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        PostFormSection(title: "物品名称", showsTitle: false) {
+                            SecondhandItemNameField(
+                                title: $title,
+                                iconColor: .secondary
+                            )
+                        }
+
+                        PostFormSection(title: "详细描述", showsTitle: false) {
+                            VStack(spacing: 10) {
+                                ZStack(alignment: .bottomTrailing) {
+                                    PostTextEditorCard(
+                                        text: $description,
+                                        placeholder: "描述一下商品的新旧程度、使用情况、交易方式等...",
+                                        minHeight: 100,
+                                        isFirstResponder: $isDescriptionFocused,
+                                        bottomContentInset: 44
+                                    )
+
+                                    Button(action: requestAIDescription) {
+                                        HStack(spacing: 6) {
+                                            if aiDescriptionModel.isGenerating {
+                                                ProgressView()
+                                                    .controlSize(.small)
+                                            } else {
+                                                Image(systemName: "sparkles")
+                                                    .font(.system(size: 12, weight: .semibold))
+                                            }
+                                            Text(
+                                                aiDescriptionModel.isGenerating
+                                                    ? L10n.tr("Generating...", "生成中...")
+                                                    : L10n.tr("AI generate", "AI 生成")
+                                            )
+                                        }
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(
+                                            canGenerateAIDescription
+                                                ? AppColors.accentStrong
+                                                : AppColors.textMuted
+                                        )
+                                        .padding(.horizontal, 12)
+                                        .frame(minHeight: 36)
+                                        .background(
+                                            canGenerateAIDescription
+                                                ? AppColors.accentStrong.opacity(0.10)
+                                                : Color.secondary.opacity(0.06)
+                                        )
+                                        .clipShape(Capsule())
+                                        .overlay {
+                                            Capsule()
+                                                .stroke(
+                                                    canGenerateAIDescription
+                                                        ? AppColors.accentStrong.opacity(0.45)
+                                                        : Color.secondary.opacity(0.18),
+                                                    lineWidth: 1
+                                                )
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(!canGenerateAIDescription)
+                                    .padding(12)
+                                    .accessibilityLabel(
+                                        L10n.tr(
+                                            "Generate description with AI",
+                                            "使用 AI 生成简介"
+                                        )
+                                    )
+                                }
+
+                                if !canGenerateAIDescription,
+                                   !aiDescriptionModel.isGenerating,
+                                   !isLoading {
+                                    Text(L10n.tr(
+                                        "Add a title, valid price, category, condition, and at least one image to use AI.",
+                                        "填写商品名称、有效价格、分类、成色并添加至少一张图片后，才能使用 AI 简介。"
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(AppColors.textMuted)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                MentionSuggestionPanel(
+                                    text: $description,
+                                    selectedMentions: $selectedMentions
+                                )
+
+                                if let aiError = aiDescriptionModel.errorMessage {
+                                    Label(aiError, systemImage: "exclamationmark.circle")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(Color.red)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
                             }
                         }
+                        .id("secondhand-description")
 
-                        PostFormSection(title: L10n.tr("Category", "分类")) {
+                        PostFormSection(
+                            title: L10n.tr("Category", "分类"),
+                            showsTitle: false
+                        ) {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 10) {
                                     ForEach(SecondhandPost.Category.allCases, id: \.rawValue) { option in
@@ -163,27 +261,32 @@ struct CreateSecondhandView: View {
                             .padding(.vertical, 4)
                         }
 
-                        SecondhandConditionSection(selection: $condition)
+                        SecondhandConditionSection(
+                            selection: $condition,
+                            showsTitle: false
+                        )
 
-                        SecondhandNegotiableSection(isNegotiable: $isNegotiable)
-
-                        PostFormSection(title: "详细描述") {
-                            VStack(spacing: 10) {
-                                PostTextEditorCard(
-                                    text: $description,
-                                    placeholder: "描述一下商品的新旧程度、使用情况、交易方式等...",
-                                    minHeight: 100,
-                                    isFirstResponder: $isDescriptionFocused
-                                )
-                                MentionSuggestionPanel(
-                                    text: $description,
-                                    selectedMentions: $selectedMentions
-                                )
-                            }
+                        PostFormSection(title: "价格", showsTitle: false) {
+                            SecondhandPriceFields(
+                                price: $price,
+                                originalPrice: $originalPrice,
+                                iconColor: .secondary
+                            )
                         }
-                        .id("secondhand-description")
 
-                        PostFormSection(title: "帖子有效期") {
+                        if let priceLimitMessage {
+                            Label(priceLimitMessage, systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Color.red)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        SecondhandNegotiableSection(
+                            isNegotiable: $isNegotiable,
+                            showsTitle: false
+                        )
+
+                        PostFormSection(title: "帖子有效期", showsTitle: false) {
                             Label(
                                 "发布后公开展示 30 天，第 14 天会收到提醒，满 30 天自动转为私密内容。",
                                 systemImage: "clock.badge.checkmark"
@@ -242,7 +345,11 @@ struct CreateSecondhandView: View {
                     }
                 }
                 .foregroundStyle(canAttemptPublish ? AppColors.accentStrong : AppColors.textMuted)
-                .disabled(!canAttemptPublish || isLoading)
+                .disabled(
+                    !canAttemptPublish
+                        || isLoading
+                        || aiDescriptionModel.isGenerating
+                )
             }
         }
         .overlay(alignment: .top) {
@@ -262,20 +369,119 @@ struct CreateSecondhandView: View {
             hasRestoredInitialDraft = true
             restoreDraft(showBanner: true)
         }
+        .onDisappear {
+            aiGenerationTask?.cancel()
+            preserveInterruptedDraftIfNeeded()
+        }
+        .onChange(of: isLoading) { _, _ in
+            reportBusyState()
+        }
+        .onChange(of: aiDescriptionModel.isGenerating) { _, _ in
+            reportBusyState()
+        }
+        .alert(
+            L10n.tr("Replace the current description?", "重新生成简介？"),
+            isPresented: $showAIOverwriteConfirmation
+        ) {
+            Button(L10n.tr("Cancel", "取消"), role: .cancel) {}
+            Button(L10n.tr("Replace", "替换")) {
+                startAIDescriptionGeneration()
+            }
+        } message: {
+            Text(L10n.tr(
+                "The generated text will replace your current description. You can continue editing it afterward.",
+                "生成内容会替换当前简介，生成后仍可继续编辑。"
+            ))
+        }
+        .alert(
+            L10n.tr("Keep the generated description?", "使用生成的简介？"),
+            isPresented: $showAILateOverwriteConfirmation
+        ) {
+            Button(L10n.tr("Keep my text", "保留我的文字"), role: .cancel) {
+                pendingAIDescription = nil
+            }
+            Button(L10n.tr("Use generated text", "使用生成内容")) {
+                if let pendingAIDescription {
+                    description = pendingAIDescription
+                }
+                pendingAIDescription = nil
+            }
+        } message: {
+            Text(L10n.tr(
+                "You edited the description while AI was working. Choose which version to keep.",
+                "AI 生成期间你修改了简介，请选择要保留的版本。"
+            ))
+        }
         .alert(L10n.tr("Post not published", "帖子尚未发布"), isPresented: $showExitDraftPrompt) {
             Button(L10n.tr("Cancel", "取消"), role: .cancel) {}
             Button(L10n.tr("Discard", "不保存"), role: .destructive) {
-                finishExitNavigation()
+                finishExitNavigation(preservingDraft: false)
             }
             Button(L10n.tr("Save as draft", "存为草稿")) {
                 saveDraft(showBanner: false)
-                finishExitNavigation()
+                finishExitNavigation(preservingDraft: true)
             }
         } message: {
             Text(L10n.tr("Save as draft?", "是否存为草稿"))
         }
         .enableSwipeBackGesture()
         .interceptSwipeBack(when: hasDraftableContent, onAttempt: attemptClose)
+    }
+
+    private var canGenerateAIDescription: Bool {
+        category != nil
+            && SecondhandPost.Condition(rawValue: condition) != nil
+            && SecondhandAIDescriptionRules.canGenerate(
+                title: title,
+                price: SecondhandCreateFormRules.validPrice(from: price),
+                imageCount: selectedImages.count,
+                isGenerating: aiDescriptionModel.isGenerating,
+                isPublishing: isLoading
+            )
+    }
+
+    private func requestAIDescription() {
+        guard canGenerateAIDescription else { return }
+        if SecondhandAIDescriptionRules.requiresOverwriteConfirmation(description) {
+            showAIOverwriteConfirmation = true
+        } else {
+            startAIDescriptionGeneration()
+        }
+    }
+
+    private func startAIDescriptionGeneration() {
+        let normalizedTitle = SecondhandCreateFormRules.normalizedRequiredText(title)
+        guard canGenerateAIDescription,
+              !normalizedTitle.isEmpty,
+              let priceValue = SecondhandCreateFormRules.validPrice(from: price),
+              let category,
+              let selectedCondition = SecondhandPost.Condition(rawValue: condition)
+        else { return }
+        let descriptionAtRequestStart = description
+        let input = SecondhandAIDescriptionInput(
+            postID: publishRequestID,
+            images: Array(selectedImages.prefix(3)),
+            title: normalizedTitle,
+            category: category,
+            condition: selectedCondition,
+            price: priceValue,
+            isNegotiable: isNegotiable
+        )
+        aiGenerationTask?.cancel()
+        aiGenerationTask = Task {
+            if let generated = await aiDescriptionModel.generate(input: input) {
+                guard !Task.isCancelled else { return }
+                if SecondhandAIDescriptionRules.canApplyGeneratedDescription(
+                    currentDescription: description,
+                    descriptionAtRequestStart: descriptionAtRequestStart
+                ) {
+                    description = generated
+                } else {
+                    pendingAIDescription = generated
+                    showAILateOverwriteConfirmation = true
+                }
+            }
+        }
     }
 
     private func submit() async {
@@ -317,6 +523,15 @@ struct CreateSecondhandView: View {
             return
         }
 
+        guard let category else {
+            errorMessage = L10n.tr("Please choose a category", "请选择分类")
+            return
+        }
+        guard let selectedCondition = SecondhandPost.Condition(rawValue: condition) else {
+            errorMessage = L10n.tr("Please choose the item condition", "请选择成色")
+            return
+        }
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -347,7 +562,7 @@ struct CreateSecondhandView: View {
             price: priceValue,
             originalPrice: originalPriceValue,
             category: category,
-            condition: SecondhandPost.Condition(normalizing: condition),
+            condition: selectedCondition,
             isNegotiable: isNegotiable,
             mentionedUserIDs: MentionTextLogic.activeUserIDs(
                 in: description,
@@ -384,6 +599,7 @@ struct CreateSecondhandView: View {
             subtitle: price.isEmpty ? nil : "CAD \(price)",
             payload: payload
         )
+        CreateComposerSessionStore.save(images: selectedImages, for: .secondhand)
         if showBanner {
             showDraftBanner(L10n.tr("Draft saved", "草稿已保存"))
         }
@@ -397,9 +613,10 @@ struct CreateSecondhandView: View {
         description = payload.description
         price = payload.price
         originalPrice = payload.originalPrice ?? ""
-        category = payload.category ?? SecondhandCreateFormRules.defaultCategory
+        category = payload.category
         condition = payload.condition
         isNegotiable = payload.isNegotiable
+        selectedImages = CreateComposerSessionStore.images(for: .secondhand)
         if showBanner {
             showDraftBanner(L10n.tr("Draft restored", "草稿已恢复"))
         }
@@ -428,17 +645,18 @@ struct CreateSecondhandView: View {
     }
 
     private func attemptClose() {
-        guard !isLoading else { return }
+        guard !isLoading, !aiDescriptionModel.isGenerating else { return }
         if hasDraftableContent {
             showExitDraftPrompt = true
         } else {
-            finishExitNavigation()
+            finishExitNavigation(preservingDraft: false)
         }
     }
 
     private func finishPersistedPost(userId: UUID, postId: UUID) async {
         await SecondhandService.shared.fetchItems()
         CreateDraftStore.clear(.secondhand)
+        CreateComposerSessionStore.clear(.secondhand)
         PostFeatureEvents.postDidChange(
             kind: .secondhand,
             authorId: userId,
@@ -448,6 +666,7 @@ struct CreateSecondhandView: View {
     }
 
     private func finishNavigation() {
+        hasFinishedCreateFlow = true
         if let onCreated {
             onCreated()
         } else {
@@ -455,12 +674,28 @@ struct CreateSecondhandView: View {
         }
     }
 
-    private func finishExitNavigation() {
+    private func finishExitNavigation(preservingDraft: Bool) {
+        hasFinishedCreateFlow = true
+        if preservingDraft {
+            CreateComposerSessionStore.markResumable(.secondhand)
+        }
         if let onExit {
             onExit()
         } else {
             dismiss()
         }
+    }
+
+    private func preserveInterruptedDraftIfNeeded() {
+        guard !hasFinishedCreateFlow,
+              hasDraftableContent,
+              !isLoading
+        else { return }
+        saveDraft(showBanner: false)
+    }
+
+    private func reportBusyState() {
+        onBusyChanged?(isLoading || aiDescriptionModel.isGenerating)
     }
 
 }

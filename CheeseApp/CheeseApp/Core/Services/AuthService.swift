@@ -31,6 +31,11 @@ struct AccountIdentityStatuses {
     let apple: AccountIdentityStatus
 }
 
+enum AddedAccountRegistrationResult: Equatable {
+    case added(UUID)
+    case emailVerificationRequired
+}
+
 enum AppLifecycleRefreshPolicy {
     static func shouldRefresh(
         hasCachedData: Bool,
@@ -41,6 +46,54 @@ enum AppLifecycleRefreshPolicy {
         guard hasCachedData, let lastSuccessfulRefreshAt else { return true }
         return now.timeIntervalSince(lastSuccessfulRefreshAt) >= cacheLifetime
     }
+}
+
+enum AuthSessionFailurePolicy {
+    private static let definitiveInvalidSessionCodes: Set<ErrorCode> = [
+        .badJWT,
+        .noAuthorization,
+        .userNotFound,
+        .sessionNotFound,
+        .sessionExpired,
+        .refreshTokenNotFound,
+        .refreshTokenAlreadyUsed,
+        .userBanned,
+        .invalidJWT
+    ]
+
+    static func shouldResetAuth(for error: Error) -> Bool {
+        if error is AuthSessionValidationError {
+            return true
+        }
+
+        guard let authError = error as? AuthError else {
+            return false
+        }
+
+        switch authError {
+        case .sessionMissing, .jwtVerificationFailed:
+            return true
+        case let .api(_, errorCode, _, response):
+            return shouldResetAuth(
+                statusCode: response.statusCode,
+                errorCode: errorCode
+            )
+        default:
+            return false
+        }
+    }
+
+    static func shouldResetAuth(
+        statusCode: Int?,
+        errorCode: ErrorCode?
+    ) -> Bool {
+        statusCode == 401
+            || errorCode.map(definitiveInvalidSessionCodes.contains) == true
+    }
+}
+
+private enum AuthSessionValidationError: Error {
+    case identityMismatch
 }
 
 // MARK: - 认证服务
@@ -159,9 +212,10 @@ class AuthService: ObservableObject {
                 await leaveProfileCompletion()
             }
         } catch BootstrapTimeoutError.timedOut {
-            resetAuthState()
+            cancelSessionValidation()
+            preserveLocalSessionAfterTransientFailure()
         } catch {
-            resetAuthState()
+            handleSessionValidationFailure(error)
         }
     }
     
@@ -229,14 +283,64 @@ class AuthService: ObservableObject {
             _ = await persistCurrentSessionForAccountSwitching()
             lastSuccessfulSessionValidationAt = validatedAt
         } catch {
-            // 前台恢复遇到瞬时网络错误时保留同账号的可用缓存；下一次恢复会重试。
-            if isAuthenticated,
-               let currentUser,
-               localSessionUserId() == currentUser.id {
-                return
-            }
-            resetAuthState()
+            guard isCurrentSessionValidation(validationID) else { return }
+            handleSessionValidationFailure(error)
         }
+    }
+
+    private func handleSessionValidationFailure(_ error: Error) {
+        if AuthSessionFailurePolicy.shouldResetAuth(for: error) {
+            resetAuthState()
+        } else {
+            preserveLocalSessionAfterTransientFailure()
+        }
+    }
+
+    private func preserveLocalSessionAfterTransientFailure() {
+        guard let session = supabase.auth.currentSession else { return }
+        let userId = session.user.id
+
+        if currentUser?.id != userId {
+            let savedAccount = savedAccounts.first(where: { $0.id == userId })
+            beginAccountStateTransition()
+            currentUser = Profile(
+                id: userId,
+                publicID: nil,
+                email: savedAccount?.email.nilIfEmpty ?? session.user.email,
+                fullName: savedAccount?.displayName,
+                avatarUrl: savedAccount?.avatarURL,
+                coverImageUrl: nil,
+                school: nil,
+                schoolId: nil,
+                campusId: nil,
+                major: nil,
+                gender: nil,
+                isGenderVisible: nil,
+                occupation: nil,
+                phoneNumber: nil,
+                gradYear: nil,
+                bio: nil,
+                wechatId: nil,
+                profileCompleted: savedAccount?.profileCompleted ?? true,
+                createdAt: nil,
+                updatedAt: nil,
+                is_verified: nil,
+                isAnonymousDefault: nil,
+                isOfficial: nil,
+                isMcMasterVerified: nil
+            )
+        }
+
+        isAuthenticated = true
+        requiresProfileCompletion = needsProfileCompletion(currentUser)
+        // 保持为 nil，确保下次前台恢复不会被 5 分钟缓存窗口跳过。
+        lastSuccessfulSessionValidationAt = nil
+    }
+
+    private func cancelSessionValidation() {
+        sessionValidationTask?.cancel()
+        sessionValidationTask = nil
+        sessionValidationID = nil
     }
 
     private func isCurrentSessionValidation(_ validationID: UUID) -> Bool {
@@ -276,7 +380,7 @@ class AuthService: ObservableObject {
         // 2) 服务端校验，避免本地残留 session
         let serverUser = try await supabase.auth.user()
         guard serverUser.id == session.user.id else {
-            throw NSError(domain: "", code: 401, userInfo: [NSLocalizedDescriptionKey: "登录状态无效，请重新登录"])
+            throw AuthSessionValidationError.identityMismatch
         }
 
         return session.user.id
@@ -827,6 +931,152 @@ class AuthService: ObservableObject {
         }
     }
 
+    func registerAccount(email: String, password: String) async throws -> AddedAccountRegistrationResult {
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedEmail.isEmpty else {
+            throw NSError(
+                domain: "AuthService",
+                code: 400,
+                userInfo: [NSLocalizedDescriptionKey: "请输入邮箱地址。"]
+            )
+        }
+        guard !isGmailAddress(normalizedEmail) else {
+            throw NSError(
+                domain: "AuthService",
+                code: 400,
+                userInfo: [NSLocalizedDescriptionKey: "检测到 Gmail 邮箱，请使用 Google 注册添加账号。"]
+            )
+        }
+        guard password.count >= 6 else {
+            throw NSError(
+                domain: "AuthService",
+                code: 400,
+                userInfo: [NSLocalizedDescriptionKey: "密码至少需要 6 位。"]
+            )
+        }
+        guard !isLoading else {
+            throw NSError(
+                domain: "AuthService",
+                code: 409,
+                userInfo: [NSLocalizedDescriptionKey: "账号操作进行中，请稍后再试。"]
+            )
+        }
+        guard let currentUserId = currentUser?.id else {
+            throw NSError(
+                domain: "AuthService",
+                code: 401,
+                userInfo: [NSLocalizedDescriptionKey: "当前未登录，无法注册并添加账号。"]
+            )
+        }
+        guard savedAccounts.count < maxSavedAccounts else {
+            throw NSError(
+                domain: "AuthService",
+                code: 409,
+                userInfo: [NSLocalizedDescriptionKey: "最多只能保存 \(maxSavedAccounts) 个账号，请先手动移除一个账号后再注册。"]
+            )
+        }
+
+        let previousSession: Session
+        do {
+            previousSession = try await currentValidSession()
+        } catch {
+            throw NSError(
+                domain: "AuthService",
+                code: 401,
+                userInfo: [NSLocalizedDescriptionKey: "当前会话失效，请重新登录后再注册账号。"]
+            )
+        }
+        let previousProfile = currentUser
+
+        beginAccountStateTransition()
+        isLoading = true
+        suppressSessionValidation = true
+        errorMessage = nil
+        defer {
+            suppressSessionValidation = false
+            isLoading = false
+            activateAccountState(currentUser?.id)
+        }
+
+        do {
+            let response = try await supabase.auth.signUp(
+                email: normalizedEmail,
+                password: password
+            )
+
+            var result: AddedAccountRegistrationResult = .emailVerificationRequired
+            if let newSession = response.session {
+                guard canStoreSavedAccount(for: newSession.user.id) else {
+                    throw NSError(
+                        domain: "AuthService",
+                        code: 409,
+                        userInfo: [NSLocalizedDescriptionKey: "最多只能保存 \(maxSavedAccounts) 个账号，请先手动移除一个账号后再注册。"]
+                    )
+                }
+
+                let newProfile = try? await fetchProfileWithRetry(
+                    userId: newSession.user.id,
+                    attempts: 2
+                )
+                recordRecentLoginAccount(
+                    userId: newSession.user.id,
+                    email: newSession.user.email ?? normalizedEmail,
+                    profile: newProfile,
+                    signInMethod: .password
+                )
+                _ = try storeInactiveSavedAccount(
+                    userId: newSession.user.id,
+                    email: newSession.user.email ?? normalizedEmail,
+                    accessToken: newSession.accessToken,
+                    refreshToken: newSession.refreshToken,
+                    profile: newProfile
+                )
+                result = .added(newSession.user.id)
+            }
+
+            let restoredSession = try await restoreSession(
+                accessToken: previousSession.accessToken,
+                refreshToken: previousSession.refreshToken
+            )
+            let restoredProfile = try await fetchProfile(userId: restoredSession.user.id)
+            currentUser = restoredProfile
+            isAuthenticated = true
+            requiresProfileCompletion = needsProfileCompletion(restoredProfile)
+            _ = try upsertCurrentSavedAccount(
+                userId: restoredSession.user.id,
+                email: restoredSession.user.email ?? restoredProfile.email,
+                profile: restoredProfile
+            )
+
+            return result
+        } catch {
+            _ = try? await restoreSession(
+                accessToken: previousSession.accessToken,
+                refreshToken: previousSession.refreshToken
+            )
+            if let restoredProfile = try? await fetchProfile(userId: currentUserId) {
+                currentUser = restoredProfile
+                isAuthenticated = true
+                requiresProfileCompletion = needsProfileCompletion(restoredProfile)
+            } else if let previousProfile {
+                currentUser = previousProfile
+                isAuthenticated = true
+                requiresProfileCompletion = needsProfileCompletion(previousProfile)
+            }
+
+            let nsError = error as NSError
+            let message = nsError.domain == "AuthService"
+                ? nsError.localizedDescription
+                : signUpErrorMessage(for: error)
+            errorMessage = message
+            throw NSError(
+                domain: "AuthService",
+                code: nsError.code,
+                userInfo: [NSLocalizedDescriptionKey: message]
+            )
+        }
+    }
+
     func addAccountWithGoogle() async throws -> UUID {
         let previousUserId = currentUser?.id
         return try await addAccountBySigningIn(signInMethod: .google) {
@@ -1364,6 +1614,7 @@ class AuthService: ObservableObject {
             email: resolvedEmail,
             displayName: resolvedName,
             avatarURL: profile?.avatarUrl,
+            profileCompleted: profile?.profileCompleted,
             lastUsedAt: Date()
         )
 
@@ -1573,6 +1824,7 @@ struct SavedAuthAccount: Codable, Identifiable, Hashable {
     let email: String
     let displayName: String?
     let avatarURL: String?
+    let profileCompleted: Bool?
     let lastUsedAt: Date
 
     var displayLabel: String {

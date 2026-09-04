@@ -183,6 +183,8 @@ struct FeedMediaStrip: View {
     let metrics: FeedMediaMetrics
     var targetPixelWidth: Int = 1_024
     var allowsImagePreview = true
+    var previewURLStrings: [String]? = nil
+    var showsRetryButton = false
 
     private let engine = FeedMediaLayoutEngine()
     @State private var aspectRatios: [FeedMediaImageKey: CGFloat] = [:]
@@ -194,6 +196,14 @@ struct FeedMediaStrip: View {
 
     private var remoteURLStrings: [String] {
         images.compactMap(\.remoteURL).map(\.absoluteString)
+    }
+
+    private var resolvedPreviewURLStrings: [String] {
+        if let previewURLStrings,
+           previewURLStrings.count == images.count {
+            return previewURLStrings
+        }
+        return remoteURLStrings
     }
 
     private var contentWidth: CGFloat {
@@ -282,13 +292,14 @@ struct FeedMediaStrip: View {
             source: image,
             targetPixelWidth: targetPixelWidth,
             renderMode: layout.renderMode,
+            showsRetryButton: showsRetryButton,
             onImageSize: { updateAspectRatio(for: imageKey, size: $0) }
         )
 
         if allowsImagePreview,
-           remoteURLStrings.count == images.count,
+           resolvedPreviewURLStrings.count == images.count,
            image.remoteURL != nil {
-            item.tappableImagePreview(remoteURLStrings, initialIndex: index)
+            item.tappableImagePreview(resolvedPreviewURLStrings, initialIndex: index)
         } else {
             item
         }
@@ -337,6 +348,7 @@ struct FeedMediaItem: View {
     let source: ImageSource
     var targetPixelWidth: Int = 1_024
     var renderMode: FeedMediaRenderMode = .fit
+    var showsRetryButton = false
     var onImageSize: (CGSize) -> Void = { _ in }
 
     var body: some View {
@@ -357,6 +369,7 @@ struct FeedMediaItem: View {
                     CachedRemoteImage(
                         url: url,
                         targetPixelWidth: targetPixelWidth,
+                        showsRetryButton: showsRetryButton,
                         onImageLoaded: onImageSize
                     ) { image in
                         renderedImage(

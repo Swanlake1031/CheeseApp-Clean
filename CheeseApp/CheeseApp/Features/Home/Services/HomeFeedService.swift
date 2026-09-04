@@ -61,6 +61,22 @@ struct HomeForumPreview {
     let createdAt: Date
 }
 
+struct HomeForumRecommendationBundle {
+    let sessionID: UUID
+    let algorithmVersion: String
+    let posts: [HomeForumPreview]
+    let positions: [UUID: Int]
+}
+
+struct RecommendationSessionPaginationState: Equatable {
+    let sessionID: UUID
+    private(set) var offset = 0
+
+    mutating func recordPage(itemCount: Int) {
+        offset += max(itemCount, 0)
+    }
+}
+
 final class HomeFeedService {
     static let shared = HomeFeedService()
 
@@ -101,6 +117,81 @@ final class HomeFeedService {
             .value
 
         return rows.map(Self.makeForumPreview)
+    }
+
+    /// Returns nil when server-side rollout keeps this account on the legacy
+    /// feed. A V1 session owns ordering; hydration below preserves that order.
+    func fetchRecommendationForumPreview(
+        limit: Int = 36,
+        forceRefresh: Bool
+    ) async throws -> HomeForumRecommendationBundle? {
+        let mode: RecommendationFeedModeRow = try await supabase.client
+            .rpc("get_recommendation_feed_mode")
+            .execute()
+            .value
+        guard mode.useRecommendations else { return nil }
+
+        let sessionID: UUID? = try await supabase.client
+            .rpc(
+                "create_recommendation_feed_session",
+                params: CreateRecommendationSessionParams(
+                    forceRefresh: forceRefresh,
+                    shadow: false,
+                    userID: nil
+                )
+            )
+            .execute()
+            .value
+        guard let sessionID else { return nil }
+
+        var references: [RecommendationFeedPageRow] = []
+        var pagination = RecommendationSessionPaginationState(sessionID: sessionID)
+        let boundedLimit = min(max(limit, 1), 60)
+        while references.count < boundedLimit {
+            let page: [RecommendationFeedPageRow] = try await supabase.client
+                .rpc(
+                    "get_recommendation_feed_page",
+                    params: RecommendationFeedPageParams(
+                        sessionID: sessionID,
+                        offset: pagination.offset,
+                        limit: min(20, boundedLimit - references.count)
+                    )
+                )
+                .execute()
+                .value
+            references.append(contentsOf: page)
+            guard page.count == min(20, boundedLimit - (references.count - page.count)) else {
+                break
+            }
+            pagination.recordPage(itemCount: page.count)
+        }
+
+        let postIDs = references.map(\.postID)
+        guard !postIDs.isEmpty else {
+            return HomeForumRecommendationBundle(
+                sessionID: sessionID,
+                algorithmVersion: mode.algorithmVersion,
+                posts: [],
+                positions: [:]
+            )
+        }
+        let rows: [ForumPreviewRow] = try await supabase
+            .database("forum_posts_view")
+            .select()
+            .in("id", values: postIDs.map(\.uuidString))
+            .execute()
+            .value
+        let rowByID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
+        return HomeForumRecommendationBundle(
+            sessionID: sessionID,
+            algorithmVersion: mode.algorithmVersion,
+            posts: references.compactMap { reference in
+                rowByID[reference.postID].map(Self.makeForumPreview)
+            },
+            positions: Dictionary(
+                uniqueKeysWithValues: references.map { ($0.postID, $0.position) }
+            )
+        )
     }
 
     func fetchFollowingFeed(
@@ -185,7 +276,13 @@ final class HomeFeedService {
             userAvatar: row.userAvatar,
             isAnonymous: row.isAnonymous,
             isUserMcMasterVerified: !row.isAnonymous && row.userMcMasterVerified == true,
-            images: (row.images ?? []).map { HomeFeedImage(url: $0.url) },
+            images: DBSecondhandImage.stablySorted(row.images ?? [])
+                .prefix(1)
+                .map {
+                    HomeFeedImage(
+                        url: $0.url(for: .original)?.absoluteString ?? $0.url
+                    )
+                },
             likeCount: row.likeCount ?? 0,
             viewCount: row.viewCount ?? 0,
             saveCount: row.saveCount ?? 0,
@@ -208,6 +305,54 @@ final class HomeFeedService {
         )
     }
 
+}
+
+private struct RecommendationFeedModeRow: Decodable {
+    let algorithmVersion: String
+    let shadowEnabled: Bool
+    let useRecommendations: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case algorithmVersion = "algorithm_version"
+        case shadowEnabled = "shadow_enabled"
+        case useRecommendations = "use_recommendations"
+    }
+}
+
+private struct RecommendationFeedPageRow: Decodable {
+    let sessionID: UUID
+    let postID: UUID
+    let position: Int
+
+    enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+        case postID = "post_id"
+        case position
+    }
+}
+
+private struct CreateRecommendationSessionParams: Encodable {
+    let forceRefresh: Bool
+    let shadow: Bool
+    let userID: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case forceRefresh = "p_force_refresh"
+        case shadow = "p_shadow"
+        case userID = "p_user_id"
+    }
+}
+
+private struct RecommendationFeedPageParams: Encodable {
+    let sessionID: UUID
+    let offset: Int
+    let limit: Int
+
+    enum CodingKeys: String, CodingKey {
+        case sessionID = "p_session_id"
+        case offset = "p_offset"
+        case limit = "p_limit"
+    }
 }
 
 private struct HomeFollowingRow: Decodable {

@@ -325,7 +325,12 @@ struct CourseDetailView: View {
             Button {
                 selectedOutline = outline
             } label: {
-                Label(L10n.tr("View PDF", "查看 PDF"), systemImage: "doc.text")
+                Label(
+                    outline.isWebDocument
+                        ? L10n.tr("View Outline", "查看大纲")
+                        : L10n.tr("View PDF", "查看 PDF"),
+                    systemImage: "doc.text"
+                )
                     .font(.system(size: 14, weight: .semibold))
             }
             .buttonStyle(.borderedProminent)

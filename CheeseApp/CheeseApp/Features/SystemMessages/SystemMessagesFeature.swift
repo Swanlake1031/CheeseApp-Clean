@@ -54,6 +54,34 @@ enum SystemMessageCategory: String, Codable, CaseIterable, Hashable {
     }
 }
 
+enum InteractionMessagePage: String, CaseIterable, Identifiable, Hashable {
+    case activity
+    case newFollowers
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .activity: return "互动消息"
+        case .newFollowers: return "新关注我的"
+        }
+    }
+
+    var emptyTitle: String {
+        switch self {
+        case .activity: return "还没有互动消息"
+        case .newFollowers: return "还没有新关注"
+        }
+    }
+
+    var emptyDescription: String {
+        switch self {
+        case .activity: return "评论、回复、提及和点赞会显示在这里。"
+        case .newFollowers: return "新关注你的人会显示在这里。"
+        }
+    }
+}
+
 enum SystemMessageInboxEvents {
     static let remoteMessageAvailable = Notification.Name(
         "cheese.system-messages.remote-message-available"
@@ -107,6 +135,14 @@ struct SystemMessageItem: Decodable, Identifiable, Hashable {
     let ctaKind: SystemMessageCTA
     var readAt: Date?
     let createdAt: Date
+
+    var followActorUserID: UUID? {
+        kind == .follow ? actorUserID : nil
+    }
+
+    var interactionPage: InteractionMessagePage {
+        kind == .follow ? .newFollowers : .activity
+    }
 
     var postKind: PostKind? {
         guard let contentKind else { return nil }
@@ -628,8 +664,12 @@ final class SystemMessageViewModel: ObservableObject {
     }
 
     func loadNextPageIfNeeded(currentItem: SystemMessageItem) async {
-        guard currentItem.id == items.last?.id,
-              hasMore,
+        guard currentItem.id == items.last?.id else { return }
+        await loadNextPage()
+    }
+
+    func loadNextPage() async {
+        guard hasMore,
               !isLoadingNextPage,
               let cursor
         else { return }

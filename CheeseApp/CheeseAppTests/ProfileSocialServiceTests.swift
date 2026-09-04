@@ -166,6 +166,60 @@ final class ProfileSocialServiceTests: XCTestCase {
         XCTAssertTrue(service.hasSummary(for: target))
     }
 
+    func testFollowBackImmediatelyAddsFollowerToFollowingAndMutual() {
+        let follower = followEntry(amFollowing: false)
+        var snapshot = ProfileFollowListsSnapshot(
+            following: [],
+            followers: [follower]
+        )
+
+        snapshot.applyFollowingChange(entry: follower, isFollowing: true)
+
+        XCTAssertEqual(snapshot.following.map(\.id), [follower.id])
+        XCTAssertEqual(snapshot.mutual.map(\.id), [follower.id])
+        XCTAssertTrue(snapshot.followers[0].amFollowing)
+    }
+
+    func testUnfollowImmediatelyRemovesMutualButKeepsFollower() {
+        let mutual = followEntry(amFollowing: true)
+        var snapshot = ProfileFollowListsSnapshot(
+            following: [mutual],
+            followers: [mutual]
+        )
+
+        snapshot.applyFollowingChange(entry: mutual, isFollowing: false)
+
+        XCTAssertTrue(snapshot.following.isEmpty)
+        XCTAssertTrue(snapshot.mutual.isEmpty)
+        XCTAssertEqual(snapshot.followers.map(\.id), [mutual.id])
+        XCTAssertFalse(snapshot.followers[0].amFollowing)
+    }
+
+    func testRemoveFollowerKeepsMyFollowingRelationship() {
+        let mutual = followEntry(amFollowing: true)
+        var snapshot = ProfileFollowListsSnapshot(
+            following: [mutual],
+            followers: [mutual]
+        )
+
+        snapshot.removeFollower(userID: mutual.id)
+
+        XCTAssertTrue(snapshot.followers.isEmpty)
+        XCTAssertTrue(snapshot.mutual.isEmpty)
+        XCTAssertEqual(snapshot.following.map(\.id), [mutual.id])
+    }
+
+    private func followEntry(amFollowing: Bool) -> ProfileFollowListEntry {
+        ProfileFollowListEntry(
+            id: UUID(),
+            displayName: "Student",
+            avatarURL: nil,
+            subtitle: "McMaster University",
+            isNew: false,
+            amFollowing: amFollowing
+        )
+    }
+
 }
 
 private enum ProfileSocialServiceTestError: Error {

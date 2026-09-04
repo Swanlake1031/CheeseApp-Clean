@@ -17,9 +17,7 @@ struct SearchView: View {
     @StateObject private var chatService = ChatService.shared
     @State private var searchText = ""
     @State private var isSearchFieldFocused = false
-    @State private var selectedCategory: SearchCategory = .all
-    @State private var selectedHotCategory: SearchCategory = .all
-    @State private var destination: SearchNavigationDestination?
+    @State private var selectedTab: SearchTab = .hot
     @State private var selectedResolvedResult: SearchResolvedDestination?
     @State private var selectedProfile: SearchProfileResult?
     @State private var activeConversation: ChatConversationPreview?
@@ -41,32 +39,30 @@ struct SearchView: View {
             AppColors.pageBackground
                 .ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    searchBar
+            VStack(spacing: 0) {
+                searchBar
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
 
-                    VStack(spacing: 20) {
-                        categoryFilter
+                if hasSearchQuery {
+                    searchTabs
 
-                        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            recentSearchesSection
-                            hotByTypeSection
-                        } else {
-                            searchResults
+                    Divider()
+                        .overlay(AppColors.divider)
+
+                    TabView(selection: $selectedTab) {
+                        ForEach(SearchTab.allCases) { tab in
+                            searchPage(for: tab)
+                                .tag(tab)
                         }
-
-                        Spacer(minLength: 100)
                     }
-                    .frame(maxWidth: .infinity)
-                    .prioritizeKeyboardDismissal(
-                        while: isSearchFieldFocused,
-                        onDismiss: dismissSearchKeyboard
-                    )
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
             }
-            .scrollDismissesKeyboard(.interactively)
         }
         // Keep the search timeline's geometry stable while UIKit animates the
         // keyboard. Resizing this nested vertical/horizontal scroll hierarchy
@@ -77,9 +73,6 @@ struct SearchView: View {
             message: L10n.tr("Opening post...", "正在打开贴文...")
         )
         .navigationBarBackButtonHidden(showsBackButton)
-        .navigationDestination(item: $destination) { target in
-            destinationView(for: target)
-        }
         .navigationDestination(item: $selectedResolvedResult) { destination in
             resolvedDestinationView(for: destination)
         }
@@ -91,16 +84,11 @@ struct SearchView: View {
         }
         .task(id: authService.currentUser?.id) {
             viewModel.activateAccount(authService.currentUser?.id)
-            await viewModel.loadInitialData()
-            viewModel.updateSearch(text: searchText, category: selectedCategory)
+            viewModel.updateSearch(text: searchText, category: selectedTab.searchCategory)
         }
         .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { _ in
-            Task {
-                await viewModel.loadInitialData()
-                await MainActor.run {
-                    viewModel.updateSearch(text: searchText, category: selectedCategory)
-                }
-            }
+            guard hasSearchQuery else { return }
+            viewModel.updateSearch(text: searchText, category: selectedTab.searchCategory)
         }
         .onReceive(NotificationCenter.default.publisher(for: ProfileSocialEvents.followingDidChange)) { notification in
             guard let (targetUserID, isFollowing) = ProfileSocialEvents.change(
@@ -121,10 +109,13 @@ struct SearchView: View {
             await focusSearchFieldIfRequested()
         }
         .onChange(of: searchText) { _, newValue in
-            viewModel.updateSearch(text: newValue, category: selectedCategory)
+            if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                selectedTab = .hot
+            }
+            viewModel.updateSearch(text: newValue, category: selectedTab.searchCategory)
         }
-        .onChange(of: selectedCategory) { _, newValue in
-            viewModel.updateSearch(text: searchText, category: newValue)
+        .onChange(of: selectedTab) { _, newValue in
+            viewModel.updateSearch(text: searchText, category: newValue.searchCategory)
         }
         .alert(
             "操作失败",
@@ -158,6 +149,10 @@ struct SearchView: View {
     }
 
     // MARK: - 搜索框
+    private var hasSearchQuery: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private var searchBar: some View {
         HStack(spacing: 12) {
             if showsBackButton {
@@ -173,10 +168,6 @@ struct SearchView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("返回首页")
             }
-
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(.secondary)
 
             CheeseSearchTextField(
                 text: $searchText,
@@ -222,184 +213,79 @@ struct SearchView: View {
         shouldAutoFocus = false
     }
 
-    // MARK: - 分类筛选
-    private var categoryFilter: some View {
-        HStack(spacing: 10) {
-            ForEach(SearchCategory.allCases, id: \.self) { category in
-                SearchCategoryPill(
-                    category: category,
-                    isSelected: selectedCategory == category
-                ) {
-                    withAnimation(.spring(response: 0.3)) {
-                        selectedCategory = category
-                    }
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // MARK: - 最近搜索
-    private var recentSearchesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(L10n.tr("Recent", "最近搜寻"))
-                    .font(.system(size: 18, weight: .semibold))
-                Spacer()
-                if !viewModel.recentSearches.isEmpty {
-                    Button(L10n.tr("Clear", "清除")) {
-                        viewModel.clearRecentSearches()
-                    }
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.secondary)
-                }
-            }
-
-            if viewModel.recentSearches.isEmpty {
-                Text(L10n.tr("Your recent searches will appear here", "你的最近搜寻会显示在这里"))
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 8)
-            } else {
-                FlowLayout(spacing: 10) {
-                    ForEach(viewModel.recentSearches, id: \.self) { query in
-                        Button(action: {
-                            searchText = query
-                            viewModel.updateSearch(text: query, category: selectedCategory)
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "clock.arrow.circlepath")
-                                    .font(.system(size: 12))
-                                Text(query)
-                                    .font(.system(size: 14, weight: .medium))
-                            }
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(AppColors.cardBackground)
-                            .clipShape(Capsule())
-                            .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - 热门榜（文字榜单 + 分类切换）
-    private var hotByTypeSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(L10n.tr("Hot Ranking", "热门排行榜"))
-                .font(.system(size: 18, weight: .semibold))
-
-            hotCategorySwitch
-
-            let rankingItems = viewModel.hotPosts(for: selectedHotCategory)
-
-            switch viewModel.hotRankingLoadState(for: selectedHotCategory) {
-            case .unresolved, .initialLoading:
-                landingSectionLoadingCard(minHeight: 168)
-            case .empty:
-                Text(L10n.tr("No trending content yet", "目前没有热门内容"))
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 8)
-            case .loaded:
-                VStack(spacing: 0) {
-                    ForEach(Array(rankingItems.prefix(10).enumerated()), id: \.element.id) { index, item in
-                        Button {
-                            handleResultTap(item)
-                        } label: {
-                            TextHotRankRow(rank: index + 1, item: item)
-                        }
-                        .buttonStyle(.plain)
-
-                        if index < min(rankingItems.count, 10) - 1 {
-                            Divider()
-                                .padding(.leading, 42)
-                        }
-                    }
-                }
-                .padding(.vertical, 4)
-                .background(AppColors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .cheeseCardChrome(cornerRadius: 16)
-            case .error(let message):
-                ErrorView(message) {
-                    Task { await viewModel.loadInitialData() }
-                }
-            }
-        }
-    }
-
-    private var hotCategorySwitch: some View {
-        HStack(spacing: 8) {
-            ForEach(SearchCategory.allCases, id: \.self) { category in
+    // MARK: - 搜索标签
+    private var searchTabs: some View {
+        HStack(spacing: 0) {
+            ForEach(SearchTab.allCases) { tab in
                 Button {
-                    withAnimation(.spring(response: 0.25)) {
-                        selectedHotCategory = category
-                    }
+                    selectTab(tab)
                 } label: {
-                    Text(category.hotRankingDisplayName)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(selectedHotCategory == category ? .white : .primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(selectedHotCategory == category ? AppColors.selectedBackground : AppColors.cardBackground)
-                        .clipShape(Capsule())
+                    Text(tab.displayName)
+                        .font(.system(size: 15, weight: selectedTab == tab ? .bold : .semibold))
+                        .foregroundStyle(selectedTab == tab ? AppColors.textPrimary : AppColors.textMuted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .overlay(alignment: .bottom) {
+                            if selectedTab == tab {
+                                Capsule()
+                                    .fill(AppColors.textPrimary)
+                                    .frame(width: 28, height: 3)
+                            }
+                        }
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
             }
-            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
     }
 
-    private func landingSectionLoadingCard(minHeight: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(AppColors.cardBackground)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: minHeight)
-            .overlay {
-                ProgressView()
-                    .progressViewStyle(.circular)
-            }
-            .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: 4)
+    private func selectTab(_ tab: SearchTab) {
+        guard selectedTab != tab else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedTab = tab
+        }
+    }
+
+    private func searchPage(for tab: SearchTab) -> some View {
+        ScrollView(showsIndicators: false) {
+            searchResults(for: tab)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 100)
+                .prioritizeKeyboardDismissal(
+                    while: isSearchFieldFocused,
+                    onDismiss: dismissSearchKeyboard
+                )
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(AppColors.pageBackground)
+        .contentShape(Rectangle())
     }
 
     // MARK: - 搜索结果
-    private var searchResults: some View {
+    private func searchResults(for tab: SearchTab) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(L10n.tr("Results", "搜寻结果"))
-                .font(.system(size: 18, weight: .semibold))
+            let showsProfiles = tab == .profiles
+            let posts = visibleSearchPosts(for: tab)
+            let hasVisibleResults = showsProfiles ? !viewModel.profileResults.isEmpty : !posts.isEmpty
 
-            if viewModel.isSearching && viewModel.filteredResults.isEmpty && viewModel.profileResults.isEmpty {
+            if viewModel.isSearching && !hasVisibleResults {
                 ProgressView()
+                    .frame(maxWidth: .infinity)
                     .padding(.vertical, 24)
-            } else if viewModel.filteredResults.isEmpty && viewModel.profileResults.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.secondary)
-                    Text(L10n.tr("No matching result", "没有符合的结果"))
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
+            } else if !hasVisibleResults {
+                searchEmptyState(
+                    icon: showsProfiles ? "person.crop.circle.badge.questionmark" : "tray",
+                    text: L10n.tr("No matching result", "没有符合的结果")
+                )
             } else {
-                if !viewModel.profileResults.isEmpty {
+                if showsProfiles {
                     if viewModel.isSearching {
                         ProgressView()
                             .padding(.vertical, 4)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-
-                    Text("用户")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(AppColors.textMuted)
-                        .padding(.top, 2)
 
                     ForEach(viewModel.profileResults) { profile in
                         SearchProfileCard(
@@ -439,60 +325,86 @@ struct SearchView: View {
                                 }
                             }
                         )
+
+                        Divider()
+                            .overlay(AppColors.divider)
                     }
-                }
+                } else {
+                    postResultsList(posts)
 
-                if !viewModel.filteredResults.isEmpty {
-                    Text("帖子")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(AppColors.textMuted)
-                        .padding(.top, viewModel.profileResults.isEmpty ? 0 : 4)
-                }
-
-                ForEach(viewModel.filteredResults) { result in
-                    Button(action: {
-                        handleResultTap(result)
-                    }) {
-                        SearchResultCard(item: result)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                if viewModel.isLoadingMoreSearchResults {
-                    ProgressView()
+                    if viewModel.isLoadingMoreSearchResults {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                    } else if viewModel.hasMoreSearchResults {
+                        Button(L10n.tr("Load more", "加载更多")) {
+                            Task { await viewModel.loadMoreSearchResults() }
+                        }
+                        .font(.system(size: 13, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
-                } else if viewModel.hasMoreSearchResults {
-                    Button(L10n.tr("Load more", "加载更多")) {
-                        Task { await viewModel.loadMoreSearchResults() }
                     }
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                }
 
-                if let pageError = viewModel.searchPageErrorMessage {
-                    Button {
-                        Task { await viewModel.retrySearchPage() }
-                    } label: {
-                        Text("\(pageError) · \(L10n.tr("Retry", "重试"))")
+                    if let pageError = viewModel.searchPageErrorMessage {
+                        Button {
+                            Task { await viewModel.retrySearchPage() }
+                        } label: {
+                            Text("\(pageError) · \(L10n.tr("Retry", "重试"))")
+                        }
+                        .font(.system(size: 12))
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity)
                     }
-                    .font(.system(size: 12))
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity)
                 }
             }
         }
     }
 
-    @ViewBuilder
-    private func destinationView(for destination: SearchNavigationDestination) -> some View {
-        switch destination {
+    private func visibleSearchPosts(for tab: SearchTab) -> [UnifiedSearchResult] {
+        switch tab {
+        case .hot:
+            return viewModel.filteredResults.sorted(by: SearchViewModel.isHigherPriorityForFeed)
+        case .latest:
+            return viewModel.filteredResults.sorted(by: SearchViewModel.isNewerForFeed)
+        case .profiles:
+            return []
         case .secondhand:
-            SecondhandListView()
+            return viewModel.filteredResults.filter { $0.category == .secondhand }
         case .forum:
-            ForumSearchView(initialBoard: nil)
+            return viewModel.filteredResults.filter { $0.category == .forum }
         }
+    }
+
+    private func postResultsList(_ items: [UnifiedSearchResult]) -> some View {
+        LazyVStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, result in
+                Button {
+                    handleResultTap(result)
+                } label: {
+                    SearchResultCard(item: result)
+                }
+                .buttonStyle(.plain)
+
+                if index < items.count - 1 {
+                    Divider()
+                        .overlay(AppColors.divider)
+                }
+            }
+        }
+    }
+
+    private func searchEmptyState(icon: String, text: String) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 24))
+                .foregroundStyle(.secondary)
+            Text(text)
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
     }
 
     private func dismissSearchKeyboard() {
@@ -542,7 +454,36 @@ struct SearchView: View {
     }
 }
 
-// MARK: - 搜索分类
+// MARK: - 搜索标签
+enum SearchTab: String, CaseIterable, Identifiable {
+    case hot
+    case latest
+    case profiles
+    case secondhand
+    case forum
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .hot: return L10n.tr("Popular", "热门")
+        case .latest: return L10n.tr("Latest", "最新")
+        case .profiles: return L10n.tr("People", "人物")
+        case .secondhand: return L10n.tr("Secondhand", "二手")
+        case .forum: return L10n.tr("Forum", "论坛")
+        }
+    }
+
+    var searchCategory: SearchCategory {
+        switch self {
+        case .hot, .latest, .profiles: return .all
+        case .secondhand: return .secondhand
+        case .forum: return .forum
+        }
+    }
+}
+
+// MARK: - 搜索数据分类
 enum SearchCategory: String, CaseIterable, Hashable {
     case all
     case secondhand
@@ -556,10 +497,11 @@ enum SearchCategory: String, CaseIterable, Hashable {
         }
     }
 
-    var hotRankingDisplayName: String {
+    var color: Color {
         switch self {
-        case .all: return L10n.tr("Overall", "综合")
-        case .secondhand, .forum: return displayName
+        case .all: return .secondary
+        case .secondhand: return AppColors.categoryColor(for: "secondhand")
+        case .forum: return AppColors.categoryColor(for: "forum")
         }
     }
 
@@ -571,28 +513,6 @@ enum SearchCategory: String, CaseIterable, Hashable {
         }
     }
 
-    var color: Color {
-        switch self {
-        case .all: return .secondary
-        case .secondhand: return AppColors.categoryColor(for: "secondhand")
-        case .forum: return AppColors.categoryColor(for: "forum")
-        }
-    }
-
-    var navigationDestination: SearchNavigationDestination? {
-        switch self {
-        case .all: return nil
-        case .secondhand: return .secondhand
-        case .forum: return .forum
-        }
-    }
-}
-
-enum SearchNavigationDestination: String, Identifiable {
-    case secondhand
-    case forum
-
-    var id: String { rawValue }
 }
 
 struct UnifiedSearchResult: Identifiable, Hashable {
@@ -641,7 +561,7 @@ final class SearchViewModel: ObservableObject {
 
     @Published var recentSearches: [String] = []
     @Published var trendingItems: [UnifiedSearchResult] = []
-    @Published var hotByCategory: [SearchCategory: [UnifiedSearchResult]] = [:]
+    @Published var landingPostsByCategory: [SearchCategory: [UnifiedSearchResult]] = [:]
     @Published var categoryCounts: [SearchCategory: Int] = [:]
     @Published var filteredResults: [UnifiedSearchResult] = []
     @Published var profileResults: [SearchProfileResult] = []
@@ -663,7 +583,7 @@ final class SearchViewModel: ObservableObject {
     private var searchPageRequestID: UUID?
     private let recentSearchesKeyPrefix = "search_recent_queries."
     private let searchPageSize = 24
-    private let hotPerCategoryLimit = 10
+    private let landingPageLimit = 24
     private let searchService = SearchService.shared
     private let loadPostPage: PostPageLoader
     private let loadPostCounts: PostCountLoader
@@ -711,7 +631,7 @@ final class SearchViewModel: ObservableObject {
         searchCursor = nil
         searchPageRequestID = nil
         trendingItems = []
-        hotByCategory = [:]
+        landingPostsByCategory = [:]
         categoryCounts = [:]
         filteredResults = []
         profileResults = []
@@ -739,8 +659,8 @@ final class SearchViewModel: ObservableObject {
         }
 
         async let counts = try? loadPostCounts()
-        async let secondhand = try? loadPostPage("", .secondhand, nil, hotPerCategoryLimit)
-        async let forum = try? loadPostPage("", .forum, nil, hotPerCategoryLimit)
+        async let secondhand = try? loadPostPage("", .secondhand, nil, landingPageLimit)
+        async let forum = try? loadPostPage("", .forum, nil, landingPageLimit)
 
         let landingCounts = await counts ?? [:]
         let categoryPages: [SearchCategory: [UnifiedSearchResult]] = [
@@ -750,11 +670,11 @@ final class SearchViewModel: ObservableObject {
 
         guard accountGeneration == requestGeneration, !Task.isCancelled else { return }
         categoryCounts = landingCounts
-        hotByCategory = categoryPages
+        landingPostsByCategory = categoryPages
         trendingItems = Array(
             categoryPages.values
                 .flatMap { $0 }
-                .sorted(by: isHigherPriorityForFeed)
+                .sorted(by: Self.isHigherPriorityForFeed)
                 .prefix(5)
         )
     }
@@ -937,16 +857,23 @@ final class SearchViewModel: ObservableObject {
         categoryCounts[category] ?? 0
     }
 
-    func hotPosts(for category: SearchCategory) -> [UnifiedSearchResult] {
-        if category == .all {
-            return Array(
-                hotByCategory.values
-                    .flatMap { $0 }
-                    .sorted(by: isHigherPriorityForFeed)
-                    .prefix(hotPerCategoryLimit)
-            )
+    func feedPosts(for tab: SearchTab) -> [UnifiedSearchResult] {
+        switch tab {
+        case .hot:
+            return landingPostsByCategory.values
+                .flatMap { $0 }
+                .sorted(by: Self.isHigherPriorityForFeed)
+        case .latest:
+            return landingPostsByCategory.values
+                .flatMap { $0 }
+                .sorted(by: Self.isNewerForFeed)
+        case .profiles:
+            return []
+        case .secondhand:
+            return landingPostsByCategory[.secondhand] ?? []
+        case .forum:
+            return landingPostsByCategory[.forum] ?? []
         }
-        return hotByCategory[category] ?? []
     }
 
     var landingLoadState: CollectionLoadState {
@@ -958,11 +885,11 @@ final class SearchViewModel: ObservableObject {
         )
     }
 
-    func hotRankingLoadState(for category: SearchCategory) -> CollectionLoadState {
+    func feedLoadState(for tab: SearchTab) -> CollectionLoadState {
         CollectionLoadState.resolve(
             hasResolvedInitialLoad: hasResolvedInitialLandingLoad,
             isLoading: isLoading,
-            hasContent: !hotPosts(for: category).isEmpty,
+            hasContent: !feedPosts(for: tab).isEmpty,
             errorMessage: nil
         )
     }
@@ -1057,7 +984,7 @@ final class SearchViewModel: ObservableObject {
         }
     }
 
-    private func isHigherPriorityForFeed(_ lhs: UnifiedSearchResult, _ rhs: UnifiedSearchResult) -> Bool {
+    static func isHigherPriorityForFeed(_ lhs: UnifiedSearchResult, _ rhs: UnifiedSearchResult) -> Bool {
         if lhs.hotScore != rhs.hotScore {
             return lhs.hotScore > rhs.hotScore
         }
@@ -1065,64 +992,14 @@ final class SearchViewModel: ObservableObject {
         let rhsDate = rhs.createdAt ?? .distantPast
         return lhsDate > rhsDate
     }
-}
 
-// MARK: - 搜索分类胶囊
-struct SearchCategoryPill: View {
-    let category: SearchCategory
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: category.icon)
-                    .font(.system(size: 13, weight: .medium))
-                Text(category.displayName)
-                    .font(.system(size: 14, weight: .semibold))
-            }
-            .foregroundStyle(isSelected ? .white : .primary)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(isSelected ? AppColors.selectedBackground : AppColors.cardBackground)
-            .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+    static func isNewerForFeed(_ lhs: UnifiedSearchResult, _ rhs: UnifiedSearchResult) -> Bool {
+        let lhsDate = lhs.createdAt ?? .distantPast
+        let rhsDate = rhs.createdAt ?? .distantPast
+        if lhsDate != rhsDate {
+            return lhsDate > rhsDate
         }
-    }
-}
-
-// MARK: - 热门榜文字行
-struct TextHotRankRow: View {
-    let rank: Int
-    let item: UnifiedSearchResult
-
-    var body: some View {
-        HStack(spacing: 14) {
-            Text("\(rank)")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(rank <= 3 ? AppColors.accentStrong : .secondary)
-                .frame(width: 24)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-
-                Text(item.subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            Text("#\(item.category.displayName)")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(item.category.color)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        return lhs.id.uuidString > rhs.id.uuidString
     }
 }
 
@@ -1130,12 +1007,27 @@ struct TextHotRankRow: View {
 struct SearchResultCard: View {
     let item: UnifiedSearchResult
 
+    private var thumbnailURL: URL? {
+        guard item.category == .secondhand else {
+            return item.previewImageURL.flatMap(URL.init(string:))
+        }
+        return SupabasePublicImageURLResolver.url(
+            fromStoredURL: item.previewImageURL,
+            purpose: .feedThumbnail
+        )
+    }
+
     var body: some View {
         HStack(spacing: 14) {
             Group {
-                if let previewImageURL = item.previewImageURL,
-                   let url = URL(string: previewImageURL) {
-                    CachedRemoteImage(url: url, targetPixelWidth: 192) { image in
+                if let url = thumbnailURL {
+                    CachedRemoteImage(
+                        url: url,
+                        targetPixelWidth: item.category == .secondhand
+                            ? RemoteImagePurpose.feedThumbnail.targetPixelWidth
+                            : 192,
+                        showsRetryButton: item.category == .secondhand
+                    ) { image in
                         image.resizable().scaledToFill()
                     } placeholder: {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -1188,10 +1080,7 @@ struct SearchResultCard: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(12)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 14)
+        .padding(.vertical, 12)
     }
 }
 
@@ -1296,10 +1185,7 @@ struct SearchProfileCard: View {
                 Spacer()
             }
         }
-        .padding(12)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 14)
+        .padding(.vertical, 14)
     }
 
     private var avatarView: some View {

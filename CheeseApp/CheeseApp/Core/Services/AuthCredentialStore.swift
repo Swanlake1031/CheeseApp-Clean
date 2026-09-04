@@ -140,6 +140,7 @@ struct LegacySavedAuthAccount: Codable {
             email: email,
             displayName: displayName,
             avatarURL: avatarURL,
+            profileCompleted: nil,
             lastUsedAt: lastUsedAt
         )
     }

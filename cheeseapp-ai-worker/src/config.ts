@@ -3,6 +3,14 @@ import type { Env } from "./types";
 export const CHEESE_AI_MODEL = "gemini-3.5-flash-lite";
 export const CHEESE_AI_PROMPT_VERSION = "cheese-community-v3";
 export const CHEESE_AI_MAX_OUTPUT_TOKENS = 160;
+export const SECONDHAND_DESCRIPTION_PROMPT_VERSION =
+  "cheese-secondhand-description-v6";
+export const SECONDHAND_DESCRIPTION_MAX_OUTPUT_TOKENS = 2_048;
+export const RECOMMENDATION_ALGORITHM_VERSION = "cheese-rec-v1";
+export const RECOMMENDATION_EMBEDDING_VERSION = "cheese-semantic-v1";
+export const RECOMMENDATION_EMBEDDING_MODEL = "gemini-embedding-2";
+export const RECOMMENDATION_EMBEDDING_DIMENSION = 768;
+export const RECOMMENDATION_INPUT_FORMAT_VERSION = 1;
 
 export interface AppConfig {
   readonly enabled: boolean;
@@ -15,6 +23,19 @@ export interface AppConfig {
   readonly perUserWindowMinutes: number;
   readonly perUserWindowLimit: number;
   readonly dailySoftLimit: number;
+}
+
+export interface RecommendationConfig {
+  readonly enabled: boolean;
+  readonly shadowEnabled: boolean;
+  readonly geminiApiKey: string;
+  readonly supabaseUrl: string;
+  readonly supabaseServiceRoleKey: string;
+  readonly algorithmVersion: typeof RECOMMENDATION_ALGORITHM_VERSION;
+  readonly embeddingVersion: typeof RECOMMENDATION_EMBEDDING_VERSION;
+  readonly embeddingModel: typeof RECOMMENDATION_EMBEDDING_MODEL;
+  readonly embeddingDimension: typeof RECOMMENDATION_EMBEDDING_DIMENSION;
+  readonly inputFormatVersion: typeof RECOMMENDATION_INPUT_FORMAT_VERSION;
 }
 
 export class ConfigurationError extends Error {
@@ -75,5 +96,27 @@ export function loadConfig(env: Env): AppConfig {
       5,
     ),
     dailySoftLimit: positiveInteger(env.CHEESE_AI_DAILY_SOFT_LIMIT, 25),
+  };
+}
+
+export function loadRecommendationConfig(env: Env): RecommendationConfig {
+  return {
+    enabled:
+      (env.CHEESE_RECOMMENDATION_JOBS_ENABLED ?? "false").toLowerCase() ===
+      "true",
+    shadowEnabled:
+      (env.CHEESE_RECOMMENDATION_SHADOW_ENABLED ?? "false").toLowerCase() ===
+      "true",
+    geminiApiKey: env.GEMINI_API_KEY?.trim() ?? "",
+    supabaseUrl: requireValue(env.SUPABASE_URL, "SUPABASE_URL").replace(/\/$/, ""),
+    supabaseServiceRoleKey: requireValue(
+      env.SUPABASE_SERVICE_ROLE_KEY,
+      "SUPABASE_SERVICE_ROLE_KEY",
+    ),
+    algorithmVersion: RECOMMENDATION_ALGORITHM_VERSION,
+    embeddingVersion: RECOMMENDATION_EMBEDDING_VERSION,
+    embeddingModel: RECOMMENDATION_EMBEDDING_MODEL,
+    embeddingDimension: RECOMMENDATION_EMBEDDING_DIMENSION,
+    inputFormatVersion: RECOMMENDATION_INPUT_FORMAT_VERSION,
   };
 }

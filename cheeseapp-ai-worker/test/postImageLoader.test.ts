@@ -17,10 +17,12 @@ function image(overrides: Partial<PostImageRecord> = {}): PostImageRecord {
 
 test("loads supported images only from the configured public post bucket", async () => {
   const requested: string[] = [];
-  const fetcher: typeof fetch = async (input) => {
+  let redirect: RequestRedirect | undefined;
+  const fetcher: typeof fetch = async (input, init) => {
     requested.push(String(input));
-    return new Response(new Uint8Array([1, 2, 3]), {
-      headers: { "Content-Type": "image/jpeg", "Content-Length": "3" },
+    redirect = init?.redirect;
+    return new Response(new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), {
+      headers: { "Content-Type": "image/jpeg", "Content-Length": "4" },
     });
   };
   const loader = new SupabasePostImageLoader(
@@ -29,9 +31,27 @@ test("loads supported images only from the configured public post bucket", async
   );
 
   assert.deepEqual(await loader.load([image()]), [
-    { mimeType: "image/jpeg", data: "AQID" },
+    { mimeType: "image/jpeg", data: "/9j/2Q==" },
   ]);
   assert.equal(requested.length, 1);
+  assert.equal(redirect, "manual");
+});
+
+test("redirects are rejected without following them", async () => {
+  let redirect: RequestRedirect | undefined;
+  const loader = new SupabasePostImageLoader(
+    "https://example.supabase.co",
+    (async (_input, init) => {
+      redirect = init?.redirect;
+      return new Response(null, {
+        status: 302,
+        headers: { Location: "https://attacker.example/photo.jpg" },
+      });
+    }) as typeof fetch,
+  );
+
+  assert.deepEqual(await loader.load([image()]), []);
+  assert.equal(redirect, "manual");
 });
 
 test("foreign URLs, wrong buckets, and path traversal are skipped", async () => {
@@ -73,6 +93,44 @@ test("unsupported content types are skipped", async () => {
 
   assert.deepEqual(await loader.load([image()]), []);
   assert.equal(calls, 1);
+});
+
+test("content type must match the actual image signature", async () => {
+  const loader = new SupabasePostImageLoader(
+    "https://example.supabase.co",
+    (async () =>
+      new Response(new TextEncoder().encode("not-a-jpeg"), {
+        headers: { "Content-Type": "image/jpeg" },
+      })) as typeof fetch,
+  );
+
+  assert.deepEqual(await loader.load([image()]), []);
+});
+
+test("a failed image fetch does not block another valid image", async () => {
+  let calls = 0;
+  const loader = new SupabasePostImageLoader(
+    "https://example.supabase.co",
+    (async () => {
+      calls += 1;
+      if (calls === 1) throw new TypeError("network failure");
+      return new Response(new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), {
+        headers: { "Content-Type": "image/jpeg" },
+      });
+    }) as typeof fetch,
+  );
+
+  assert.deepEqual(
+    await loader.load([
+      image(),
+      image({
+        id: "00000000-0000-4000-8000-000000000020",
+        url: "https://example.supabase.co/storage/v1/object/public/post-images/posts/second.jpg",
+      }),
+    ]),
+    [{ mimeType: "image/jpeg", data: "/9j/2Q==" }],
+  );
+  assert.equal(calls, 2);
 });
 
 test("an oversized image is ignored without blocking the text reply", async () => {

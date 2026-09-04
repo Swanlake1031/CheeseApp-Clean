@@ -350,6 +350,11 @@ struct GroupChatRoomView: View {
 
                 TextField("输入消息...", text: $viewModel.draftText, axis: .vertical)
                     .lineLimit(1...4)
+                    .submitLabel(.send)
+                    .onSubmit {
+                        guard !viewModel.isComposerBusy else { return }
+                        viewModel.submitText()
+                    }
                     .focused($isDraftFocused)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)

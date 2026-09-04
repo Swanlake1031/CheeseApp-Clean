@@ -13,7 +13,6 @@
 		021 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121 /* User.swift */; };
 		022 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 122 /* ChatMessage.swift */; };
 		030 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130 /* AuthService.swift */; };
-		AUTHCRED02 /* AuthCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUTHCRED01 /* AuthCredentialStore.swift */; };
 		031 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131 /* ChatService.swift */; };
 		032 /* ImageUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 132 /* ImageUploadService.swift */; };
 		034 /* SchoolDirectoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 134 /* SchoolDirectoryService.swift */; };
@@ -21,8 +20,6 @@
 		041 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 141 /* Constants.swift */; };
 		050 /* Date+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 150 /* Date+Extensions.swift */; };
 		051 /* View+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151 /* View+Extensions.swift */; };
-		IMGPRBLD1 /* ImagePreview+View.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMGPRFILE1 /* ImagePreview+View.swift */; };
-		CHATCFBLD1 /* PressEnterComposerField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHATCFFILE1 /* PressEnterComposerField.swift */; };
 		061 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 161 /* LoadingView.swift */; };
 		062 /* ErrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162 /* ErrorView.swift */; };
 		063 /* ImagePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163 /* ImagePicker.swift */; };
@@ -35,55 +32,24 @@
 		093 /* CreateSecondhandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 193 /* CreateSecondhandView.swift */; };
 		0C0 /* ForumPost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0 /* ForumPost.swift */; };
 		0C1 /* ForumListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1 /* ForumListView.swift */; };
-		FCARDBLD1 /* ForumPostCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCARDFILE1 /* ForumPostCardView.swift */; };
-		FDETBLD1 /* ForumDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDETFILE1 /* ForumDetailView.swift */; };
-		FBRDBLD1 /* ForumBoardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBRDFILE1 /* ForumBoardViews.swift */; };
-		FSRCBLD1 /* ForumSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FSRCFILE1 /* ForumSearchView.swift */; };
-		FREFBLD1 /* HotpotSteamRefreshView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FREFFILE1 /* HotpotSteamRefreshView.swift */; };
 		0C2 /* ForumService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C2 /* ForumService.swift */; };
 		0C3 /* CreateForumView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C3 /* CreateForumView.swift */; };
 		0D1 /* ChatListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D1 /* ChatListView.swift */; };
 		0D2 /* ChatRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2 /* ChatRoomView.swift */; };
-		CMSGCBLD1 /* ChatMessageContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CMSGCFILE1 /* ChatMessageContentView.swift */; };
-		CRSUPBLD1 /* ChatRoomSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRSUPFILE1 /* ChatRoomSupportingViews.swift */; };
-		CRUTLBLD1 /* ChatRoomUtilityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRUTLFILE1 /* ChatRoomUtilityViews.swift */; };
-		CRGRPBLD1 /* ChatRoomGroupCreationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRGRPFILE1 /* ChatRoomGroupCreationViews.swift */; };
-		CGRPBLD1 /* ChatGroupCreationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CGRPFILE1 /* ChatGroupCreationViews.swift */; };
-		CFOLBLD1 /* ChatFollowSearchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFOLFILE1 /* ChatFollowSearchViews.swift */; };
-		CROWBLD1 /* ChatConversationRowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CROWFILE1 /* ChatConversationRowViews.swift */; };
 		0D3 /* ChatInboxSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D3 /* ChatInboxSupport.swift */; };
 		0D4 /* ChatInboxPresentationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D4 /* ChatInboxPresentationState.swift */; };
 		0D5 /* ChatGroupConversationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D5 /* ChatGroupConversationViews.swift */; };
 		0D6 /* ChatConversationStateUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D6 /* ChatConversationStateUpdater.swift */; };
 		0D7 /* ChatRoomLifecycleController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D7 /* ChatRoomLifecycleController.swift */; };
-		CRVMBLD1 /* ChatRoomViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRVMFILE1 /* ChatRoomViewModel.swift */; };
-		GCVMBLD1 /* GroupChatViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = GCVMFILE1 /* GroupChatViewModels.swift */; };
-		CHVMBLD1 /* ChatRoomHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHVMFILE1 /* ChatRoomHistoryViewModel.swift */; };
-		CFVMBLD1 /* ChatFollowSearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFVMFILE1 /* ChatFollowSearchViewModel.swift */; };
-		CGDTBLD1 /* ChatGroupDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CGDTFILE1 /* ChatGroupDetailsView.swift */; };
-		CRSVBLD1 /* ChatRoomServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRSVFILE1 /* ChatRoomServices.swift */; };
 		0D8 /* ChatServiceRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D8 /* ChatServiceRepository.swift */; };
 		0D9 /* ChatPrivacyActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D9 /* ChatPrivacyActions.swift */; };
 		0E1 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E1 /* ProfileView.swift */; };
-		PSOCBLD1 /* ProfileSocialViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSOCFILE1 /* ProfileSocialViews.swift */; };
-		PEDTBLD1 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PEDTFILE1 /* EditProfileView.swift */; };
-		PSETBLD1 /* ProfileSettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSETFILE1 /* ProfileSettingsViews.swift */; };
-		PLEGALBLD1 /* LegalDocumentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PLEGALFILE1 /* LegalDocumentViews.swift */; };
-		PACCBLD1 /* ProfileAccountViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PACCFILE1 /* ProfileAccountViews.swift */; };
-		PCOLBLD1 /* ProfileCollectionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PCOLFILE1 /* ProfileCollectionViews.swift */; };
-		PACTSVBLD1 /* ProfileActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = PACTSVFILE1 /* ProfileActivityService.swift */; };
-		PACTVWBLD1 /* ProfileActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PACTVWFILE1 /* ProfileActivityView.swift */; };
 		0E2 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E2 /* AuthView.swift */; };
-		IMGCH02 /* CachedRemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMGCH01 /* CachedRemoteImage.swift */; };
-		FMEDBLD1 /* FeedMediaLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = FMEDFILE1 /* FeedMediaLayout.swift */; };
-		AVCRP02 /* AvatarImageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AVCRP01 /* AvatarImageViews.swift */; };
 		0F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1F0 /* Assets.xcassets */; };
 		200A /* PostKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200 /* PostKind.swift */; };
 		201A /* CommunityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 201 /* CommunityService.swift */; };
 		202A /* UserPostSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202 /* UserPostSummary.swift */; };
 		203A /* UserPostsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 203 /* UserPostsService.swift */; };
-		210A /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 210 /* ProfileService.swift */; };
-		211A /* ProfileSocialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 211 /* ProfileSocialService.swift */; };
 		204A /* ReportPostSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 204 /* ReportPostSheet.swift */; };
 		205A /* SupportCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 205 /* SupportCenterView.swift */; };
 		206A /* UserPostsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 206 /* UserPostsView.swift */; };
@@ -92,22 +58,12 @@
 		20AA /* PostEditorComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A /* PostEditorComponents.swift */; };
 		20BA /* PostEditorFeatureSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B /* PostEditorFeatureSections.swift */; };
 		20CA /* PostEditorFeatureForms.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C /* PostEditorFeatureForms.swift */; };
-		FEDITBLD1 /* ForumPostEditorSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEDITFILE1 /* ForumPostEditorSurface.swift */; };
 		20DA /* PostSharePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D /* PostSharePresentation.swift */; };
 		20EA /* PostDeepLinkPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20E /* PostDeepLinkPresentation.swift */; };
-		PDRBLD1 /* PostDeepLinkRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = PDRFILE1 /* PostDeepLinkRoute.swift */; };
-		PSPBLD1 /* PostSharePayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSPFILE1 /* PostSharePayload.swift */; };
-		CR1 /* CreatePostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CR11 /* CreatePostView.swift */; };
-		DBA54B9C2F2D43DA0073E17A /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54B9B2F2D43DA0073E17A /* Auth */; };
-		DBA54B9E2F2D43DA0073E17A /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54B9D2F2D43DA0073E17A /* Functions */; };
-		DBA54BA02F2D43DA0073E17A /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54B9F2F2D43DA0073E17A /* PostgREST */; };
-		DBA54BA22F2D43DA0073E17A /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA12F2D43DA0073E17A /* Realtime */; };
-		DBA54BA42F2D43DA0073E17A /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA32F2D43DA0073E17A /* Storage */; };
-		DBA54BA72F2D44C30073E17A /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA62F2D44C30073E17A /* Supabase */; };
-		H01 /* HomeCardItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = H11 /* HomeCardItem.swift */; };
-		H03 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = H21 /* HomeViewModel.swift */; };
-		H04 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = H31 /* HomeView.swift */; };
-		H07 /* QuickActionsRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = H43 /* QuickActionsRowView.swift */; };
+		210A /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 210 /* ProfileService.swift */; };
+		211A /* ProfileSocialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 211 /* ProfileSocialService.swift */; };
+		AUTHCRED02 /* AuthCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUTHCRED01 /* AuthCredentialStore.swift */; };
+		AVCRP02 /* AvatarImageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AVCRP01 /* AvatarImageViews.swift */; };
 		C01A /* CourseSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01 /* CourseSummary.swift */; };
 		C04A /* CourseDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04 /* CourseDiscoveryView.swift */; };
 		C05A /* CourseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05 /* CourseDetailView.swift */; };
@@ -121,17 +77,60 @@
 		C13A /* CourseCatalogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13 /* CourseCatalogService.swift */; };
 		C14A /* CourseDiscoveryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14 /* CourseDiscoveryViewModel.swift */; };
 		C15A /* CoursePageBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15 /* CoursePageBackground.swift */; };
+		CFOLBLD1 /* ChatFollowSearchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFOLFILE1 /* ChatFollowSearchViews.swift */; };
+		CFVMBLD1 /* ChatFollowSearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFVMFILE1 /* ChatFollowSearchViewModel.swift */; };
+		CGDTBLD1 /* ChatGroupDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CGDTFILE1 /* ChatGroupDetailsView.swift */; };
+		CGRPBLD1 /* ChatGroupCreationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CGRPFILE1 /* ChatGroupCreationViews.swift */; };
+		CHATCFBLD1 /* PressEnterComposerField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHATCFFILE1 /* PressEnterComposerField.swift */; };
+		CHVMBLD1 /* ChatRoomHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHVMFILE1 /* ChatRoomHistoryViewModel.swift */; };
+		CMSGCBLD1 /* ChatMessageContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CMSGCFILE1 /* ChatMessageContentView.swift */; };
+		CR1 /* CreatePostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CR11 /* CreatePostView.swift */; };
+		CRGRPBLD1 /* ChatRoomGroupCreationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRGRPFILE1 /* ChatRoomGroupCreationViews.swift */; };
+		CROWBLD1 /* ChatConversationRowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CROWFILE1 /* ChatConversationRowViews.swift */; };
+		CRSUPBLD1 /* ChatRoomSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRSUPFILE1 /* ChatRoomSupportingViews.swift */; };
+		CRSVBLD1 /* ChatRoomServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRSVFILE1 /* ChatRoomServices.swift */; };
+		CRUTLBLD1 /* ChatRoomUtilityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRUTLFILE1 /* ChatRoomUtilityViews.swift */; };
+		CRVMBLD1 /* ChatRoomViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRVMFILE1 /* ChatRoomViewModel.swift */; };
+		DBA54B9C2F2D43DA0073E17A /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54B9B2F2D43DA0073E17A /* Auth */; };
+		DBA54B9E2F2D43DA0073E17A /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54B9D2F2D43DA0073E17A /* Functions */; };
+		DBA54BA02F2D43DA0073E17A /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54B9F2F2D43DA0073E17A /* PostgREST */; };
+		DBA54BA22F2D43DA0073E17A /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA12F2D43DA0073E17A /* Realtime */; };
+		DBA54BA42F2D43DA0073E17A /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA32F2D43DA0073E17A /* Storage */; };
+		DBA54BA72F2D44C30073E17A /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA62F2D44C30073E17A /* Supabase */; };
+		FBRDBLD1 /* ForumBoardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBRDFILE1 /* ForumBoardViews.swift */; };
+		FCARDBLD1 /* ForumPostCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCARDFILE1 /* ForumPostCardView.swift */; };
+		FDETBLD1 /* ForumDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDETFILE1 /* ForumDetailView.swift */; };
+		FEDITBLD1 /* ForumPostEditorSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEDITFILE1 /* ForumPostEditorSurface.swift */; };
+		FMEDBLD1 /* FeedMediaLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = FMEDFILE1 /* FeedMediaLayout.swift */; };
+		FREFBLD1 /* HotpotSteamRefreshView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FREFFILE1 /* HotpotSteamRefreshView.swift */; };
+		FSRCBLD1 /* ForumSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FSRCFILE1 /* ForumSearchView.swift */; };
+		GCVMBLD1 /* GroupChatViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = GCVMFILE1 /* GroupChatViewModels.swift */; };
+		H01 /* HomeCardItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = H11 /* HomeCardItem.swift */; };
+		H03 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = H21 /* HomeViewModel.swift */; };
+		H04 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = H31 /* HomeView.swift */; };
+		H07 /* QuickActionsRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = H43 /* QuickActionsRowView.swift */; };
 		H09 /* HomeFeedService.swift in Sources */ = {isa = PBXBuildFile; fileRef = H51 /* HomeFeedService.swift */; };
+		IMGCH02 /* CachedRemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMGCH01 /* CachedRemoteImage.swift */; };
+		IMGPRBLD1 /* ImagePreview+View.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMGPRFILE1 /* ImagePreview+View.swift */; };
+		PACCBLD1 /* ProfileAccountViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PACCFILE1 /* ProfileAccountViews.swift */; };
+		PACTSVBLD1 /* ProfileActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = PACTSVFILE1 /* ProfileActivityService.swift */; };
+		PACTVWBLD1 /* ProfileActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PACTVWFILE1 /* ProfileActivityView.swift */; };
+		PCOLBLD1 /* ProfileCollectionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PCOLFILE1 /* ProfileCollectionViews.swift */; };
+		PDRBLD1 /* PostDeepLinkRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = PDRFILE1 /* PostDeepLinkRoute.swift */; };
+		PEDTBLD1 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PEDTFILE1 /* EditProfileView.swift */; };
+		PLEGALBLD1 /* LegalDocumentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PLEGALFILE1 /* LegalDocumentViews.swift */; };
+		PSETBLD1 /* ProfileSettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSETFILE1 /* ProfileSettingsViews.swift */; };
+		PSOCBLD1 /* ProfileSocialViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSOCFILE1 /* ProfileSocialViews.swift */; };
+		PSPBLD1 /* PostSharePayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSPFILE1 /* PostSharePayload.swift */; };
 		S01 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = S11 /* SearchView.swift */; };
 		S02 /* SearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = S12 /* SearchService.swift */; };
 		S03 /* SearchProfileResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = S13 /* SearchProfileResult.swift */; };
-		SYSMSGBLD1 /* SystemMessagesFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYSMSGFILE1 /* SystemMessagesFeature.swift */; };
 		SYSMENBLD1 /* MentionFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYSMENFILE1 /* MentionFeature.swift */; };
+		SYSMSGBLD1 /* SystemMessagesFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYSMSGFILE1 /* SystemMessagesFeature.swift */; };
 		SYSVIEWBLD1 /* SystemMessageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYSVIEWFILE1 /* SystemMessageViews.swift */; };
 		TSTBLD03 /* ChatInboxPresentationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE03 /* ChatInboxPresentationStateTests.swift */; };
 		TSTBLD04 /* ChatConversationStateUpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE04 /* ChatConversationStateUpdaterTests.swift */; };
 		TSTBLD05 /* ChatRoomLifecycleControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE05 /* ChatRoomLifecycleControllerTests.swift */; };
-		TSTBLDCHATGH1 /* ChatGroupAndHistoryViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILECHATGH1 /* ChatGroupAndHistoryViewModelTests.swift */; };
 		TSTBLD06 /* PostCorrectnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE06 /* PostCorrectnessTests.swift */; };
 		TSTBLD07 /* ProfileSocialServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE07 /* ProfileSocialServiceTests.swift */; };
 		TSTBLD08 /* HomeFeedServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE08 /* HomeFeedServiceTests.swift */; };
@@ -146,6 +145,7 @@
 		TSTBLD17 /* MentionTextLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE17 /* MentionTextLogicTests.swift */; };
 		TSTBLD18 /* ProfileActivityServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE18 /* ProfileActivityServiceTests.swift */; };
 		TSTBLD19 /* FeedMediaLayoutEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE19 /* FeedMediaLayoutEngineTests.swift */; };
+		TSTBLDCHATGH1 /* ChatGroupAndHistoryViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILECHATGH1 /* ChatGroupAndHistoryViewModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -159,17 +159,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		CFGSHARED /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		100 /* CheeseAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheeseAppApp.swift; sourceTree = "<group>"; };
 		101 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
-		SYSMSGFILE1 /* SystemMessagesFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMessagesFeature.swift; sourceTree = "<group>"; };
-		SYSMENFILE1 /* MentionFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionFeature.swift; sourceTree = "<group>"; };
-		SYSVIEWFILE1 /* SystemMessageViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMessageViews.swift; sourceTree = "<group>"; };
 		110 /* SupabaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
 		121 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		122 /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
 		130 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
-		AUTHCRED01 /* AuthCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthCredentialStore.swift; sourceTree = "<group>"; };
 		131 /* ChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatService.swift; sourceTree = "<group>"; };
 		132 /* ImageUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageUploadService.swift; sourceTree = "<group>"; };
 		134 /* SchoolDirectoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchoolDirectoryService.swift; sourceTree = "<group>"; };
@@ -177,8 +172,6 @@
 		141 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		150 /* Date+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Date+Extensions.swift"; sourceTree = "<group>"; };
 		151 /* View+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Extensions.swift"; sourceTree = "<group>"; };
-		IMGPRFILE1 /* ImagePreview+View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImagePreview+View.swift"; sourceTree = "<group>"; };
-		CHATCFFILE1 /* PressEnterComposerField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PressEnterComposerField.swift; sourceTree = "<group>"; };
 		161 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
 		162 /* ErrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorView.swift; sourceTree = "<group>"; };
 		163 /* ImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePicker.swift; sourceTree = "<group>"; };
@@ -191,55 +184,24 @@
 		193 /* CreateSecondhandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateSecondhandView.swift; sourceTree = "<group>"; };
 		1C0 /* ForumPost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumPost.swift; sourceTree = "<group>"; };
 		1C1 /* ForumListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumListView.swift; sourceTree = "<group>"; };
-		FCARDFILE1 /* ForumPostCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumPostCardView.swift; sourceTree = "<group>"; };
-		FDETFILE1 /* ForumDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumDetailView.swift; sourceTree = "<group>"; };
-		FBRDFILE1 /* ForumBoardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumBoardViews.swift; sourceTree = "<group>"; };
-		FSRCFILE1 /* ForumSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumSearchView.swift; sourceTree = "<group>"; };
-		FREFFILE1 /* HotpotSteamRefreshView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotpotSteamRefreshView.swift; sourceTree = "<group>"; };
 		1C2 /* ForumService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumService.swift; sourceTree = "<group>"; };
 		1C3 /* CreateForumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateForumView.swift; sourceTree = "<group>"; };
 		1D1 /* ChatListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatListView.swift; sourceTree = "<group>"; };
 		1D2 /* ChatRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomView.swift; sourceTree = "<group>"; };
-		CMSGCFILE1 /* ChatMessageContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessageContentView.swift; sourceTree = "<group>"; };
-		CRSUPFILE1 /* ChatRoomSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomSupportingViews.swift; sourceTree = "<group>"; };
-		CRUTLFILE1 /* ChatRoomUtilityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomUtilityViews.swift; sourceTree = "<group>"; };
-		CRGRPFILE1 /* ChatRoomGroupCreationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomGroupCreationViews.swift; sourceTree = "<group>"; };
-		CGRPFILE1 /* ChatGroupCreationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGroupCreationViews.swift; sourceTree = "<group>"; };
-		CFOLFILE1 /* ChatFollowSearchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFollowSearchViews.swift; sourceTree = "<group>"; };
-		CROWFILE1 /* ChatConversationRowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatConversationRowViews.swift; sourceTree = "<group>"; };
 		1D3 /* ChatInboxSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInboxSupport.swift; sourceTree = "<group>"; };
 		1D4 /* ChatInboxPresentationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInboxPresentationState.swift; sourceTree = "<group>"; };
 		1D5 /* ChatGroupConversationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGroupConversationViews.swift; sourceTree = "<group>"; };
 		1D6 /* ChatConversationStateUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatConversationStateUpdater.swift; sourceTree = "<group>"; };
 		1D7 /* ChatRoomLifecycleController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomLifecycleController.swift; sourceTree = "<group>"; };
-		CRVMFILE1 /* ChatRoomViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomViewModel.swift; sourceTree = "<group>"; };
-		GCVMFILE1 /* GroupChatViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupChatViewModels.swift; sourceTree = "<group>"; };
-		CHVMFILE1 /* ChatRoomHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomHistoryViewModel.swift; sourceTree = "<group>"; };
-		CFVMFILE1 /* ChatFollowSearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFollowSearchViewModel.swift; sourceTree = "<group>"; };
-		CGDTFILE1 /* ChatGroupDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGroupDetailsView.swift; sourceTree = "<group>"; };
-		CRSVFILE1 /* ChatRoomServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomServices.swift; sourceTree = "<group>"; };
 		1D8 /* ChatServiceRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatServiceRepository.swift; sourceTree = "<group>"; };
 		1D9 /* ChatPrivacyActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatPrivacyActions.swift; sourceTree = "<group>"; };
 		1E1 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
-		PSOCFILE1 /* ProfileSocialViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSocialViews.swift; sourceTree = "<group>"; };
-		PEDTFILE1 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
-		PSETFILE1 /* ProfileSettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsViews.swift; sourceTree = "<group>"; };
-		PLEGALFILE1 /* LegalDocumentViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalDocumentViews.swift; sourceTree = "<group>"; };
-		PACCFILE1 /* ProfileAccountViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAccountViews.swift; sourceTree = "<group>"; };
-		PCOLFILE1 /* ProfileCollectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileCollectionViews.swift; sourceTree = "<group>"; };
-		PACTSVFILE1 /* ProfileActivityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityService.swift; sourceTree = "<group>"; };
-		PACTVWFILE1 /* ProfileActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityView.swift; sourceTree = "<group>"; };
 		1E2 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
-		IMGCH01 /* CachedRemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedRemoteImage.swift; sourceTree = "<group>"; };
-		FMEDFILE1 /* FeedMediaLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedMediaLayout.swift; sourceTree = "<group>"; };
-		AVCRP01 /* AvatarImageViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarImageViews.swift; sourceTree = "<group>"; };
 		1F0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		200 /* PostKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostKind.swift; sourceTree = "<group>"; };
 		201 /* CommunityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityService.swift; sourceTree = "<group>"; };
 		202 /* UserPostSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPostSummary.swift; sourceTree = "<group>"; };
 		203 /* UserPostsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPostsService.swift; sourceTree = "<group>"; };
-		210 /* ProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileService.swift; sourceTree = "<group>"; };
-		211 /* ProfileSocialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSocialService.swift; sourceTree = "<group>"; };
 		204 /* ReportPostSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportPostSheet.swift; sourceTree = "<group>"; };
 		205 /* SupportCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportCenterView.swift; sourceTree = "<group>"; };
 		206 /* UserPostsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPostsView.swift; sourceTree = "<group>"; };
@@ -248,18 +210,14 @@
 		20A /* PostEditorComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostEditorComponents.swift; sourceTree = "<group>"; };
 		20B /* PostEditorFeatureSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostEditorFeatureSections.swift; sourceTree = "<group>"; };
 		20C /* PostEditorFeatureForms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostEditorFeatureForms.swift; sourceTree = "<group>"; };
-		FEDITFILE1 /* ForumPostEditorSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumPostEditorSurface.swift; sourceTree = "<group>"; };
 		20D /* PostSharePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostSharePresentation.swift; sourceTree = "<group>"; };
 		20E /* PostDeepLinkPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDeepLinkPresentation.swift; sourceTree = "<group>"; };
-		PDRFILE1 /* PostDeepLinkRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDeepLinkRoute.swift; sourceTree = "<group>"; };
-		PSPFILE1 /* PostSharePayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostSharePayload.swift; sourceTree = "<group>"; };
 		20F /* Resources/CheeseApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Resources/CheeseApp.entitlements; sourceTree = "<group>"; };
+		210 /* ProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileService.swift; sourceTree = "<group>"; };
+		211 /* ProfileSocialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSocialService.swift; sourceTree = "<group>"; };
 		AAA /* CheeseApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CheeseApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		CR11 /* CreatePostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreatePostView.swift; sourceTree = "<group>"; };
-		H11 /* HomeCardItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeCardItem.swift; sourceTree = "<group>"; };
-		H21 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
-		H31 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
-		H43 /* QuickActionsRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionsRowView.swift; sourceTree = "<group>"; };
+		AUTHCRED01 /* AuthCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthCredentialStore.swift; sourceTree = "<group>"; };
+		AVCRP01 /* AvatarImageViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarImageViews.swift; sourceTree = "<group>"; };
 		C01 /* CourseSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseSummary.swift; sourceTree = "<group>"; };
 		C04 /* CourseDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseDiscoveryView.swift; sourceTree = "<group>"; };
 		C05 /* CourseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseDetailView.swift; sourceTree = "<group>"; };
@@ -273,14 +231,55 @@
 		C13 /* CourseCatalogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseCatalogService.swift; sourceTree = "<group>"; };
 		C14 /* CourseDiscoveryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseDiscoveryViewModel.swift; sourceTree = "<group>"; };
 		C15 /* CoursePageBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoursePageBackground.swift; sourceTree = "<group>"; };
+		CFGSHARED /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		CFOLFILE1 /* ChatFollowSearchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFollowSearchViews.swift; sourceTree = "<group>"; };
+		CFVMFILE1 /* ChatFollowSearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFollowSearchViewModel.swift; sourceTree = "<group>"; };
+		CGDTFILE1 /* ChatGroupDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGroupDetailsView.swift; sourceTree = "<group>"; };
+		CGRPFILE1 /* ChatGroupCreationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGroupCreationViews.swift; sourceTree = "<group>"; };
+		CHATCFFILE1 /* PressEnterComposerField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PressEnterComposerField.swift; sourceTree = "<group>"; };
+		CHVMFILE1 /* ChatRoomHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomHistoryViewModel.swift; sourceTree = "<group>"; };
+		CMSGCFILE1 /* ChatMessageContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessageContentView.swift; sourceTree = "<group>"; };
+		CR11 /* CreatePostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreatePostView.swift; sourceTree = "<group>"; };
+		CRGRPFILE1 /* ChatRoomGroupCreationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomGroupCreationViews.swift; sourceTree = "<group>"; };
+		CROWFILE1 /* ChatConversationRowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatConversationRowViews.swift; sourceTree = "<group>"; };
+		CRSUPFILE1 /* ChatRoomSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomSupportingViews.swift; sourceTree = "<group>"; };
+		CRSVFILE1 /* ChatRoomServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomServices.swift; sourceTree = "<group>"; };
+		CRUTLFILE1 /* ChatRoomUtilityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomUtilityViews.swift; sourceTree = "<group>"; };
+		CRVMFILE1 /* ChatRoomViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomViewModel.swift; sourceTree = "<group>"; };
+		FBRDFILE1 /* ForumBoardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumBoardViews.swift; sourceTree = "<group>"; };
+		FCARDFILE1 /* ForumPostCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumPostCardView.swift; sourceTree = "<group>"; };
+		FDETFILE1 /* ForumDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumDetailView.swift; sourceTree = "<group>"; };
+		FEDITFILE1 /* ForumPostEditorSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumPostEditorSurface.swift; sourceTree = "<group>"; };
+		FMEDFILE1 /* FeedMediaLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedMediaLayout.swift; sourceTree = "<group>"; };
+		FREFFILE1 /* HotpotSteamRefreshView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotpotSteamRefreshView.swift; sourceTree = "<group>"; };
+		FSRCFILE1 /* ForumSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumSearchView.swift; sourceTree = "<group>"; };
+		GCVMFILE1 /* GroupChatViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupChatViewModels.swift; sourceTree = "<group>"; };
+		H11 /* HomeCardItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeCardItem.swift; sourceTree = "<group>"; };
+		H21 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
+		H31 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		H43 /* QuickActionsRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionsRowView.swift; sourceTree = "<group>"; };
 		H51 /* HomeFeedService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFeedService.swift; sourceTree = "<group>"; };
+		IMGCH01 /* CachedRemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedRemoteImage.swift; sourceTree = "<group>"; };
+		IMGPRFILE1 /* ImagePreview+View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImagePreview+View.swift"; sourceTree = "<group>"; };
+		PACCFILE1 /* ProfileAccountViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAccountViews.swift; sourceTree = "<group>"; };
+		PACTSVFILE1 /* ProfileActivityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityService.swift; sourceTree = "<group>"; };
+		PACTVWFILE1 /* ProfileActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityView.swift; sourceTree = "<group>"; };
+		PCOLFILE1 /* ProfileCollectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileCollectionViews.swift; sourceTree = "<group>"; };
+		PDRFILE1 /* PostDeepLinkRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDeepLinkRoute.swift; sourceTree = "<group>"; };
+		PEDTFILE1 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
+		PLEGALFILE1 /* LegalDocumentViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalDocumentViews.swift; sourceTree = "<group>"; };
+		PSETFILE1 /* ProfileSettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsViews.swift; sourceTree = "<group>"; };
+		PSOCFILE1 /* ProfileSocialViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSocialViews.swift; sourceTree = "<group>"; };
+		PSPFILE1 /* PostSharePayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostSharePayload.swift; sourceTree = "<group>"; };
 		S11 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		S12 /* SearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchService.swift; sourceTree = "<group>"; };
 		S13 /* SearchProfileResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchProfileResult.swift; sourceTree = "<group>"; };
+		SYSMENFILE1 /* MentionFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionFeature.swift; sourceTree = "<group>"; };
+		SYSMSGFILE1 /* SystemMessagesFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMessagesFeature.swift; sourceTree = "<group>"; };
+		SYSVIEWFILE1 /* SystemMessageViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMessageViews.swift; sourceTree = "<group>"; };
 		TSTFILE03 /* ChatInboxPresentationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInboxPresentationStateTests.swift; sourceTree = "<group>"; };
 		TSTFILE04 /* ChatConversationStateUpdaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatConversationStateUpdaterTests.swift; sourceTree = "<group>"; };
 		TSTFILE05 /* ChatRoomLifecycleControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomLifecycleControllerTests.swift; sourceTree = "<group>"; };
-		TSTFILECHATGH1 /* ChatGroupAndHistoryViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGroupAndHistoryViewModelTests.swift; sourceTree = "<group>"; };
 		TSTFILE06 /* PostCorrectnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostCorrectnessTests.swift; sourceTree = "<group>"; };
 		TSTFILE07 /* ProfileSocialServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSocialServiceTests.swift; sourceTree = "<group>"; };
 		TSTFILE08 /* HomeFeedServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFeedServiceTests.swift; sourceTree = "<group>"; };
@@ -295,6 +294,7 @@
 		TSTFILE17 /* MentionTextLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionTextLogicTests.swift; sourceTree = "<group>"; };
 		TSTFILE18 /* ProfileActivityServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityServiceTests.swift; sourceTree = "<group>"; };
 		TSTFILE19 /* FeedMediaLayoutEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedMediaLayoutEngineTests.swift; sourceTree = "<group>"; };
+		TSTFILECHATGH1 /* ChatGroupAndHistoryViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGroupAndHistoryViewModelTests.swift; sourceTree = "<group>"; };
 		TSTPROD01 /* CheeseAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CheeseAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -329,25 +329,6 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		GC5 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				C13 /* CourseCatalogService.swift */,
-				C07 /* CourseOutlineService.swift */,
-				C10 /* CourseReviewService.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		GC6 /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-				C14 /* CourseDiscoveryViewModel.swift */,
-				C11 /* CourseReviewViewModel.swift */,
-			);
-			path = ViewModels;
-			sourceTree = "<group>";
-		};
 		G00 = {
 			isa = PBXGroup;
 			children = (
@@ -357,14 +338,6 @@
 				G02 /* Products */,
 				DBA54BA52F2D44BE0073E17A /* Frameworks */,
 			);
-			sourceTree = "<group>";
-		};
-		GCONFIG /* Configuration */ = {
-			isa = PBXGroup;
-			children = (
-				CFGSHARED /* Shared.xcconfig */,
-			);
-			path = Configuration;
 			sourceTree = "<group>";
 		};
 		G01 /* CheeseApp */ = {
@@ -380,43 +353,6 @@
 				20F /* Resources/CheeseApp.entitlements */,
 			);
 			path = CheeseApp;
-			sourceTree = "<group>";
-		};
-		GAPP /* App */ = {
-			isa = PBXGroup;
-			children = (
-				GAPPNAV /* Navigation */,
-				GAPPSHARE /* Sharing */,
-				GAPPEDIT /* PostEditing */,
-			);
-			path = App;
-			sourceTree = "<group>";
-		};
-		GAPPNAV /* Navigation */ = {
-			isa = PBXGroup;
-			children = (
-				20E /* PostDeepLinkPresentation.swift */,
-			);
-			path = Navigation;
-			sourceTree = "<group>";
-		};
-		GAPPSHARE /* Sharing */ = {
-			isa = PBXGroup;
-			children = (
-				20D /* PostSharePresentation.swift */,
-			);
-			path = Sharing;
-			sourceTree = "<group>";
-		};
-		GAPPEDIT /* PostEditing */ = {
-			isa = PBXGroup;
-			children = (
-				208 /* EditPostSheet.swift */,
-				20B /* PostEditorFeatureSections.swift */,
-				20C /* PostEditorFeatureForms.swift */,
-				FEDITFILE1 /* ForumPostEditorSurface.swift */,
-			);
-			path = PostEditing;
 			sourceTree = "<group>";
 		};
 		G02 /* Products */ = {
@@ -550,57 +486,6 @@
 			path = Features;
 			sourceTree = "<group>";
 		};
-		G38 /* SystemMessages */ = {
-			isa = PBXGroup;
-			children = (
-				SYSMSGFILE1 /* SystemMessagesFeature.swift */,
-				SYSMENFILE1 /* MentionFeature.swift */,
-				SYSVIEWFILE1 /* SystemMessageViews.swift */,
-			);
-			path = SystemMessages;
-			sourceTree = "<group>";
-		};
-		G34 /* Courses */ = {
-			isa = PBXGroup;
-			children = (
-				GC4 /* Models */,
-				GC5 /* Services */,
-				GC6 /* ViewModels */,
-				GC7 /* Views */,
-			);
-			path = Courses;
-			sourceTree = "<group>";
-		};
-		GC4 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				C01 /* CourseSummary.swift */,
-				C06 /* CourseOutline.swift */,
-				C09 /* CourseReview.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		GC7 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				C04 /* CourseDiscoveryView.swift */,
-				C05 /* CourseDetailView.swift */,
-				C08 /* CourseOutlineViewerView.swift */,
-				C12 /* CourseReviewSection.swift */,
-				GC8 /* Components */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
-		GC8 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				C15 /* CoursePageBackground.swift */,
-			);
-			path = Components;
-			sourceTree = "<group>";
-		};
 		G32 /* Secondhand */ = {
 			isa = PBXGroup;
 			children = (
@@ -634,6 +519,17 @@
 				192 /* SecondhandService.swift */,
 			);
 			path = Services;
+			sourceTree = "<group>";
+		};
+		G34 /* Courses */ = {
+			isa = PBXGroup;
+			children = (
+				GC4 /* Models */,
+				GC5 /* Services */,
+				GC6 /* ViewModels */,
+				GC7 /* Views */,
+			);
+			path = Courses;
 			sourceTree = "<group>";
 		};
 		G35 /* Forum */ = {
@@ -687,14 +583,6 @@
 			path = Chat;
 			sourceTree = "<group>";
 		};
-		G36M /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				122 /* ChatMessage.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
 		G36C /* Components */ = {
 			isa = PBXGroup;
 			children = (
@@ -720,18 +608,6 @@
 			path = ViewModels;
 			sourceTree = "<group>";
 		};
-		G36S /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				131 /* ChatService.swift */,
-				1D6 /* ChatConversationStateUpdater.swift */,
-				1D8 /* ChatServiceRepository.swift */,
-				1D9 /* ChatPrivacyActions.swift */,
-				CRSVFILE1 /* ChatRoomServices.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
 		G36E /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -745,6 +621,26 @@
 				CRGRPFILE1 /* ChatRoomGroupCreationViews.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		G36M /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				122 /* ChatMessage.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G36S /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				131 /* ChatService.swift */,
+				1D6 /* ChatConversationStateUpdater.swift */,
+				1D8 /* ChatServiceRepository.swift */,
+				1D9 /* ChatPrivacyActions.swift */,
+				CRSVFILE1 /* ChatRoomServices.swift */,
+			);
+			path = Services;
 			sourceTree = "<group>";
 		};
 		G37 /* Profile */ = {
@@ -802,6 +698,110 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
+		G38 /* SystemMessages */ = {
+			isa = PBXGroup;
+			children = (
+				SYSMSGFILE1 /* SystemMessagesFeature.swift */,
+				SYSMENFILE1 /* MentionFeature.swift */,
+				SYSVIEWFILE1 /* SystemMessageViews.swift */,
+			);
+			path = SystemMessages;
+			sourceTree = "<group>";
+		};
+		GAPP /* App */ = {
+			isa = PBXGroup;
+			children = (
+				GAPPNAV /* Navigation */,
+				GAPPSHARE /* Sharing */,
+				GAPPEDIT /* PostEditing */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		GAPPEDIT /* PostEditing */ = {
+			isa = PBXGroup;
+			children = (
+				208 /* EditPostSheet.swift */,
+				20B /* PostEditorFeatureSections.swift */,
+				20C /* PostEditorFeatureForms.swift */,
+				FEDITFILE1 /* ForumPostEditorSurface.swift */,
+			);
+			path = PostEditing;
+			sourceTree = "<group>";
+		};
+		GAPPNAV /* Navigation */ = {
+			isa = PBXGroup;
+			children = (
+				20E /* PostDeepLinkPresentation.swift */,
+			);
+			path = Navigation;
+			sourceTree = "<group>";
+		};
+		GAPPSHARE /* Sharing */ = {
+			isa = PBXGroup;
+			children = (
+				20D /* PostSharePresentation.swift */,
+			);
+			path = Sharing;
+			sourceTree = "<group>";
+		};
+		GC4 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				C01 /* CourseSummary.swift */,
+				C06 /* CourseOutline.swift */,
+				C09 /* CourseReview.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		GC5 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				C13 /* CourseCatalogService.swift */,
+				C07 /* CourseOutlineService.swift */,
+				C10 /* CourseReviewService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		GC6 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				C14 /* CourseDiscoveryViewModel.swift */,
+				C11 /* CourseReviewViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		GC7 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				C04 /* CourseDiscoveryView.swift */,
+				C05 /* CourseDetailView.swift */,
+				C08 /* CourseOutlineViewerView.swift */,
+				C12 /* CourseReviewSection.swift */,
+				GC8 /* Components */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		GC8 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				C15 /* CoursePageBackground.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		GCONFIG /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				CFGSHARED /* Shared.xcconfig */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
 		GCR /* Create */ = {
 			isa = PBXGroup;
 			children = (
@@ -837,14 +837,6 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
-		GH5 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				H51 /* HomeFeedService.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
 		GH2 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
@@ -870,6 +862,14 @@
 			path = Components;
 			sourceTree = "<group>";
 		};
+		GH5 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				H51 /* HomeFeedService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
 		GS0 /* Search */ = {
 			isa = PBXGroup;
 			children = (
@@ -880,12 +880,12 @@
 			path = Search;
 			sourceTree = "<group>";
 		};
-		GSM /* Models */ = {
+		GSE /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				S13 /* SearchProfileResult.swift */,
+				S11 /* SearchView.swift */,
 			);
-			path = Models;
+			path = Views;
 			sourceTree = "<group>";
 		};
 		GSF /* Services */ = {
@@ -896,12 +896,12 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
-		GSE /* Views */ = {
+		GSM /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				S11 /* SearchView.swift */,
+				S13 /* SearchProfileResult.swift */,
 			);
-			path = Views;
+			path = Models;
 			sourceTree = "<group>";
 		};
 		GT0 /* CheeseAppTests */ = {
@@ -1318,9 +1318,9 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = CFGSHARED /* Shared.xcconfig */;
 			buildSettings = {
+				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				APS_ENVIRONMENT = development;
 				CODE_SIGN_ENTITLEMENTS = CheeseApp/Resources/CheeseApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 10;
@@ -1351,9 +1351,9 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = CFGSHARED /* Shared.xcconfig */;
 			buildSettings = {
+				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				APS_ENVIRONMENT = production;
 				CODE_SIGN_ENTITLEMENTS = CheeseApp/Resources/CheeseApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 10;

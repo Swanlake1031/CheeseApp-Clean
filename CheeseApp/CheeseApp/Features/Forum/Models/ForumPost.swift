@@ -8,10 +8,6 @@
 import Foundation
 
 struct ForumBoard: Codable, Identifiable, Hashable {
-    private static let anonymousBoardID = UUID(
-        uuidString: "f0000000-0000-0000-0000-000000000005"
-    )!
-
     enum Status: String, Codable {
         case active
         case closed
@@ -43,12 +39,6 @@ struct ForumBoard: Codable, Identifiable, Hashable {
     let viewerRole: MembershipRole?
     let canManage: Bool
     let canAdminister: Bool
-
-    /// The canonical Anonymous board never exposes an identity choice. The
-    /// stable ID fallback keeps this safe while migration 133 rolls out.
-    var requiresAnonymousPosts: Bool {
-        slug == "anonymous" || id == Self.anonymousBoardID
-    }
 
     enum CodingKeys: String, CodingKey {
         case id, slug, name, description, rules, icon, status

@@ -49,6 +49,13 @@ struct SecondhandItem: Identifiable, Hashable {
         return imageUrl.map { [$0] } ?? []
     }
 
+    var feedThumbnailURL: URL? {
+        SupabasePublicImageURLResolver.url(
+            fromStoredURL: displayImageUrls.first,
+            purpose: .feedThumbnail
+        )
+    }
+
     func applying(_ payload: EditableUserPostPayload) -> SecondhandItem {
         guard payload.id == id,
               payload.kind == .secondhand,
@@ -99,6 +106,315 @@ struct SecondhandCreateInput {
     let condition: SecondhandPost.Condition
     let isNegotiable: Bool
     var mentionedUserIDs: [UUID] = []
+}
+
+struct SecondhandAIDescriptionInput {
+    let postID: UUID
+    let images: [UIImage]
+    let title: String
+    let category: SecondhandPost.Category
+    let condition: SecondhandPost.Condition
+    let price: Double
+    let isNegotiable: Bool
+}
+
+enum SecondhandAIDescriptionRules {
+    static func canGenerate(
+        title: String,
+        price: Double?,
+        imageCount: Int,
+        isGenerating: Bool,
+        isPublishing: Bool
+    ) -> Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && price?.isFinite == true
+            && (price ?? -1) >= 0
+            && imageCount > 0
+            && !isGenerating
+            && !isPublishing
+    }
+
+    static func requiresOverwriteConfirmation(_ description: String) -> Bool {
+        !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    static func canApplyGeneratedDescription(
+        currentDescription: String,
+        descriptionAtRequestStart: String
+    ) -> Bool {
+        currentDescription == descriptionAtRequestStart
+            || currentDescription.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).isEmpty
+    }
+}
+
+enum SecondhandAIDescriptionError: LocalizedError {
+    case requiredFieldsMissing
+    case imagesRequired
+    case authenticationRequired
+    case serviceUnavailable
+    case rateLimited
+    case noValidImages
+    case invalidResponse
+    case timedOut
+
+    var errorDescription: String? {
+        switch self {
+        case .requiredFieldsMissing:
+            return L10n.tr(
+                "Add a title, valid price, and at least one image first.",
+                "请先填写商品名称、有效价格并添加至少一张图片。"
+            )
+        case .imagesRequired:
+            return L10n.tr(
+                "Add at least one image before generating a description.",
+                "请先添加至少一张商品图片。"
+            )
+        case .authenticationRequired:
+            return L10n.tr("Please sign in again and retry.", "请重新登入后再试。")
+        case .rateLimited:
+            return L10n.tr(
+                "Too many requests. Please wait a minute and retry.",
+                "操作太频繁，请稍等一分钟后重试。"
+            )
+        case .noValidImages:
+            return L10n.tr(
+                "The selected images could not be read. Try another image.",
+                "暂时无法读取所选图片，请更换图片后重试。"
+            )
+        case .timedOut:
+            return L10n.tr(
+                "Generation timed out. Check your connection and retry.",
+                "生成超时，请检查网络后重试。"
+            )
+        case .serviceUnavailable:
+            return L10n.tr(
+                "AI description is temporarily unavailable. Please retry.",
+                "AI 简介暂时不可用，请重试。"
+            )
+        case .invalidResponse:
+            return L10n.tr(
+                "The generated description could not be used. Please retry.",
+                "生成的简介无法使用，请重试。"
+            )
+        }
+    }
+}
+
+@MainActor
+final class SecondhandAIDescriptionViewModel: ObservableObject {
+    typealias Generator = (SecondhandAIDescriptionInput) async throws -> String
+
+    @Published private(set) var isGenerating = false
+    @Published private(set) var errorMessage: String?
+    private let generator: Generator
+
+    init(
+        generator: @escaping Generator = { input in
+            try await SecondhandAIDescriptionService.shared.generate(input: input)
+        }
+    ) {
+        self.generator = generator
+    }
+
+    func generate(input: SecondhandAIDescriptionInput) async -> String? {
+        guard !isGenerating else { return nil }
+        guard !input.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              input.price.isFinite,
+              input.price >= 0
+        else {
+            errorMessage = SecondhandAIDescriptionError.requiredFieldsMissing
+                .localizedDescription
+            return nil
+        }
+        guard !input.images.isEmpty else {
+            errorMessage = SecondhandAIDescriptionError.imagesRequired.localizedDescription
+            return nil
+        }
+        isGenerating = true
+        errorMessage = nil
+        defer { isGenerating = false }
+        do {
+            let value = try await generator(input)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else {
+                throw SecondhandAIDescriptionError.invalidResponse
+            }
+            return value
+        } catch is CancellationError {
+            return nil
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription
+                ?? SecondhandAIDescriptionError.serviceUnavailable.localizedDescription
+            return nil
+        }
+    }
+}
+
+@MainActor
+final class SecondhandAIDescriptionService {
+    static let shared = SecondhandAIDescriptionService()
+
+    private struct ImageReference: Encodable {
+        let bucket: String
+        let objectPath: String
+
+        enum CodingKeys: String, CodingKey {
+            case bucket
+            case objectPath = "object_path"
+        }
+    }
+
+    private struct RequestPayload: Encodable {
+        let images: [ImageReference]
+        let title: String
+        let category: String
+        let condition: String
+        let price: Double
+        let isNegotiable: Bool
+        let locale: String
+
+        enum CodingKeys: String, CodingKey {
+            case images, title, category, condition, price, locale
+            case isNegotiable = "is_negotiable"
+        }
+    }
+
+    private struct SuccessPayload: Decodable {
+        let description: String
+    }
+
+    private struct ErrorPayload: Decodable {
+        let error: String
+    }
+
+    private init() {}
+
+    func generate(input: SecondhandAIDescriptionInput) async throws -> String {
+        let normalizedTitle = input.title.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !normalizedTitle.isEmpty,
+              input.price.isFinite,
+              input.price >= 0
+        else {
+            throw SecondhandAIDescriptionError.requiredFieldsMissing
+        }
+        guard !input.images.isEmpty else {
+            throw SecondhandAIDescriptionError.imagesRequired
+        }
+        guard let endpoint = Self.configuredEndpoint() else {
+            throw SecondhandAIDescriptionError.serviceUnavailable
+        }
+
+        let staged = try await SecondhandService.shared.stageImagesForAIDescription(
+            postID: input.postID,
+            images: Array(input.images.prefix(3))
+        )
+        do {
+            let session = try await SupabaseManager.shared.auth.session
+            var request = URLRequest(url: endpoint)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 32
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(
+                "Bearer \(session.accessToken)",
+                forHTTPHeaderField: "Authorization"
+            )
+            request.httpBody = try JSONEncoder().encode(
+                RequestPayload(
+                    images: staged.plans.map {
+                        ImageReference(bucket: $0.bucket, objectPath: $0.objectPath)
+                    },
+                    title: normalizedTitle,
+                    category: input.category.displayName,
+                    condition: input.condition.displayName,
+                    price: input.price,
+                    isNegotiable: input.isNegotiable,
+                    locale: Locale.preferredLanguages.first?.lowercased().hasPrefix("zh") == true
+                        ? "zh-Hans"
+                        : "en"
+                )
+            )
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard data.count <= 16_384,
+                  let http = response as? HTTPURLResponse
+            else {
+                throw SecondhandAIDescriptionError.invalidResponse
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                let category = try? JSONDecoder().decode(ErrorPayload.self, from: data).error
+                throw Self.error(for: http.statusCode, category: category)
+            }
+            let output = try JSONDecoder().decode(SuccessPayload.self, from: data)
+                .description
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !output.isEmpty, output.count <= 500 else {
+                throw SecondhandAIDescriptionError.invalidResponse
+            }
+            await SecondhandService.shared.discardAIDescriptionImages(
+                operationID: staged.operationID
+            )
+            return output
+        } catch {
+            await SecondhandService.shared.discardAIDescriptionImages(
+                operationID: staged.operationID
+            )
+            if let urlError = error as? URLError, urlError.code == .timedOut {
+                throw SecondhandAIDescriptionError.timedOut
+            }
+            if error is CancellationError { throw CancellationError() }
+            if error is SecondhandAIDescriptionError { throw error }
+            throw SecondhandAIDescriptionError.serviceUnavailable
+        }
+    }
+
+    private static func configuredEndpoint() -> URL? {
+        guard let rawValue = Bundle.main.object(
+            forInfoDictionaryKey: "CHEESE_AI_TRIGGER_URL"
+        ) as? String else { return nil }
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty,
+              !value.hasPrefix("$("),
+              var components = URLComponents(string: value),
+              components.scheme == "https"
+                || components.host == "127.0.0.1"
+                || components.host == "localhost"
+        else { return nil }
+        components.path = "/v1/secondhand/generate-description"
+        components.query = nil
+        components.fragment = nil
+        return components.url
+    }
+
+    private static func error(
+        for statusCode: Int,
+        category: String?
+    ) -> SecondhandAIDescriptionError {
+        if statusCode == 403, category == "image_not_owned" {
+            return .serviceUnavailable
+        }
+        switch statusCode {
+        case 401, 403:
+            return .authenticationRequired
+        case 429:
+            return .rateLimited
+        case 422 where category == "no_valid_images":
+            return .noValidImages
+        case 504:
+            return .timedOut
+        case 400 where category == "images_required":
+            return .imagesRequired
+        case 400 where category == "title_required"
+            || category == "price_required"
+            || category == "invalid_price":
+            return .requiredFieldsMissing
+        default:
+            return .serviceUnavailable
+        }
+    }
 }
 
 struct SecondhandEditableFields {
@@ -364,6 +680,55 @@ class SecondhandService: ObservableObject {
 
         await retryPendingMediaCleanup(postID: publishedID)
         return publishedID
+    }
+
+    func stageImagesForAIDescription(
+        postID: UUID,
+        images: [UIImage]
+    ) async throws -> (operationID: UUID, plans: [PostImageUploadPlan]) {
+        guard !images.isEmpty else {
+            throw SecondhandAIDescriptionError.imagesRequired
+        }
+        let actingUserID = try await AuthService.shared.requireAuthUserId()
+        let operationID = UUID()
+        let selectedImages = Array(images.prefix(3))
+        let plans = try ImageUploadService.shared.makePostImageUploadPlans(
+            imageCount: selectedImages.count,
+            userID: actingUserID,
+            postID: postID,
+            operationID: operationID
+        )
+        do {
+            try await prepareMediaOperation(
+                operationID: operationID,
+                postID: postID,
+                plans: plans
+            )
+            for (image, plan) in zip(selectedImages, plans) {
+                _ = try await ImageUploadService.shared.uploadPostImage(image, plan: plan)
+                try await markMediaUploaded(
+                    operationID: operationID,
+                    orderIndex: plan.orderIndex
+                )
+            }
+            return (operationID, plans)
+        } catch {
+            await discardAIDescriptionImages(operationID: operationID)
+            throw error
+        }
+    }
+
+    func discardAIDescriptionImages(operationID: UUID) async {
+        do {
+            let cleanupItems = try await abandonMediaOperation(
+                operationID: operationID,
+                reason: "ai_description_finished"
+            )
+            await performMediaCleanup(cleanupItems)
+        } catch {
+            // Existing cleanup reconciliation recovers staged operations if
+            // the app exits before this best-effort cleanup completes.
+        }
     }
 
     static func makeDetailInsert(input: SecondhandCreateInput) -> SecondhandDetailInsert {
@@ -956,17 +1321,15 @@ class SecondhandService: ObservableObject {
         limit: Int = 4
     ) {
         let urls = dbPosts.compactMap { post -> URL? in
-            guard let imageURLString = post.images?
-                .min(by: { ($0.orderIndex ?? Int.max) < ($1.orderIndex ?? Int.max) })?
-                .url,
-                  let originalURL = URL(string: imageURLString)
-            else { return nil }
-            return originalURL
+            let image = DBSecondhandImage
+                .stablySorted(post.images ?? [])
+                .first
+            return image?.url(for: .feedThumbnail)
         }
 
         RemoteImageCache.shared.prefetch(
             urls,
-            maxPixelSize: 640,
+            maxPixelSize: RemoteImagePurpose.feedThumbnail.targetPixelWidth,
             limit: limit,
             maxConcurrent: 2
         )
@@ -1001,9 +1364,8 @@ class SecondhandService: ObservableObject {
         isFavorited: Bool
     ) -> SecondhandItem {
         let category = SecondhandPost.Category(normalizing: dbPost.category)
-        let orderedImageURLs = (dbPost.images ?? [])
-            .sorted { ($0.orderIndex ?? Int.max) < ($1.orderIndex ?? Int.max) }
-            .map(\.url)
+        let orderedImageURLs = DBSecondhandImage.stablySorted(dbPost.images ?? [])
+            .compactMap { $0.url(for: .original)?.absoluteString }
 
         let item = SecondhandItem(
             id: dbPost.id,
@@ -1123,12 +1485,39 @@ struct DBSecondhandPost: Codable, Identifiable {
 }
 
 struct DBSecondhandImage: Codable {
+    var id: UUID? = nil
     let url: String
     let orderIndex: Int?
+    var bucket: String? = nil
+    var objectPath: String? = nil
+
+    func url(for purpose: RemoteImagePurpose) -> URL? {
+        SupabasePublicImageURLResolver.url(
+            bucket: bucket,
+            objectPath: objectPath,
+            fromStoredURL: url,
+            purpose: purpose
+        )
+    }
+
+    static func stablySorted(_ images: [DBSecondhandImage]) -> [DBSecondhandImage] {
+        images.sorted { lhs, rhs in
+            let lhsOrder = lhs.orderIndex ?? Int.max
+            let rhsOrder = rhs.orderIndex ?? Int.max
+            if lhsOrder != rhsOrder { return lhsOrder < rhsOrder }
+
+            let lhsTieBreaker = lhs.id?.uuidString.lowercased() ?? lhs.url
+            let rhsTieBreaker = rhs.id?.uuidString.lowercased() ?? rhs.url
+            return lhsTieBreaker < rhsTieBreaker
+        }
+    }
 
     enum CodingKeys: String, CodingKey {
+        case id
         case url
         case orderIndex = "order_index"
+        case bucket
+        case objectPath = "object_path"
     }
 }
 

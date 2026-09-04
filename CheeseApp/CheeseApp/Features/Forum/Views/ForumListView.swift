@@ -93,7 +93,7 @@ struct ForumBoardView: View {
                 )
                 .id(board.id)
             } else {
-                ProgressView(L10n.tr("Loading board…", "正在载入板块…"))
+                ProgressView(L10n.tr("Loading hashtag…", "正在载入 Hashtag…"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -262,13 +262,11 @@ private struct ForumChannelPageView: View {
                 ForumPostCardView(
                     post: post,
                     isOwnPost: currentUserID == post.authorId,
-                    headerStyle: .author,
                     onTap: { onOpen(post) },
                     onLikeTap: { await toggleLike(for: post) },
                     onFavoriteTap: { await toggleFavorite(for: post) },
                     onEditTap: { onEdit(post) },
-                    onShareTap: { onShare(post) },
-                    onBoardTap: nil
+                    onShareTap: { onShare(post) }
                 )
             }
         }
@@ -401,19 +399,7 @@ private struct ForumBoardIntroductionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                Image(systemName: board.icon)
-                    .font(.system(size: 23, weight: .bold))
-                    .foregroundStyle(AppColors.accentStrong)
-                    .frame(width: 50, height: 50)
-                    .background(AppColors.accent.opacity(0.14))
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: 15,
-                            style: .continuous
-                        )
-                    )
-
-                Text(board.name)
+                Text("# \(board.name)")
                     .font(.system(size: 21, weight: .bold))
                 Spacer()
             }
@@ -425,7 +411,7 @@ private struct ForumBoardIntroductionCard: View {
 
             Button(action: onRulesTap) {
                 Label(
-                    L10n.tr("Rules", "板块规则"),
+                    L10n.tr("Hashtag rules", "Hashtag 规则"),
                     systemImage: "doc.text"
                 )
             }

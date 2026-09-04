@@ -122,7 +122,7 @@ final class SearchPaginationViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.recentSearches, ["ECON 1B03"])
     }
 
-    func testOverallHotRankingMergesCategoriesByHotScore() async {
+    func testPopularFeedMergesCategoriesByHotScore() async {
         let secondhand = makeResult(
             title: "secondhand",
             category: .secondhand,
@@ -153,9 +153,43 @@ final class SearchPaginationViewModelTests: XCTestCase {
 
         await viewModel.loadInitialData()
 
-        XCTAssertEqual(viewModel.hotPosts(for: .all).map(\.id), [forum.id, secondhand.id])
-        XCTAssertEqual(viewModel.hotPosts(for: .secondhand).map(\.id), [secondhand.id])
-        XCTAssertEqual(viewModel.hotPosts(for: .forum).map(\.id), [forum.id])
+        XCTAssertEqual(viewModel.feedPosts(for: .hot).map(\.id), [forum.id, secondhand.id])
+        XCTAssertEqual(viewModel.feedPosts(for: .secondhand).map(\.id), [secondhand.id])
+        XCTAssertEqual(viewModel.feedPosts(for: .forum).map(\.id), [forum.id])
+    }
+
+    func testLatestFeedMergesCategoriesByCreationDate() async {
+        let older = makeResult(
+            title: "older",
+            category: .secondhand,
+            hotScore: 100,
+            rankScore: 1
+        )
+        let newer = makeResult(
+            title: "newer",
+            category: .forum,
+            hotScore: 1,
+            rankScore: 2
+        )
+        let viewModel = SearchViewModel(
+            loadPostPage: { _, category, _, _ in
+                switch category {
+                case .secondhand:
+                    return SearchPostPage(results: [older], nextCursor: nil)
+                case .forum:
+                    return SearchPostPage(results: [newer], nextCursor: nil)
+                case .all:
+                    return SearchPostPage(results: [], nextCursor: nil)
+                }
+            },
+            loadPostCounts: { [:] },
+            loadProfiles: { _, _ in [] },
+            searchDebounceNanoseconds: 0
+        )
+
+        await viewModel.loadInitialData()
+
+        XCTAssertEqual(viewModel.feedPosts(for: .latest).map(\.id), [newer.id, older.id])
     }
 
     func testPublicUIDSearchPublishesExactProfileResult() async {

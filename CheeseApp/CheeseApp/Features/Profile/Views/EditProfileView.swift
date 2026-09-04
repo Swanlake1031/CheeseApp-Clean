@@ -33,9 +33,13 @@ struct EditProfileView: View {
     @State private var showingAvatarCropper = false
     @State private var showingAvatarCamera = false
     @State private var avatarURLString: String = ""
+    @State private var coverURLString: String?
     @State private var saveErrorMessage: String?
     @State private var showingAvatarActionPreview = false
+    @State private var showingCoverEditor = false
     @FocusState private var focusedField: EditProfileFocusField?
+
+    private let startsWithAvatarActions: Bool
 
     private let genderOptions: [(value: String, label: String)] = [
         ("male", "男"),
@@ -44,11 +48,63 @@ struct EditProfileView: View {
         ("prefer_not_to_say", "暂不透露")
     ]
 
+    init(startsWithAvatarActions: Bool = false) {
+        self.startsWithAvatarActions = startsWithAvatarActions
+        _showingAvatarActionPreview = State(initialValue: startsWithAvatarActions)
+    }
+
     private var storedSchoolName: String {
         authService.currentUser?.school ?? CheeseUniversityOption.defaultSchoolName
     }
 
     var body: some View {
+        Group {
+            if startsWithAvatarActions && showingAvatarActionPreview {
+                avatarActionFullScreen
+            } else {
+                profileEditor
+            }
+        }
+        .onChange(of: selectedAvatarItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                let image: UIImage?
+                if let data = try? await newItem.loadTransferable(type: Data.self) {
+                    image = UIImage(data: data)
+                } else {
+                    image = nil
+                }
+
+                await MainActor.run {
+                    selectedAvatarItem = nil
+                    guard let image else {
+                        saveErrorMessage = L10n.tr(
+                            "Unable to load this photo. Please choose another image.",
+                            "无法读取这张照片，请选择其他图片"
+                        )
+                        return
+                    }
+                    saveErrorMessage = nil
+                    pendingAvatarCropImage = image
+                    showingAvatarCropper = true
+                }
+            }
+        }
+        .onAppear {
+            guard let user = authService.currentUser else { return }
+            fullName = user.fullName ?? ""
+            phoneNumber = user.phoneNumber ?? ""
+            let savedGender = user.gender ?? ""
+            gender = genderOptions.contains(where: { $0.value == savedGender }) ? savedGender : ""
+            isGenderVisible = user.isGenderVisible ?? true
+            occupation = user.occupation ?? ""
+            bio = user.bio ?? ""
+            avatarURLString = user.avatarUrl ?? ""
+            coverURLString = user.coverImageUrl
+        }
+    }
+
+    private var profileEditor: some View {
         NavigationStack {
             ZStack {
                 AppColors.pageBackground
@@ -73,6 +129,11 @@ struct EditProfileView: View {
                             ) {
                                 focusedField = .bio
                             }
+
+                            Divider()
+                                .padding(.leading, 16)
+
+                            coverImageField
 
                             Divider()
                                 .padding(.leading, 16)
@@ -164,41 +225,18 @@ struct EditProfileView: View {
             .fullScreenCover(isPresented: $showingAvatarActionPreview) {
                 avatarActionFullScreen
             }
-            .onChange(of: selectedAvatarItem) { _, newItem in
-                guard let newItem else { return }
-                Task {
-                    let image: UIImage?
-                    if let data = try? await newItem.loadTransferable(type: Data.self) {
-                        image = UIImage(data: data)
-                    } else {
-                        image = nil
-                    }
-
-                    await MainActor.run {
-                        selectedAvatarItem = nil
-                        guard let image else {
-                            saveErrorMessage = L10n.tr(
-                                "Unable to load this photo. Please choose another image.",
-                                "无法读取这张照片，请选择其他图片"
-                            )
-                            return
-                        }
-                        saveErrorMessage = nil
-                        pendingAvatarCropImage = image
-                        showingAvatarCropper = true
+            .fullScreenCover(isPresented: $showingCoverEditor) {
+                if let userID = authService.currentUser?.id {
+                    ProfileCoverEditorView(
+                        userID: userID,
+                        coverURLString: coverURLString
+                    ) { updatedURL in
+                        coverURLString = updatedURL
+                        guard var updatedProfile = authService.currentUser else { return }
+                        updatedProfile.coverImageUrl = updatedURL
+                        authService.currentUser = updatedProfile
                     }
                 }
-            }
-            .onAppear {
-                guard let user = authService.currentUser else { return }
-                fullName = user.fullName ?? ""
-                phoneNumber = user.phoneNumber ?? ""
-                let savedGender = user.gender ?? ""
-                gender = genderOptions.contains(where: { $0.value == savedGender }) ? savedGender : ""
-                isGenderVisible = user.isGenderVisible ?? true
-                occupation = user.occupation ?? ""
-                bio = user.bio ?? ""
-                avatarURLString = user.avatarUrl ?? ""
             }
         }
     }
@@ -293,6 +331,76 @@ struct EditProfileView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 15)
+    }
+
+    private var coverImageField: some View {
+        Button {
+            focusedField = nil
+            showingCoverEditor = true
+        } label: {
+            HStack(spacing: 14) {
+                Text(L10n.tr("Cover image", "背景图"))
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(AppColors.textMuted)
+                    .frame(width: 66, alignment: .leading)
+
+                coverImageThumbnail
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AppColors.textMuted.opacity(0.65))
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 70)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(authService.currentUser?.id == nil)
+    }
+
+    @ViewBuilder
+    private var coverImageThumbnail: some View {
+        if let resolvedURL = SupabasePublicImageURLResolver.url(
+            fromStoredURL: coverURLString,
+            purpose: .feedThumbnail
+        ) {
+            CachedRemoteImage(
+                url: resolvedURL,
+                targetPixelWidth: 180
+            ) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+            } placeholder: {
+                coverThumbnailPlaceholder
+            }
+            .frame(width: 64, height: 44)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        } else {
+            HStack(spacing: 6) {
+                coverThumbnailPlaceholder
+                    .frame(width: 42, height: 30)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                Text(L10n.tr("Not set", "未设置"))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(AppColors.textMuted.opacity(0.72))
+            }
+        }
+    }
+
+    private var coverThumbnailPlaceholder: some View {
+        LinearGradient(
+            colors: [AppColors.accent.opacity(0.24), Color(.systemGray6)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay {
+            Image(systemName: "photo")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(AppColors.textMuted.opacity(0.7))
+        }
     }
 
     private var genderPickerField: some View {
@@ -462,7 +570,7 @@ struct EditProfileView: View {
                 VStack(spacing: 0) {
                     HStack {
                         Button {
-                            showingAvatarActionPreview = false
+                            closeAvatarActions()
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 28, weight: .regular))
@@ -568,6 +676,19 @@ struct EditProfileView: View {
     private func cancelAvatarCrop() {
         pendingAvatarCropImage = nil
         showingAvatarCropper = false
+    }
+
+    private func closeAvatarActions() {
+        guard startsWithAvatarActions,
+              selectedAvatarImage == nil
+        else {
+            showingAvatarActionPreview = false
+            return
+        }
+
+        // The profile-avatar entry presents this editor directly full screen,
+        // so closing dismisses that surface without flashing the profile form.
+        dismiss()
     }
 
     private func confirmAvatarCrop(_ image: UIImage) {

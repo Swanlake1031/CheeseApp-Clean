@@ -65,9 +65,12 @@ struct ProfileSocialSummary: Decodable, Equatable {
     }
 }
 
-enum ProfileFollowListMode {
-    case followers
+enum ProfileFollowListMode: Int, CaseIterable, Identifiable {
     case following
+    case followers
+    case mutual
+
+    var id: Int { rawValue }
 }
 
 struct ProfileFollowListEntry: Identifiable, Hashable {
@@ -76,6 +79,51 @@ struct ProfileFollowListEntry: Identifiable, Hashable {
     let avatarURL: String?
     let subtitle: String?
     let isNew: Bool
+    var amFollowing: Bool
+}
+
+struct ProfileFollowListsSnapshot: Equatable {
+    var following: [ProfileFollowListEntry]
+    var followers: [ProfileFollowListEntry]
+
+    var mutual: [ProfileFollowListEntry] {
+        let followingIDs = Set(following.map(\.id))
+        return followers.filter { followingIDs.contains($0.id) }
+    }
+
+    func entries(for mode: ProfileFollowListMode) -> [ProfileFollowListEntry] {
+        switch mode {
+        case .following:
+            return following
+        case .followers:
+            return followers
+        case .mutual:
+            return mutual
+        }
+    }
+
+    mutating func applyFollowingChange(
+        entry: ProfileFollowListEntry,
+        isFollowing: Bool
+    ) {
+        if isFollowing {
+            if !following.contains(where: { $0.id == entry.id }) {
+                var followedEntry = entry
+                followedEntry.amFollowing = true
+                following.insert(followedEntry, at: 0)
+            }
+        } else {
+            following.removeAll { $0.id == entry.id }
+        }
+
+        if let followerIndex = followers.firstIndex(where: { $0.id == entry.id }) {
+            followers[followerIndex].amFollowing = isFollowing
+        }
+    }
+
+    mutating func removeFollower(userID: UUID) {
+        followers.removeAll { $0.id == userID }
+    }
 }
 
 enum ProfileFollowFreshness {
@@ -266,6 +314,30 @@ final class ProfileSocialService: ObservableObject {
         )
     }
 
+    /// Resolves the viewer's relationship to a batch of users without causing
+    /// each notification row to issue its own social-summary request.
+    func loadFollowingUserIDs(
+        among targetUserIDs: Set<UUID>
+    ) async throws -> Set<UUID> {
+        guard !targetUserIDs.isEmpty else { return [] }
+        let currentUserId = try await AuthService.shared.requireAuthUserId()
+        guard let requestGeneration = requestGeneration() else {
+            throw CancellationError()
+        }
+
+        let rows: [ProfileFollowRow] = try await supabase
+            .database("user_follows")
+            .select("following_id")
+            .eq("follower_id", value: currentUserId.uuidString)
+            .in("following_id", values: targetUserIDs.map(\.uuidString))
+            .execute()
+            .value
+        guard isCurrentAccountRequest(generation: requestGeneration) else {
+            throw CancellationError()
+        }
+        return Set(rows.compactMap(\.followingId))
+    }
+
     func removeFollower(followerUserId: UUID) async throws {
         let currentUserId = try await AuthService.shared.requireAuthUserId()
         guard currentUserId != followerUserId else { return }
@@ -286,58 +358,78 @@ final class ProfileSocialService: ObservableObject {
         userId: UUID,
         mode: ProfileFollowListMode
     ) async throws -> (entries: [ProfileFollowListEntry], newFollowerCount: Int) {
+        let snapshot = try await loadFollowLists(userId: userId)
+        let entries = snapshot.entries(for: mode)
+        return (entries, mode == .followers ? entries.filter(\.isNew).count : 0)
+    }
+
+    /// Loads both relationship directions once, hydrates their shared profiles
+    /// in one batch, and derives mutuals from the same coherent snapshot.
+    func loadFollowLists(userId: UUID) async throws -> ProfileFollowListsSnapshot {
         guard let requestGeneration = requestGeneration() else {
             throw CancellationError()
         }
-        let sourceRows = try await fetchFollowRows(userId: userId, mode: mode)
+        async let followingRowsTask = fetchFollowRows(userId: userId, mode: .following)
+        async let followerRowsTask = fetchFollowRows(userId: userId, mode: .followers)
+        let (followingRows, followerRows) = try await (
+            followingRowsTask,
+            followerRowsTask
+        )
         guard isCurrentAccountRequest(generation: requestGeneration) else {
             throw CancellationError()
         }
-        let ordered = orderedFollowIds(from: sourceRows, mode: mode)
-        let isViewingOwnFollowers = mode == .followers
-            && AuthService.shared.currentUser?.id == userId
-
-        guard !ordered.ids.isEmpty else {
-            if isViewingOwnFollowers {
-                markFollowersRead(userId: userId, latestFollowedAt: nil)
-            }
-            return ([], 0)
+        let orderedFollowing = orderedFollowIds(from: followingRows, mode: .following)
+        let orderedFollowers = orderedFollowIds(from: followerRows, mode: .followers)
+        var seenProfileIDs = Set<UUID>()
+        let profileIDs = (orderedFollowing.ids + orderedFollowers.ids).filter {
+            seenProfileIDs.insert($0).inserted
         }
-
-        let profiles = try await ProfileService.fetchProfiles(userIds: ordered.ids)
+        let profiles: [UUID: Profile] = profileIDs.isEmpty
+            ? [:]
+            : try await ProfileService.fetchProfiles(userIds: profileIDs)
         guard isCurrentAccountRequest(generation: requestGeneration) else {
             throw CancellationError()
         }
-        let followerSeenAt = mode == .followers ? seenDate(for: userId) : nil
-        let builtEntries = ordered.ids.compactMap { id -> ProfileFollowListEntry? in
+
+        let followingIDs = Set(orderedFollowing.ids)
+        let followerSeenAt = seenDate(for: userId)
+        let followingEntries = orderedFollowing.ids.compactMap { id -> ProfileFollowListEntry? in
             guard let profile = profiles[id] else { return nil }
-            let followedAt = mode == .followers ? ordered.followedAt[id] : nil
             return ProfileFollowListEntry(
                 id: id,
                 displayName: displayName(for: profile),
                 avatarURL: profile.avatarUrl,
                 subtitle: profile.school,
-                isNew: mode == .followers
-                    && ProfileFollowFreshness.isNew(
-                        followedAt: followedAt,
-                        seenAt: followerSeenAt
-                    )
+                isNew: false,
+                amFollowing: true
+            )
+        }
+        let followerEntries = orderedFollowers.ids.compactMap { id -> ProfileFollowListEntry? in
+            guard let profile = profiles[id] else { return nil }
+            return ProfileFollowListEntry(
+                id: id,
+                displayName: displayName(for: profile),
+                avatarURL: profile.avatarUrl,
+                subtitle: profile.school,
+                isNew: ProfileFollowFreshness.isNew(
+                    followedAt: orderedFollowers.followedAt[id],
+                    seenAt: followerSeenAt
+                ),
+                amFollowing: followingIDs.contains(id)
             )
         }
 
-        guard mode == .followers else {
-            return (builtEntries, 0)
-        }
-
-        let newEntries = builtEntries.filter(\.isNew)
-        let entries = newEntries + builtEntries.filter { !$0.isNew }
+        let isViewingOwnFollowers = AuthService.shared.currentUser?.id == userId
         if isViewingOwnFollowers {
             markFollowersRead(
                 userId: userId,
-                latestFollowedAt: sourceRows.compactMap(\.createdAt).max()
+                latestFollowedAt: followerRows.compactMap(\.createdAt).max()
             )
         }
-        return (entries, newEntries.count)
+        return ProfileFollowListsSnapshot(
+            following: followingEntries,
+            followers: followerEntries
+        )
     }
 
     func refreshUnreadStatus() async {
@@ -469,6 +561,10 @@ final class ProfileSocialService: ObservableObject {
                 .order("created_at", ascending: false)
                 .execute()
                 .value
+        case .mutual:
+            // Mutual is derived from the two directional queries in
+            // `loadFollowLists` and never performs a third request.
+            return []
         }
     }
 
@@ -481,7 +577,15 @@ final class ProfileSocialService: ObservableObject {
         var followedAt: [UUID: Date] = [:]
 
         for row in rows {
-            let id = mode == .followers ? row.followerId : row.followingId
+            let id: UUID?
+            switch mode {
+            case .followers:
+                id = row.followerId
+            case .following:
+                id = row.followingId
+            case .mutual:
+                id = nil
+            }
             guard let id, seen.insert(id).inserted else { continue }
             ids.append(id)
             if mode == .followers {

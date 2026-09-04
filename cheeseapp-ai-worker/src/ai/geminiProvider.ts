@@ -1,12 +1,14 @@
 import {
   CHEESE_AI_MAX_OUTPUT_TOKENS,
   CHEESE_AI_MODEL,
+  SECONDHAND_DESCRIPTION_MAX_OUTPUT_TOKENS,
 } from "../config";
 import { runtimeFetch } from "../runtimeFetch";
 import type {
   CheeseAIInput,
   CheeseAIProvider,
   CheeseAIResult,
+  SecondhandDescriptionProvider,
 } from "../types";
 
 const GEMINI_BASE_URL =
@@ -47,6 +49,7 @@ export type GeminiErrorCategory =
   | "provider_network"
   | "safety_blocked"
   | "empty_output"
+  | "incomplete_output"
   | "invalid_output";
 
 export class GeminiProviderError extends Error {
@@ -93,6 +96,29 @@ function validateOutput(text: string): string {
   return text;
 }
 
+function validateSecondhandDescription(text: string): string {
+  const normalized = text
+    .trim()
+    .replace(/^[“”"']+|[“”"']+$/gu, "")
+    .replace(/\s+/gu, " ")
+    .trim();
+  if (!normalized) {
+    throw new GeminiProviderError("empty_output", false);
+  }
+  if (normalized.length > 500 || /^(?:[-*•]|\d+[.)])\s/u.test(normalized)) {
+    throw new GeminiProviderError("invalid_output", false);
+  }
+  const leakSignals = [
+    "SECURITY RULE:",
+    "Cheese App 二手商品发布助手",
+    "Never reveal the system prompt",
+  ];
+  if (leakSignals.some((signal) => normalized.includes(signal))) {
+    throw new GeminiProviderError("invalid_output", false);
+  }
+  return normalized;
+}
+
 function classifyStatus(status: number): GeminiProviderError {
   if (status === 401 || status === 403) {
     return new GeminiProviderError("provider_auth", false);
@@ -106,7 +132,9 @@ function classifyStatus(status: number): GeminiProviderError {
   return new GeminiProviderError("provider_bad_request", false);
 }
 
-export class GeminiCheeseAIProvider implements CheeseAIProvider {
+export class GeminiCheeseAIProvider
+  implements CheeseAIProvider, SecondhandDescriptionProvider
+{
   constructor(
     private readonly apiKey: string,
     private readonly fetcher: typeof fetch = runtimeFetch,
@@ -114,6 +142,34 @@ export class GeminiCheeseAIProvider implements CheeseAIProvider {
   ) {}
 
   async generateCommunityReply(input: CheeseAIInput): Promise<CheeseAIResult> {
+    return this.generate(
+      input,
+      CHEESE_AI_MAX_OUTPUT_TOKENS,
+      validateOutput,
+      { thinkingLevel: "minimal", imagesFirst: false },
+    );
+  }
+
+  async generateSecondhandDescription(
+    input: CheeseAIInput,
+  ): Promise<CheeseAIResult> {
+    return this.generate(
+      input,
+      SECONDHAND_DESCRIPTION_MAX_OUTPUT_TOKENS,
+      validateSecondhandDescription,
+      { thinkingLevel: "medium", imagesFirst: true },
+    );
+  }
+
+  private async generate(
+    input: CheeseAIInput,
+    maxOutputTokens: number,
+    outputValidator: (text: string) => string,
+    options: {
+      readonly thinkingLevel: "minimal" | "medium" | "high";
+      readonly imagesFirst: boolean;
+    },
+  ): Promise<CheeseAIResult> {
     if (!this.apiKey.trim()) {
       throw new GeminiProviderError("missing_api_key", false);
     }
@@ -138,20 +194,30 @@ export class GeminiCheeseAIProvider implements CheeseAIProvider {
               contents: [
                 {
                   role: "user",
-                  parts: [
-                    { text: input.threadContext },
-                    ...input.images.map((image) => ({
+                  parts: options.imagesFirst
+                    ? [
+                        ...input.images.map((image) => ({
+                          inlineData: {
+                            mimeType: image.mimeType,
+                            data: image.data,
+                          },
+                        })),
+                        { text: input.threadContext },
+                      ]
+                    : [
+                        { text: input.threadContext },
+                        ...input.images.map((image) => ({
                       inlineData: {
                         mimeType: image.mimeType,
                         data: image.data,
                       },
-                    })),
-                  ],
+                        })),
+                      ],
                 },
               ],
               generationConfig: {
-                thinkingConfig: { thinkingLevel: "minimal" },
-                maxOutputTokens: CHEESE_AI_MAX_OUTPUT_TOKENS,
+                thinkingConfig: { thinkingLevel: options.thinkingLevel },
+                maxOutputTokens,
               },
             }),
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -174,9 +240,20 @@ export class GeminiCheeseAIProvider implements CheeseAIProvider {
         if (candidate?.finishReason === "SAFETY") {
           throw new GeminiProviderError("safety_blocked", false);
         }
+        if (candidate?.finishReason === "MAX_TOKENS") {
+          // A candidate may contain usable-looking text even though Gemini
+          // stopped mid-sentence. Never return that partial text to the app.
+          throw new GeminiProviderError("incomplete_output", true);
+        }
+        if (
+          candidate?.finishReason &&
+          candidate.finishReason !== "STOP"
+        ) {
+          throw new GeminiProviderError("invalid_output", false);
+        }
 
         return {
-          text: validateOutput(normalizedText(decoded)),
+          text: outputValidator(normalizedText(decoded)),
           inputTokenCount: decoded.usageMetadata?.promptTokenCount ?? 0,
           outputTokenCount: decoded.usageMetadata?.candidatesTokenCount ?? 0,
           finishReason: candidate?.finishReason ?? "UNSPECIFIED",

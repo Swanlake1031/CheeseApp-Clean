@@ -83,8 +83,8 @@ struct EditPostSheet: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
-                        editForm
                         existingImageSection
+                        editForm
 
                         if let errorMessage {
                             Text(errorMessage)
@@ -161,6 +161,7 @@ struct EditPostSheet: View {
             isEditing: true,
             boards: forumService.boards,
             selectedBoardID: $forumBoardID,
+            isAnonymous: $forumIsAnonymous,
             title: $title,
             content: $description,
             selectedImages: $selectedImages,
@@ -179,7 +180,6 @@ struct EditPostSheet: View {
             onClearDraft: {},
             onBoardSelected: { board in
                 forumBoardID = board.id
-                forumIsAnonymous = board.requiresAnonymousPosts
             }
         )
     }
@@ -270,21 +270,27 @@ struct EditPostSheet: View {
                     HStack(spacing: 10) {
                         ForEach(existingImages) { image in
                             ZStack(alignment: .topTrailing) {
-                                AsyncImage(url: URL(string: image.url)) { phase in
-                                    if let loaded = phase.image {
-                                        loaded
-                                            .resizable()
-                                            .scaledToFill()
+                                ZStack {
+                                    if let url = SupabasePublicImageURLResolver.url(
+                                        fromStoredURL: image.url,
+                                        purpose: .feedThumbnail
+                                    ) {
+                                        CachedRemoteImage(
+                                            url: url,
+                                            targetPixelWidth: 256,
+                                            showsRetryButton: true
+                                        ) { loaded in
+                                            loaded.resizable().scaledToFill()
+                                        } placeholder: {
+                                            existingImagePlaceholder
+                                        }
                                     } else {
-                                        Color(.systemGray5)
-                                            .overlay {
-                                                Image(systemName: "photo")
-                                                    .foregroundStyle(.secondary)
-                                            }
+                                        existingImagePlaceholder
                                     }
                                 }
                                 .frame(width: 82, height: 82)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .tappableImagePreview(image.url)
 
                                 Button {
                                     existingImages.removeAll { $0.id == image.id }
@@ -307,6 +313,14 @@ struct EditPostSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
+    }
+
+    private var existingImagePlaceholder: some View {
+        Color(.systemGray5)
+            .overlay {
+                Image(systemName: "photo")
+                    .foregroundStyle(.secondary)
+            }
     }
 
     private func save() async {

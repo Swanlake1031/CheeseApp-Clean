@@ -4,10 +4,15 @@ struct SystemMessageTimelineView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
     @StateObject private var service = SystemMessageService.shared
+    @StateObject private var profileSocialService = ProfileSocialService.shared
     @StateObject private var viewModel: SystemMessageViewModel
     @State private var pendingSoldMessage: SystemMessageItem?
     @State private var selectedNavigationTarget: SystemMessageResolvedNavigationTarget?
     @State private var openingMessageID: UUID?
+    @State private var followingActorIDs: Set<UUID> = []
+    @State private var resolvedFollowActorIDs: Set<UUID> = []
+    @State private var pendingFollowActorIDs: Set<UUID> = []
+    @State private var selectedInteractionPage: InteractionMessagePage = .activity
 
     let category: SystemMessageCategory
 
@@ -21,44 +26,17 @@ struct SystemMessageTimelineView: View {
     var body: some View {
         ZStack {
             AppColors.pageBackground.ignoresSafeArea()
-
-            switch viewModel.loadState {
-            case .unresolved, .initialLoading:
-                loadingState
-            case .empty:
-                emptyState
-            case .error(let message):
-                ErrorView(message) {
-                    Task { await loadTimeline(force: true) }
-                }
-            case .loaded:
-                timeline
-            }
+            timelineContent
         }
         .toolbar(.hidden, for: .navigationBar)
         .enableSwipeBackGesture()
         .safeAreaInset(edge: .top) {
-            CheeseInlineTopBar {
-                Button {
-                    dismiss()
-                } label: {
-                    PostToolbarIconCircle(icon: "chevron.left")
-                }
-                .buttonStyle(.plain)
-            } center: {
-                Text(category.title)
-                    .font(.system(size: 17, weight: .semibold))
-            } trailing: {
-                Button("全部已读") {
-                    Task { await viewModel.markAllRead() }
-                }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(AppColors.link)
-                .disabled(viewModel.items.allSatisfy { $0.readAt != nil })
-            }
-            .background(AppColors.pageBackground)
+            timelineTopBar
         }
         .task(id: authService.currentUser?.id) {
+            followingActorIDs = []
+            resolvedFollowActorIDs = []
+            pendingFollowActorIDs = []
             viewModel.activateAccount(authService.currentUser?.id)
             await loadTimeline()
         }
@@ -74,6 +52,19 @@ struct SystemMessageTimelineView: View {
             guard pushedCategory == nil || pushedCategory == category else { return }
             Task {
                 await loadTimeline(force: true)
+            }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: ProfileSocialEvents.followingDidChange)
+        ) { notification in
+            guard let (targetUserID, isFollowing) = ProfileSocialEvents.change(
+                from: notification
+            ) else { return }
+            resolvedFollowActorIDs.insert(targetUserID)
+            if isFollowing {
+                followingActorIDs.insert(targetUserID)
+            } else {
+                followingActorIDs.remove(targetUserID)
             }
         }
         .navigationDestination(item: $selectedNavigationTarget) { target in
@@ -121,13 +112,163 @@ struct SystemMessageTimelineView: View {
         }
     }
 
-    private var timeline: some View {
+    @ViewBuilder
+    private var timelineContent: some View {
+        if category == .interaction {
+            TabView(selection: $selectedInteractionPage) {
+                ForEach(InteractionMessagePage.allCases) { page in
+                    interactionPage(page)
+                        .tag(page)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+        } else {
+            messagePage(
+                items: viewModel.items,
+                emptyTitle: category.emptyTitle,
+                emptyDescription: category.emptyDescription,
+                emptyIcon: "bell.slash"
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var timelineTopBar: some View {
+        if category == .interaction {
+            interactionTopBar
+        } else {
+            CheeseInlineTopBar {
+                backButton
+            } center: {
+                Text(category.title)
+                    .font(.system(size: 17, weight: .semibold))
+            } trailing: {
+                Button("全部已读") {
+                    Task { await viewModel.markAllRead() }
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(AppColors.link)
+                .disabled(viewModel.items.allSatisfy { $0.readAt != nil })
+            }
+            .background(AppColors.pageBackground)
+        }
+    }
+
+    private var interactionTopBar: some View {
+        HStack(spacing: 0) {
+            backButton
+                .padding(.trailing, 8)
+
+            ForEach(InteractionMessagePage.allCases) { page in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedInteractionPage = page
+                    }
+                } label: {
+                    VStack(spacing: 8) {
+                        Text(page.title)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(
+                                selectedInteractionPage == page
+                                    ? AppColors.textPrimary
+                                    : AppColors.textMuted
+                            )
+                            .lineLimit(1)
+
+                        Capsule()
+                            .fill(
+                                selectedInteractionPage == page
+                                    ? AppColors.textPrimary
+                                    : Color.clear
+                            )
+                            .frame(width: 28, height: 3)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(
+                    selectedInteractionPage == page ? .isSelected : []
+                )
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .background(AppColors.pageBackground)
+        .overlay(alignment: .bottom) {
+            Divider().overlay(AppColors.divider)
+        }
+    }
+
+    private var backButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            PostToolbarIconCircle(icon: "chevron.left")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.tr("Back", "返回"))
+    }
+
+    private func interactionPage(_ page: InteractionMessagePage) -> some View {
+        let items = viewModel.items.filter { $0.interactionPage == page }
+
+        return messagePage(
+            items: items,
+            emptyTitle: page.emptyTitle,
+            emptyDescription: page.emptyDescription,
+            emptyIcon: page == .activity ? "heart.slash" : "person.2.slash"
+        )
+        .task(id: "\(page.rawValue):\(viewModel.items.count):\(viewModel.hasMore)") {
+            guard viewModel.hasResolvedInitialLoad,
+                  items.isEmpty,
+                  viewModel.hasMore
+            else { return }
+            await viewModel.loadNextPage()
+            await refreshFollowStates()
+        }
+    }
+
+    @ViewBuilder
+    private func messagePage(
+        items: [SystemMessageItem],
+        emptyTitle: String,
+        emptyDescription: String,
+        emptyIcon: String
+    ) -> some View {
+        switch viewModel.loadState {
+        case .unresolved, .initialLoading:
+            loadingState
+        case .empty:
+            emptyState(
+                title: emptyTitle,
+                description: emptyDescription,
+                icon: emptyIcon
+            )
+        case .error(let message):
+            ErrorView(message) {
+                Task { await loadTimeline(force: true) }
+            }
+        case .loaded:
+            if items.isEmpty {
+                emptyState(
+                    title: emptyTitle,
+                    description: emptyDescription,
+                    icon: emptyIcon
+                )
+            } else {
+                timeline(items: items)
+            }
+        }
+    }
+
+    private func timeline(items: [SystemMessageItem]) -> some View {
         ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 12) {
-                ForEach(viewModel.items) { item in
+            LazyVStack(spacing: category == .interaction ? 0 : 12) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     SystemMessageRow(
                         item: item,
                         isOpening: openingMessageID == item.id,
+                        showsCardChrome: category != .interaction,
                         onOpen: { open(item) },
                         onActorTap: category == .interaction
                             ? {
@@ -135,6 +276,17 @@ struct SystemMessageTimelineView: View {
                                 selectedNavigationTarget = .profile(actorUserID)
                             }
                             : nil,
+                        isFollowingActor: item.followActorUserID.flatMap { actorUserID in
+                            resolvedFollowActorIDs.contains(actorUserID)
+                                ? followingActorIDs.contains(actorUserID)
+                                : nil
+                        },
+                        isFollowPending: item.followActorUserID.map {
+                            pendingFollowActorIDs.contains($0)
+                        } ?? false,
+                        onFollowBack: item.followActorUserID.map { actorUserID in
+                            { Task { await followBack(actorUserID) } }
+                        },
                         onStillAvailable: {
                             Task {
                                 await viewModel.respond(
@@ -148,11 +300,16 @@ struct SystemMessageTimelineView: View {
                         }
                     )
                     .onAppear {
+                        guard item.id == items.last?.id else { return }
                         Task {
-                            await viewModel.loadNextPageIfNeeded(
-                                currentItem: item
-                            )
+                            await viewModel.loadNextPage()
+                            await refreshFollowStates()
                         }
+                    }
+
+                    if category == .interaction,
+                       index < items.count - 1 {
+                        interactionMessageDivider
                     }
                 }
 
@@ -161,11 +318,8 @@ struct SystemMessageTimelineView: View {
                         .padding(.vertical, 12)
                 } else if let errorMessage = viewModel.errorMessage {
                     Button("加载失败，点此重试") {
-                        guard let last = viewModel.items.last else { return }
                         Task {
-                            await viewModel.loadNextPageIfNeeded(
-                                currentItem: last
-                            )
+                            await viewModel.loadNextPage()
                         }
                     }
                     .font(.system(size: 13, weight: .semibold))
@@ -179,6 +333,20 @@ struct SystemMessageTimelineView: View {
         }
     }
 
+    private var interactionMessageDivider: some View {
+        GeometryReader { proxy in
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: 0.5))
+                path.addLine(to: CGPoint(x: proxy.size.width, y: 0.5))
+            }
+            .stroke(AppColors.divider, lineWidth: 1)
+        }
+        .frame(height: 1)
+        .padding(.leading, 54)
+        .padding(.trailing, 14)
+        .accessibilityHidden(true)
+    }
+
     private var loadingState: some View {
         VStack(spacing: 10) {
             ProgressView()
@@ -188,14 +356,18 @@ struct SystemMessageTimelineView: View {
         }
     }
 
-    private var emptyState: some View {
+    private func emptyState(
+        title: String,
+        description: String,
+        icon: String
+    ) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: category == .system ? "bell.slash" : "heart.slash")
+            Image(systemName: icon)
                 .font(.system(size: 40))
                 .foregroundStyle(AppColors.textMuted)
-            Text(category.emptyTitle)
+            Text(title)
                 .font(.system(size: 16, weight: .semibold))
-            Text(category.emptyDescription)
+            Text(description)
                 .font(.system(size: 13))
                 .foregroundStyle(AppColors.textMuted)
                 .multilineTextAlignment(.center)
@@ -259,18 +431,63 @@ struct SystemMessageTimelineView: View {
 
     private func loadTimeline(force: Bool = false) async {
         await viewModel.loadInitial(force: force)
+        await refreshFollowStates()
         if category == .interaction {
             await viewModel.markAllRead()
         }
         await service.refreshUnreadCount()
+    }
+
+    @MainActor
+    private func refreshFollowStates() async {
+        guard category == .interaction else { return }
+        let actorIDs = Set(viewModel.items.compactMap(\.followActorUserID))
+        guard !actorIDs.isEmpty else {
+            followingActorIDs = []
+            resolvedFollowActorIDs = []
+            return
+        }
+
+        do {
+            let loadedFollowingIDs = try await profileSocialService
+                .loadFollowingUserIDs(among: actorIDs)
+            followingActorIDs.subtract(actorIDs)
+            followingActorIDs.formUnion(loadedFollowingIDs)
+            resolvedFollowActorIDs.formUnion(actorIDs)
+        } catch {
+            guard !error.isCancellationLike else { return }
+            // Keep the last known row state if this auxiliary batch lookup
+            // fails; the timeline itself remains usable.
+        }
+    }
+
+    @MainActor
+    private func followBack(_ actorUserID: UUID) async {
+        guard !followingActorIDs.contains(actorUserID),
+              pendingFollowActorIDs.insert(actorUserID).inserted
+        else { return }
+        defer { pendingFollowActorIDs.remove(actorUserID) }
+
+        do {
+            try await profileSocialService.follow(targetUserId: actorUserID)
+            followingActorIDs.insert(actorUserID)
+            resolvedFollowActorIDs.insert(actorUserID)
+        } catch {
+            guard !error.isCancellationLike else { return }
+            viewModel.actionMessage = error.localizedDescription
+        }
     }
 }
 
 private struct SystemMessageRow: View {
     let item: SystemMessageItem
     let isOpening: Bool
+    let showsCardChrome: Bool
     let onOpen: () -> Void
     var onActorTap: (() -> Void)?
+    var isFollowingActor: Bool?
+    var isFollowPending = false
+    var onFollowBack: (() -> Void)?
     let onStillAvailable: () -> Void
     let onSold: () -> Void
 
@@ -280,25 +497,25 @@ private struct SystemMessageRow: View {
                 actorIcon
 
                 Button(action: onOpen) {
-                    HStack(alignment: .top, spacing: 12) {
-                        messageContent
-
-                        Spacer(minLength: 4)
-                        if isOpening {
-                            ProgressView()
-                                .controlSize(.small)
-                                .padding(.top, 2)
-                        } else if item.ctaKind != .none {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(AppColors.textMuted)
-                                .padding(.top, 4)
-                        }
-                    }
+                    messageContent
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(isOpening)
+
+                if item.followActorUserID != nil {
+                    Color.clear
+                        .frame(width: 64)
+                        .accessibilityHidden(true)
+                } else {
+                    trailingAction
+                }
+            }
+            .overlay(alignment: .trailing) {
+                if item.followActorUserID != nil {
+                    trailingAction
+                }
             }
 
             if item.ctaKind == .secondhandAvailability,
@@ -328,7 +545,46 @@ private struct SystemMessageRow: View {
                 : Color.white.opacity(0.72)
         )
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .cheeseCardChrome(cornerRadius: 16)
+        .modifier(
+            SystemMessageCardChromeModifier(
+                isEnabled: showsCardChrome,
+                cornerRadius: 16
+            )
+        )
+    }
+
+    @ViewBuilder
+    private var trailingAction: some View {
+        if item.followActorUserID != nil {
+            if isFollowingActor == nil || isFollowPending {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 64, height: 30)
+            } else if isFollowingActor == true {
+                Text("已关注")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(AppColors.textMuted)
+                    .frame(minWidth: 64, minHeight: 30)
+                    .background(AppColors.pageBackground, in: Capsule())
+            } else if let onFollowBack {
+                Button("回关注", action: onFollowBack)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.black)
+                    .frame(minWidth: 64, minHeight: 30)
+                    .background(AppColors.accent, in: Capsule())
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("回关注 \(item.actorName ?? "该用户")")
+            }
+        } else if isOpening {
+            ProgressView()
+                .controlSize(.small)
+                .padding(.top, 2)
+        } else if item.ctaKind != .none {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(AppColors.textMuted)
+                .padding(.top, 4)
+        }
     }
 
     private var messageContent: some View {
@@ -420,6 +676,20 @@ private struct SystemMessageRow: View {
         case .postComment, .commentReply: return AppColors.link
         case .follow: return .green
         case .secondhandAvailability: return .orange
+        }
+    }
+}
+
+private struct SystemMessageCardChromeModifier: ViewModifier {
+    let isEnabled: Bool
+    let cornerRadius: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.cheeseCardChrome(cornerRadius: cornerRadius)
+        } else {
+            content
         }
     }
 }

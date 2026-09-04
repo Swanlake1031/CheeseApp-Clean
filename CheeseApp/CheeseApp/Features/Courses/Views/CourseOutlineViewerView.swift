@@ -1,4 +1,5 @@
 import PDFKit
+import SafariServices
 import SwiftUI
 
 struct CourseOutlineViewerView: View {
@@ -12,7 +13,11 @@ struct CourseOutlineViewerView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if let document {
+                if outline.isWebDocument,
+                   let url = CourseOutlineService.shared.validatedWebURL(for: outline) {
+                    CourseOutlineWebView(url: url)
+                        .ignoresSafeArea(edges: .bottom)
+                } else if let document {
                     CoursePDFView(document: document)
                         .ignoresSafeArea(edges: .bottom)
                 } else if let errorMessage {
@@ -48,7 +53,11 @@ struct CourseOutlineViewerView: View {
                 }
             }
             .task(id: loadAttempt) {
-                await loadDocument()
+                if !outline.isWebDocument {
+                    await loadDocument()
+                } else if CourseOutlineService.shared.validatedWebURL(for: outline) == nil {
+                    errorMessage = CourseOutlineServiceError.invalidSourceURL.localizedDescription
+                }
             }
         }
     }
@@ -69,6 +78,23 @@ struct CourseOutlineViewerView: View {
             errorMessage = error.localizedDescription
         }
     }
+}
+
+private struct CourseOutlineWebView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let configuration = SFSafariViewController.Configuration()
+        configuration.entersReaderIfAvailable = false
+        let controller = SFSafariViewController(url: url, configuration: configuration)
+        controller.dismissButtonStyle = .close
+        return controller
+    }
+
+    func updateUIViewController(
+        _ controller: SFSafariViewController,
+        context: Context
+    ) {}
 }
 
 private struct CoursePDFView: UIViewRepresentable {

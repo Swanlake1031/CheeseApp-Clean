@@ -3,6 +3,8 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { pageShell } from "../src/ui/shell.js";
+import worker from "../src/index.js";
+import { renderDownloadPageFromData } from "../src/pages/download.js";
 import { renderForumDetailPage } from "../src/pages/forum.js";
 import { renderGenericPostPage } from "../src/pages/post.js";
 import { renderSecondhandDetailPage } from "../src/pages/secondhand.js";
@@ -38,6 +40,76 @@ test("share pages expose the complete versioned Cheese metadata set", () => {
   assert.match(html, /property="og:image" content="https:\/\/cheeseapp\.org\/og\/default\.png\?v=20260802"/);
   assert.match(html, /name="twitter:image" content="https:\/\/cheeseapp\.org\/og\/default\.png\?v=20260802"/);
   assert.doesNotMatch(html, /data:image\/svg\+xml/);
+  assert.match(html, /<html lang="zh-CN">/);
+  assert.match(html, /<meta property="og:locale" content="zh_CN" \/>/);
+});
+
+test("every built-in share-page surface uses Simplified Chinese", async () => {
+  const config = {
+    canonicalHost: "cheeseapp.org",
+    appScheme: "cheeseapp://post",
+    appDownloadURL: "https://cheeseapp.org/",
+    siteName: "Cheese"
+  };
+  const postID = "c0ffee00-0000-0000-0000-000000000101";
+  const pages = [
+    renderForumDetailPage({
+      config,
+      postID,
+      previewImageURL: "",
+      metadata: {
+        status: "ok",
+        title: "论坛测试",
+        description: "论坛描述",
+        bodyText: "论坛正文",
+        boardLabel: "校园",
+        authorName: "测试用户"
+      }
+    }),
+    renderSecondhandDetailPage({
+      config,
+      postID,
+      previewImageURL: "",
+      metadata: {
+        status: "ok",
+        title: "二手测试",
+        description: "二手描述",
+        bodyText: "商品描述",
+        sellerName: "测试卖家"
+      }
+    }),
+    renderGenericPostPage({
+      config,
+      kind: "forum",
+      postID,
+      metadata: {
+        status: "unavailable",
+        title: "帖子暂时不可用",
+        description: "请稍后重试"
+      },
+      previewImageURL: ""
+    }),
+    renderDownloadPageFromData({
+      config,
+      kind: "forum",
+      postID,
+      target: "profile"
+    })
+  ];
+  const traditionalInterfaceText =
+    /打開|點擊|個人頁|請在|繼續|內容|互動|沒有|自動|安裝|連結|賣家|論壇貼文|二手貼文|瀏覽器|選擇/;
+
+  for (const html of pages) {
+    assert.match(html, /<html lang="zh-CN">/);
+    assert.doesNotMatch(html, traditionalInterfaceText);
+  }
+
+  const response = await worker.fetch(
+    new Request("https://cheeseapp.org/posts/invalid"),
+    { CANONICAL_HOST: "cheeseapp.org" }
+  );
+  assert.equal(response.headers.get("Content-Language"), "zh-CN");
+  assert.doesNotMatch(await response.text(), traditionalInterfaceText);
 });
 
 test("fallback previews and every icon use the current Cheese assets", async () => {

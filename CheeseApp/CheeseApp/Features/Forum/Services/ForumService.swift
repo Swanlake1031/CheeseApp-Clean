@@ -49,6 +49,26 @@ struct ForumPostPageCursor: Equatable {
     let id: UUID
 }
 
+struct ForumRecommendationEventContext: Equatable {
+    let sessionID: UUID
+    let position: Int
+}
+
+enum ForumRecommendationEventType: String {
+    case impression
+    case qualifiedImpression = "qualified_impression"
+    case meaningfulRead = "meaningful_read"
+    case open
+    case like
+    case unlike
+    case save
+    case unsave
+    case comment
+    case reply
+    case share
+    case hide
+}
+
 struct ForumSearchPage {
     let items: [ForumPostItem]
     let cursor: ForumSearchPageCursor?
@@ -223,6 +243,7 @@ class ForumService: ObservableObject {
     private var activeBoardID: UUID?
     private var activeSort: ForumPostSort = .latest
     private var stateOwnerID: UUID?
+    private var recommendationContexts: [UUID: ForumRecommendationEventContext] = [:]
     private static let pageSize = 24
 
     private init() {}
@@ -262,12 +283,60 @@ class ForumService: ObservableObject {
         hasMorePosts = true
         pageErrorMessage = nil
         hasResolvedInitialPostLoad = false
+        recommendationContexts = [:]
     }
 
     func isCurrentAccountRequest(generation: UInt64) -> Bool {
         !isAccountTransitionInProgress
             && stateOwnerID != nil
             && accountGeneration == generation
+    }
+
+    func registerRecommendationContexts(
+        sessionID: UUID?,
+        positions: [UUID: Int]
+    ) {
+        guard let sessionID else {
+            recommendationContexts = [:]
+            return
+        }
+        recommendationContexts = positions.mapValues {
+            ForumRecommendationEventContext(sessionID: sessionID, position: $0)
+        }
+    }
+
+    func recommendationContext(for postID: UUID) -> ForumRecommendationEventContext? {
+        recommendationContexts[postID]
+    }
+
+    func recordRecommendationEvent(
+        postID: UUID,
+        type: ForumRecommendationEventType,
+        context: ForumRecommendationEventContext? = nil,
+        visibleFraction: Double? = nil,
+        dwellMilliseconds: Int? = nil
+    ) async {
+        let resolvedContext = context ?? recommendationContexts[postID]
+        do {
+            let _: Bool = try await supabase.client
+                .rpc(
+                    "record_recommendation_event",
+                    params: RecordRecommendationEventParams(
+                        eventID: UUID(),
+                        postID: postID,
+                        sessionID: resolvedContext?.sessionID,
+                        eventType: type.rawValue,
+                        feedPosition: resolvedContext?.position,
+                        visibleFraction: visibleFraction,
+                        dwellMilliseconds: dwellMilliseconds
+                    )
+                )
+                .execute()
+                .value
+        } catch {
+            // Recommendation telemetry must never break the visible feed or
+            // the source-of-truth interaction mutation.
+        }
     }
 
     private func requestGeneration() -> UInt64? {
@@ -328,7 +397,7 @@ class ForumService: ObservableObject {
             throw NSError(
                 domain: "ForumPublishing",
                 code: 400,
-                userInfo: [NSLocalizedDescriptionKey: "请选择板块"]
+                userInfo: [NSLocalizedDescriptionKey: "请选择 Hashtag"]
             )
         }
 
@@ -638,7 +707,7 @@ class ForumService: ObservableObject {
         } catch {
             if isCurrentAccountRequest(generation: requestGeneration),
                !error.isCancellationLike {
-                errorMessage = L10n.tr("Unable to load boards", "板块加载失败")
+                errorMessage = L10n.tr("Unable to load Hashtags", "Hashtag 加载失败")
             }
         }
     }
@@ -1020,6 +1089,10 @@ class ForumService: ObservableObject {
     }
 
     func recordView(postId: UUID) async {
+        async let recommendationEvent: Void = recordRecommendationEvent(
+            postID: postId,
+            type: .open
+        )
         let previousLocalCount = posts.first(where: { $0.id == postId })?.views
         do {
             try await supabase.client
@@ -1037,6 +1110,7 @@ class ForumService: ObservableObject {
                 return
             }
         }
+        await recommendationEvent
     }
 
     // MARK: - 获取评论
@@ -1224,6 +1298,12 @@ class ForumService: ObservableObject {
     func toggleLike(postId: UUID, currentlyLiked: Bool) async throws -> Bool {
         let newLiked = try await PostReactionService.shared.toggle(postId: postId, currentlyLiked: currentlyLiked)
         updateLocalLikeState(postId: postId, isLiked: newLiked)
+        Task {
+            await recordRecommendationEvent(
+                postID: postId,
+                type: newLiked ? .like : .unlike
+            )
+        }
         return newLiked
     }
 
@@ -1232,10 +1312,17 @@ class ForumService: ObservableObject {
     }
 
     func toggleFavorite(postId: UUID, currentlyFavorited: Bool) async throws -> Bool {
-        try await PostFavoriteService.shared.toggleFavorite(
+        let favorited = try await PostFavoriteService.shared.toggleFavorite(
             postId: postId,
             currentlyFavorited: currentlyFavorited
         )
+        Task {
+            await recordRecommendationEvent(
+                postID: postId,
+                type: favorited ? .save : .unsave
+            )
+        }
+        return favorited
     }
 
     // MARK: - 发布评论
@@ -1286,6 +1373,12 @@ class ForumService: ObservableObject {
             Task {
                 await CheeseAICommentTrigger.notify(sourceCommentID: createdID)
             }
+        }
+        Task {
+            await recordRecommendationEvent(
+                postID: postId,
+                type: parentId == nil ? .comment : .reply
+            )
         }
         return createdID
     }
@@ -1696,6 +1789,37 @@ private struct CreateForumCommentParams: Encodable {
         case isAnonymous = "p_is_anonymous"
         case parentID = "p_parent_id"
         case mentionedUserIDs = "p_mentioned_user_ids"
+    }
+}
+
+private struct RecordRecommendationEventParams: Encodable {
+    let eventID: UUID
+    let postID: UUID
+    let sessionID: UUID?
+    let eventType: String
+    let feedPosition: Int?
+    let visibleFraction: Double?
+    let dwellMilliseconds: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case eventID = "p_event_id"
+        case postID = "p_post_id"
+        case sessionID = "p_feed_session_id"
+        case eventType = "p_event_type"
+        case feedPosition = "p_feed_position"
+        case visibleFraction = "p_visible_fraction"
+        case dwellMilliseconds = "p_dwell_ms"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(eventID, forKey: .eventID)
+        try container.encode(postID, forKey: .postID)
+        try container.encode(eventType, forKey: .eventType)
+        try container.encode(sessionID, forKey: .sessionID)
+        try container.encode(feedPosition, forKey: .feedPosition)
+        try container.encode(visibleFraction, forKey: .visibleFraction)
+        try container.encode(dwellMilliseconds, forKey: .dwellMilliseconds)
     }
 }
 

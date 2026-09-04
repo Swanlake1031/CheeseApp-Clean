@@ -17,6 +17,14 @@ final class SystemMessageViewModelTests: XCTestCase {
         XCTAssertEqual(SystemMessageKind.follow.category, .interaction)
     }
 
+    func testInteractionPagesSeparateNewFollowersFromOtherActivity() {
+        let like = SystemMessageItem.fixture(index: 1, kind: .postLike)
+        let follow = SystemMessageItem.fixture(index: 2, kind: .follow)
+
+        XCTAssertEqual(like.interactionPage, .activity)
+        XCTAssertEqual(follow.interactionPage, .newFollowers)
+    }
+
     func testCommentNotificationBuildsCommentTargetedForumRoute() throws {
         let postID = UUID(uuidString: "a9000000-0000-4000-8000-000000000001")!
         let commentID = UUID(uuidString: "a9000000-0000-4000-8000-000000000002")!
@@ -234,6 +242,28 @@ final class SystemMessageViewModelTests: XCTestCase {
             return XCTFail("Expected a profile navigation target")
         }
         XCTAssertEqual(userID, actorID)
+        XCTAssertEqual(item.followActorUserID, actorID)
+    }
+
+    func testNonFollowNotificationDoesNotExposeFollowBackActor() {
+        let item = SystemMessageItem(
+            id: UUID(),
+            eventID: "like:no-follow-back",
+            kind: .postLike,
+            title: "New like",
+            body: "Someone liked your post",
+            actorUserID: UUID(),
+            actorName: "Friend",
+            actorAvatarURL: nil,
+            postID: UUID(),
+            commentID: nil,
+            contentKind: "forum",
+            ctaKind: .viewPost,
+            readAt: nil,
+            createdAt: Date()
+        )
+
+        XCTAssertNil(item.followActorUserID)
     }
 
     func testAccountSwitchClearsItemsAndDiscardsLatePage() async {
@@ -393,7 +423,10 @@ private final class ControlledSystemMessageLoader {
 }
 
 private extension SystemMessageItem {
-    static func fixture(index: Int) -> SystemMessageItem {
+    static func fixture(
+        index: Int,
+        kind: SystemMessageKind = .automatic
+    ) -> SystemMessageItem {
         let id = UUID(
             uuidString: String(
                 format: "90000000-0000-4000-8000-%012d",
@@ -403,7 +436,7 @@ private extension SystemMessageItem {
         return SystemMessageItem(
             id: id,
             eventID: "test:\(index)",
-            kind: .automatic,
+            kind: kind,
             title: "系统消息 \(index)",
             body: "测试",
             actorUserID: nil,

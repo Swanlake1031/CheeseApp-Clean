@@ -19,7 +19,7 @@ struct ForumBoardRulesSheet: View {
                 }
                 .background(Color(.systemBackground))
             }
-            .navigationTitle(L10n.tr("Board Rules", "板块规则"))
+            .navigationTitle(L10n.tr("Hashtag Rules", "Hashtag 规则"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color(.systemBackground), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)

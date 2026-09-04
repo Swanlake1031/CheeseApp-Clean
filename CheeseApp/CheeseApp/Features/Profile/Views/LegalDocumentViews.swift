@@ -212,7 +212,7 @@ enum LegalDocument: String, Identifiable {
         .init(
             title: .init("7. Your choices and rights", "7. 你的选择与权利"),
             bullets: [
-                .init("Edit profile information and choose whether eligible forum posts are anonymous.", "编辑个人档案，并选择符合条件的论坛贴文是否匿名。"),
+                .init("Edit profile information and choose anonymity independently for each forum post.", "编辑个人档案，并为每篇论坛贴文独立选择是否匿名。"),
                 .init("Control push notifications, block users, hide messages for yourself and clear local image cache in Settings.", "在设定中控制推播、封锁用户、仅为自己隐藏讯息，并清除本机图片快取。"),
                 .init("Delete your account from Settings.", "从设定中注销帐号。"),
                 .init("Request access, correction, deletion, restriction or portability where applicable by emailing support@cheeseapp.dev. We may verify your identity first.", "在适用法律允许的范围内，可寄信至 support@cheeseapp.dev 请求查阅、更正、删除、限制处理或取得可携副本；我们可能先验证你的身分。")

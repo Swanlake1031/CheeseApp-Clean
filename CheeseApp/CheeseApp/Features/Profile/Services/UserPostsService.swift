@@ -277,31 +277,70 @@ final class UserPostsService: ObservableObject {
         userId: UUID,
         onChange: @escaping @MainActor () async -> Void
     ) -> () -> Void {
-        let channel = supabase.client.channel(
-            "profile-posts-\(userId.uuidString)-\(UUID().uuidString)"
-        )
-        let changes = channel.postgresChange(
-            AnyAction.self,
-            schema: "public",
-            table: "posts",
-            filter: .eq("user_id", value: userId)
-        )
-        let task = Task {
-            do {
-                try await channel.subscribeWithError()
-                for await _ in changes {
-                    guard !Task.isCancelled else { break }
+        let task = Task { [supabase] in
+            var retryDelay: UInt64 = 1
+
+            while !Task.isCancelled {
+                let channel = supabase.client.channel(
+                    "profile-posts-\(userId.uuidString)-\(UUID().uuidString)"
+                )
+                let changes = channel.postgresChange(
+                    AnyAction.self,
+                    schema: "public",
+                    table: "posts",
+                    filter: .eq("user_id", value: userId)
+                )
+
+                do {
+                    try await channel.subscribeWithError()
+                    retryDelay = 1
+
+                    // Close the fetch-before-subscribe race. If the author
+                    // published while this profile was opening, this
+                    // authoritative reconciliation includes that post even
+                    // though its realtime event was missed.
                     await onChange()
+
+                    try await withThrowingTaskGroup(of: Void.self) { group in
+                        group.addTask {
+                            for await _ in changes {
+                                guard !Task.isCancelled else { return }
+                                await onChange()
+                            }
+                            throw ProfilePostObservationError.disconnected
+                        }
+                        group.addTask {
+                            for await status in channel.statusChange {
+                                guard !Task.isCancelled else { return }
+                                if status == .unsubscribed {
+                                    throw ProfilePostObservationError.disconnected
+                                }
+                            }
+                            throw ProfilePostObservationError.disconnected
+                        }
+
+                        _ = try await group.next()
+                        group.cancelAll()
+                    }
+                } catch {
+                    // A failed or dropped subscription is recoverable while
+                    // the profile remains visible. Recreate the channel below.
                 }
-            } catch {
-                // Returning to the foreground performs an authoritative
-                // refresh, so a temporary realtime disconnect is recoverable.
+
+                await supabase.client.removeChannel(channel)
+                guard !Task.isCancelled else { break }
+
+                do {
+                    try await Task.sleep(for: .seconds(retryDelay))
+                } catch {
+                    break
+                }
+                retryDelay = min(retryDelay * 2, 8)
             }
         }
 
-        return { [supabase] in
+        return {
             task.cancel()
-            Task { await supabase.client.removeChannel(channel) }
         }
     }
 
@@ -587,6 +626,10 @@ final class UserPostsService: ObservableObject {
         return Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.isPrivate) })
     }
 
+}
+
+private enum ProfilePostObservationError: Error {
+    case disconnected
 }
 
 private struct ProfilePostsParams: Encodable {

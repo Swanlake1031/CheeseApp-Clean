@@ -23,6 +23,31 @@ final class CourseOutlineTests: XCTestCase {
         XCTAssertFalse(outline.formattedFileSize.isEmpty)
     }
 
+    func testExternalWebOutlineUsesOfficialPageLabel() {
+        let outline = CourseOutline(
+            id: UUID(),
+            courseID: UUID(),
+            academicYear: 2026,
+            term: .fall,
+            professorName: nil,
+            title: "Simple Syllabus Outline",
+            sourceKind: .externalWeb,
+            sourceURL: URL(string: "https://mcmaster.simplesyllabusca.com/doc/example"),
+            sourcePageURL: nil,
+            sourceName: "mcmaster_simple_syllabus",
+            storagePath: nil,
+            originalFilename: nil,
+            mimeType: "text/html",
+            fileSizeBytes: nil,
+            sha256: nil,
+            createdAt: Date()
+        )
+
+        XCTAssertTrue(outline.isWebDocument)
+        XCTAssertFalse(outline.formattedFileSize.isEmpty)
+        XCTAssertNotNil(CourseOutlineService.shared.validatedWebURL(for: outline))
+    }
+
     private func makeOutline(
         academicYear: Int,
         term: CourseAcademicTerm,
@@ -35,6 +60,10 @@ final class CourseOutlineTests: XCTestCase {
             term: term,
             professorName: "Professor Example",
             title: "Course Outline",
+            sourceKind: .privateStorage,
+            sourceURL: nil,
+            sourcePageURL: nil,
+            sourceName: "supabase_storage",
             storagePath: "course-id/file.pdf",
             originalFilename: "outline.pdf",
             mimeType: "application/pdf",

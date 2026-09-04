@@ -69,6 +69,8 @@ class HomeViewModel: ObservableObject {
     private struct ForumSnapshot {
         let cards: [HomeCardItem]
         let postsByID: [UUID: ForumPostItem]
+        let recommendationSessionID: UUID?
+        let recommendationPositions: [UUID: Int]
     }
 
     private struct HomeFeaturedSnapshot {
@@ -94,6 +96,8 @@ class HomeViewModel: ObservableObject {
         var followedAuthorIDs: Set<UUID> = []
         var forumPostsByID: [UUID: ForumPostItem] = [:]
         var secondhandItemsByID: [UUID: SecondhandItem] = [:]
+        var recommendationSessionID: UUID?
+        var recommendationPositions: [UUID: Int] = [:]
         var hasResolvedInitialFeaturedBundleLoad = false
         var hasResolvedInitialForumLoad = false
         var hasResolvedInitialHomeFeaturedLoad = false
@@ -273,7 +277,15 @@ class HomeViewModel: ObservableObject {
     /// 推荐使用真实互动指标与每次刷新生成的随机种子统一排序。
     /// 系统置顶内容始终位于算法内容之前。
     var recommendedCards: [HomeCardItem] {
-        HomeRecommendationRanker.ranked(
+        if contentSnapshot.recommendationSessionID != nil {
+            var seen = Set<UUID>()
+            return Array(
+                (homeFeaturedForumCards + forumCards)
+                    .filter { seen.insert($0.postId ?? $0.id).inserted }
+                    .prefix(12)
+            )
+        }
+        return HomeRecommendationRanker.ranked(
             homeFeaturedForumCards + forumCards + featuredSecondhandCards,
             seed: recommendationSeed,
             limit: 12
@@ -316,6 +328,19 @@ class HomeViewModel: ObservableObject {
     func homeCard(id: UUID) -> HomeCardItem? {
         (homeFeaturedForumCards + forumCards + featuredSecondhandCards)
             .first { $0.postId == id }
+    }
+
+    func recommendationContext(
+        for card: HomeCardItem
+    ) -> ForumRecommendationEventContext? {
+        guard let postID = card.postId,
+              let sessionID = contentSnapshot.recommendationSessionID,
+              let position = contentSnapshot.recommendationPositions[postID]
+        else { return nil }
+        return ForumRecommendationEventContext(
+            sessionID: sessionID,
+            position: position
+        )
     }
 
     func promoteCreatedPost(kind: PostKind, postID: UUID) async -> Bool {
@@ -473,6 +498,13 @@ class HomeViewModel: ObservableObject {
                 postID: postID,
                 committedIsLiked: confirmedLiked
             )
+            if let context = recommendationContext(for: card) {
+                await ForumService.shared.recordRecommendationEvent(
+                    postID: postID,
+                    type: confirmedLiked ? .like : .unlike,
+                    context: context
+                )
+            }
         } catch {
             interactionStore.replace(postID: postID, with: previous)
             interactionStore.finishLikeMutation(
@@ -513,6 +545,14 @@ class HomeViewModel: ObservableObject {
             )
             confirmed.isFavorited = confirmedFavorited
             interactionStore.replace(postID: postID, with: confirmed)
+            if card.category == .forum,
+               let context = recommendationContext(for: card) {
+                await ForumService.shared.recordRecommendationEvent(
+                    postID: postID,
+                    type: confirmedFavorited ? .save : .unsave,
+                    context: context
+                )
+            }
         } catch {
             interactionStore.replace(postID: postID, with: previous)
             throw error
@@ -600,11 +640,14 @@ class HomeViewModel: ObservableObject {
         }
 
         let nextSeed = recommendationSeed &+ 0x9E37_79B9_7F4A_7C15
-        let nextForumCards = HomeRecommendationRanker.ranked(
-            forum?.cards ?? forumCards,
-            seed: nextSeed ^ 0xF04D_F04D,
-            limit: (forum?.cards ?? forumCards).count
-        )
+        let forumSourceCards = forum?.cards ?? forumCards
+        let nextForumCards = forum?.recommendationSessionID == nil
+            ? HomeRecommendationRanker.ranked(
+                forumSourceCards,
+                seed: nextSeed ^ 0xF04D_F04D,
+                limit: forumSourceCards.count
+            )
+            : forumSourceCards
         let nextSecondhandCards = HomeRecommendationRanker.ranked(
             featured?.cards ?? featuredSecondhandCards,
             seed: nextSeed ^ 0x5EC0_0DAD,
@@ -637,6 +680,12 @@ class HomeViewModel: ObservableObject {
             nextSnapshot.forumPostsByID.merge(
                 forum.postsByID,
                 uniquingKeysWith: { _, refreshed in refreshed }
+            )
+            nextSnapshot.recommendationSessionID = forum.recommendationSessionID
+            nextSnapshot.recommendationPositions = forum.recommendationPositions
+            ForumService.shared.registerRecommendationContexts(
+                sessionID: forum.recommendationSessionID,
+                positions: forum.recommendationPositions
             )
         }
         if let homeFeatured {
@@ -778,7 +827,23 @@ class HomeViewModel: ObservableObject {
     ) async -> ForumSnapshot? {
         do {
             return try await withAuthenticatedRetry(expectedUserID: expectedUserID) {
-                let previews = try await self.feedService.fetchForumPreview(limit: 36)
+                let recommendation = try? await self.feedService
+                    .fetchRecommendationForumPreview(
+                        limit: 36,
+                        forceRefresh: true
+                    )
+                let previews: [HomeForumPreview]
+                let sessionID: UUID?
+                let positions: [UUID: Int]
+                if let recommendation {
+                    previews = recommendation.posts
+                    sessionID = recommendation.sessionID
+                    positions = recommendation.positions
+                } else {
+                    previews = try await self.feedService.fetchForumPreview(limit: 36)
+                    sessionID = nil
+                    positions = [:]
+                }
                 let posts = try await ForumService.shared.fetchPosts(
                     postIDs: previews.map(\.id)
                 )
@@ -790,7 +855,9 @@ class HomeViewModel: ObservableObject {
                             self.makeForumCard(post, saveCount: preview.saveCount)
                         }
                     },
-                    postsByID: postsByID
+                    postsByID: postsByID,
+                    recommendationSessionID: sessionID,
+                    recommendationPositions: positions
                 )
             }
         } catch {
@@ -891,16 +958,26 @@ class HomeViewModel: ObservableObject {
             postId: post.id,
             authorId: post.isAnonymous ? nil : post.userId,
             image: {
-                guard let imageURL = post.images.first?.url,
-                      let url = URL(string: imageURL)
+                guard let url = SupabasePublicImageURLResolver.url(
+                    fromStoredURL: post.images.first?.url,
+                    purpose: .feedThumbnail
+                )
                 else {
                     return .placeholder
                 }
                 return .url(url)
             }(),
-            images: post.images
-                .compactMap { URL(string: $0.url) }
-                .map(ImageSource.url),
+            images: post.images.first
+                .flatMap {
+                    SupabasePublicImageURLResolver.url(
+                        fromStoredURL: $0.url,
+                        purpose: .feedThumbnail
+                    )
+                }
+                .map { [.url($0)] } ?? [],
+            originalImageURLs: post.images.first
+                .flatMap { URL(string: $0.url) }
+                .map { [$0] } ?? [],
             title: post.title,
             subtitle: "",
             footer: .posted(
@@ -909,6 +986,7 @@ class HomeViewModel: ObservableObject {
                     : post.userName ?? L10n.tr("Unavailable user", "用户资料不可用"),
                 avatar: avatar
             ),
+            isAnonymous: post.isAnonymous,
             isAuthorMcMasterVerified: post.isUserMcMasterVerified,
             category: .secondhand,
             viewCount: post.viewCount,
@@ -930,15 +1008,16 @@ class HomeViewModel: ObservableObject {
         return HomeCardItem(
             postId: item.id,
             authorId: item.isAnonymous ? nil : item.sellerId,
-            image: item.displayImageUrls.first
-                .flatMap(URL.init(string:))
+            image: item.feedThumbnailURL
                 .map(ImageSource.url) ?? .placeholder,
-            images: item.displayImageUrls
-                .compactMap(URL.init(string:))
-                .map(ImageSource.url),
+            images: item.feedThumbnailURL.map { [.url($0)] } ?? [],
+            originalImageURLs: item.displayImageUrls.first
+                .flatMap(URL.init(string:))
+                .map { [$0] } ?? [],
             title: item.title,
             subtitle: item.description,
             footer: .posted(name: item.seller, avatar: avatar),
+            isAnonymous: item.isAnonymous,
             isAuthorMcMasterVerified: !item.isAnonymous && item.isSellerMcMasterVerified,
             category: .secondhand,
             timeText: item.timeAgo,
@@ -966,13 +1045,15 @@ class HomeViewModel: ObservableObject {
         saveCount: Int = 0,
         isSystemPinned: Bool = false
     ) -> HomeCardItem {
-        let avatar = post.authorAvatar
-            .flatMap(URL.init(string:))
-            .map(ImageSource.url) ?? .placeholder
+        let avatar = post.isAnonymous
+            ? ImageSource.placeholder
+            : post.authorAvatar
+                .flatMap(URL.init(string:))
+                .map(ImageSource.url) ?? .placeholder
 
         return HomeCardItem(
             postId: post.id,
-            authorId: post.authorId,
+            authorId: post.isAnonymous ? nil : post.authorId,
             image: post.imageUrls.first
                 .flatMap(URL.init(string:))
                 .map(ImageSource.url) ?? .placeholder,
@@ -982,6 +1063,8 @@ class HomeViewModel: ObservableObject {
             title: post.title,
             subtitle: post.content,
             footer: .posted(name: post.authorName, avatar: avatar),
+            isAnonymous: post.isAnonymous,
+            isAuthorOfficial: !post.isAnonymous && post.isAuthorOfficial,
             isAuthorMcMasterVerified: !post.isAnonymous && post.isAuthorMcMasterVerified,
             category: .forum,
             viewCount: post.views,

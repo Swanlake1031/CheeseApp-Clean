@@ -2,7 +2,7 @@
 //  QuickActionsRowView.swift
 //  CheeseApp
 //
-//  首页紧凑板块导航。顺序由 HomeFeedTab 统一定义，避免分页与顶栏漂移。
+//  首页紧凑内容导航。顺序由 HomeFeedTab 统一定义，避免分页与顶栏漂移。
 //
 
 import SwiftUI
@@ -36,7 +36,7 @@ struct HomeModuleGridView: View {
                     } label: {
                         VStack(spacing: 3) {
                             Text(module.title)
-                                .font(.system(size: 13, weight: .bold))
+                                .font(PostPreviewTypography.username)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.75)
                                 .foregroundStyle(
@@ -87,12 +87,11 @@ struct HomeModuleGridView: View {
 
 struct HomeNavigationDrawerContainer: View {
     let openRequest: UInt
-    let boards: [ForumBoard]
     let onPresentationChange: (Bool) -> Void
     let onForumTap: () -> Void
-    let onBoardTap: (ForumBoard) -> Void
     let onSecondhandTap: () -> Void
     let onSecondhandCategoryTap: (SecondhandPost.Category) -> Void
+    let onSettingsTap: () -> Void
     let onSupportTap: () -> Void
     let onCourseTap: () -> Void
     let onCourseRadarTap: () -> Void
@@ -130,16 +129,11 @@ struct HomeNavigationDrawerContainer: View {
                     .onTapGesture(perform: closeDrawer)
 
                 HomeNavigationDrawerView(
-                    boards: boards,
                     topSafeAreaInset: max(proxy.safeAreaInsets.top, 52),
                     onClose: closeDrawer,
                     onForumTap: {
                         closeDrawer()
                         onForumTap()
-                    },
-                    onBoardTap: { board in
-                        closeDrawer()
-                        onBoardTap(board)
                     },
                     onSecondhandTap: {
                         closeDrawer()
@@ -148,6 +142,10 @@ struct HomeNavigationDrawerContainer: View {
                     onSecondhandCategoryTap: { category in
                         closeDrawer()
                         onSecondhandCategoryTap(category)
+                    },
+                    onSettingsTap: {
+                        closeDrawer()
+                        onSettingsTap()
                     },
                     onSupportTap: {
                         closeDrawer()
@@ -247,18 +245,16 @@ struct HomeNavigationDrawerContainer: View {
 }
 
 struct HomeNavigationDrawerView: View {
-    let boards: [ForumBoard]
     let topSafeAreaInset: CGFloat
     let onClose: () -> Void
     let onForumTap: () -> Void
-    let onBoardTap: (ForumBoard) -> Void
     let onSecondhandTap: () -> Void
     let onSecondhandCategoryTap: (SecondhandPost.Category) -> Void
+    let onSettingsTap: () -> Void
     let onSupportTap: () -> Void
     let onCourseTap: () -> Void
     let onCourseRadarTap: () -> Void
 
-    @State private var isForumExpanded = true
     @State private var isSecondhandExpanded = true
 
     var body: some View {
@@ -308,12 +304,14 @@ struct HomeNavigationDrawerView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     forumNavigationSection
 
-                    Divider()
-                        .overlay(AppColors.divider)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 14)
-
                     secondhandNavigationSection
+
+                    navigationRow(
+                        title: L10n.tr("Settings", "设定"),
+                        subtitle: L10n.tr("Account and app preferences", "账号与应用偏好"),
+                        icon: "gearshape",
+                        action: onSettingsTap
+                    )
 
                     navigationRow(
                         title: L10n.tr("Cheese Support", "奶酪小客服"),
@@ -343,87 +341,31 @@ struct HomeNavigationDrawerView: View {
     }
 
     private var forumNavigationSection: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                Button(action: onForumTap) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "bubble.left.and.bubble.right.fill")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(AppColors.link)
-                            .frame(width: 34, height: 34)
-                            .background(AppColors.accent.opacity(0.16))
-                            .clipShape(Circle())
+        Button(action: onForumTap) {
+            HStack(spacing: 12) {
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(AppColors.link)
+                    .frame(width: 34, height: 34)
+                    .background(AppColors.accent.opacity(0.16))
+                    .clipShape(Circle())
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(L10n.tr("Forum", "论坛"))
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(AppColors.textPrimary)
-                            Text(L10n.tr("Campus conversations", "校园话题讨论"))
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(AppColors.textMuted)
-                        }
-
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.leading, 18)
-                    .frame(height: 56)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.20)) {
-                        isForumExpanded.toggle()
-                    }
-                } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L10n.tr("Forum", "论坛"))
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(AppColors.textPrimary)
+                    Text(L10n.tr("Campus conversations", "校园话题讨论"))
+                        .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(AppColors.textMuted)
-                        .rotationEffect(.degrees(isForumExpanded ? 180 : 0))
-                        .frame(width: 48, height: 56)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    isForumExpanded
-                        ? L10n.tr("Collapse forum boards", "收起论坛板块")
-                        : L10n.tr("Expand forum boards", "展开论坛板块")
-                )
+
+                Spacer(minLength: 0)
             }
-
-            if isForumExpanded {
-                VStack(spacing: 2) {
-                    ForEach(boards.filter { $0.status != .archived }) { board in
-                        Button {
-                            onBoardTap(board)
-                        } label: {
-                            HStack(spacing: 11) {
-                                Image(systemName: board.icon)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(AppColors.link)
-                                    .frame(width: 28, height: 28)
-                                    .background(AppColors.accent.opacity(0.12))
-                                    .clipShape(Circle())
-
-                                Text(board.name)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(AppColors.textPrimary)
-                                    .lineLimit(1)
-
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.leading, 38)
-                            .padding(.trailing, 18)
-                            .frame(height: 42)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.bottom, 6)
-                .transition(.identity)
-            }
+            .padding(.horizontal, 18)
+            .frame(height: 56)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     private var secondhandNavigationSection: some View {

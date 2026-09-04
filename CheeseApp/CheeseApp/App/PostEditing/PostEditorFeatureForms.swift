@@ -15,12 +15,27 @@ struct SecondhandPostEditFormView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            SecondhandBasicInfoSection(
-                title: $title,
-                price: $priceText,
-                originalPrice: $originalPriceText,
-                iconColor: accentColor
-            )
+            PostFormSection(title: "图片（可选）") {
+                PostImageSection(
+                    selectedImages: $selectedImages,
+                    existingImageCount: existingImageCount
+                )
+            }
+
+            PostFormSection(title: "物品信息") {
+                SecondhandItemNameField(
+                    title: $title,
+                    iconColor: accentColor
+                )
+            }
+
+            PostFormSection(title: "详细描述") {
+                PostTextEditorCard(
+                    text: $description,
+                    placeholder: "描述一下商品的新旧程度、使用情况、交易方式等...",
+                    minHeight: 100
+                )
+            }
 
             PostFormSection(title: L10n.tr("Category", "分类")) {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -44,25 +59,18 @@ struct SecondhandPostEditFormView: View {
                 accentColor: accentColor
             )
 
+            PostFormSection(title: "价格", showsTitle: false) {
+                SecondhandPriceFields(
+                    price: $priceText,
+                    originalPrice: $originalPriceText,
+                    iconColor: accentColor
+                )
+            }
+
             SecondhandNegotiableSection(
                 isNegotiable: $isNegotiable,
                 accentColor: accentColor
             )
-
-            PostFormSection(title: "详细描述") {
-                PostTextEditorCard(
-                    text: $description,
-                    placeholder: "描述一下商品的新旧程度、使用情况、交易方式等...",
-                    minHeight: 100
-                )
-            }
-
-            PostFormSection(title: "图片（可选）") {
-                PostImageSection(
-                    selectedImages: $selectedImages,
-                    existingImageCount: existingImageCount
-                )
-            }
         }
     }
 }

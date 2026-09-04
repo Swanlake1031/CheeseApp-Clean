@@ -273,7 +273,7 @@ struct CourseDiscoveryView: View {
                 selectedSubject = nil
             }
 
-            ForEach(CourseSubject.allCases, id: \.self) { subject in
+            ForEach(availableSubjects, id: \.self) { subject in
                 filterOption(
                     title: subject.rawValue,
                     isSelected: selectedSubject == subject
@@ -289,6 +289,12 @@ struct CourseDiscoveryView: View {
                 tint: Color(red: 0.48, green: 0.35, blue: 0.08),
                 iconBackground: Color(red: 0.99, green: 0.94, blue: 0.78)
             )
+        }
+    }
+
+    private var availableSubjects: [CourseSubject] {
+        Array(Set(state.courses.map(\.subject))).sorted {
+            $0.rawValue.localizedStandardCompare($1.rawValue) == .orderedAscending
         }
     }
 

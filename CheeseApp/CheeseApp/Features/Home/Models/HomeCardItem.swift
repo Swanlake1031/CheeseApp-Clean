@@ -66,15 +66,18 @@ struct HomeCardItem: Identifiable {
     let authorId: UUID?             // 关联作者 ID
     let image: ImageSource          // 卡片顶部图片
     let images: [ImageSource]       // 信息流紧凑图组（保留 image 兼容旧调用）
+    let originalImageURLs: [URL]    // 仅供明确打开全屏原图
     let title: String               // 主标题
     let subtitle: String            // 副标题
     let footer: CardFooterStyle     // 底部样式
+    let isAnonymous: Bool
+    let isAuthorOfficial: Bool
     let isAuthorMcMasterVerified: Bool
     let category: HomeCardCategory  // 所属分类
-    let viewCount: Int              // 板块内排序信号
-    let badgeText: String?          // 论坛板块或内容分类
-    let boardID: UUID?              // 论坛板块稳定 ID（用于直接进入板块）
-    let boardIcon: String?          // 论坛板块图标
+    let viewCount: Int              // Hashtag 内排序信号
+    let badgeText: String?          // 论坛 Hashtag 或内容分类
+    let boardID: UUID?              // Hashtag 稳定 ID（内部保留 board 命名）
+    let boardIcon: String?          // Hashtag 兼容图标
     let timeText: String?           // 发布时间
     let createdAt: Date?            // 真实发布时间（分类页稳定排序）
     let priceText: String?          // 价格正文（不作为 tag）
@@ -98,9 +101,12 @@ struct HomeCardItem: Identifiable {
         authorId: UUID? = nil,
         image: ImageSource = .placeholder,
         images: [ImageSource] = [],
+        originalImageURLs: [URL] = [],
         title: String,
         subtitle: String,
         footer: CardFooterStyle = .none,
+        isAnonymous: Bool = false,
+        isAuthorOfficial: Bool = false,
         isAuthorMcMasterVerified: Bool = false,
         category: HomeCardCategory = .forum,
         viewCount: Int = 0,
@@ -130,9 +136,12 @@ struct HomeCardItem: Identifiable {
         self.images = images.isEmpty
             ? (image.isPlaceholder ? [] : [image])
             : images
+        self.originalImageURLs = originalImageURLs
         self.title = title
         self.subtitle = subtitle
         self.footer = footer
+        self.isAnonymous = isAnonymous
+        self.isAuthorOfficial = isAuthorOfficial
         self.isAuthorMcMasterVerified = isAuthorMcMasterVerified
         self.category = category
         self.viewCount = max(viewCount, 0)

@@ -9,6 +9,9 @@ export interface Env {
   readonly CHEESE_AI_PER_USER_WINDOW_MINUTES?: string;
   readonly CHEESE_AI_PER_USER_WINDOW_LIMIT?: string;
   readonly CHEESE_AI_DAILY_SOFT_LIMIT?: string;
+  readonly SECONDHAND_AI_RATE_LIMITER: RateLimit;
+  readonly CHEESE_RECOMMENDATION_JOBS_ENABLED?: string;
+  readonly CHEESE_RECOMMENDATION_SHADOW_ENABLED?: string;
 }
 
 export interface AuthUser {
@@ -97,10 +100,40 @@ export interface CheeseAIProvider {
   generateCommunityReply(input: CheeseAIInput): Promise<CheeseAIResult>;
 }
 
+export interface SecondhandDescriptionProvider {
+  generateSecondhandDescription(input: CheeseAIInput): Promise<CheeseAIResult>;
+}
+
+export interface SecondhandImageReference {
+  readonly bucket: "post-images";
+  readonly object_path: string;
+}
+
+export interface SecondhandDescriptionRequest {
+  readonly images: readonly SecondhandImageReference[];
+  readonly title: string;
+  readonly category?: string;
+  readonly condition?: string;
+  readonly price: number;
+  readonly is_negotiable: boolean;
+  readonly locale: "zh-Hans" | "en";
+}
+
 export interface ThreadContext {
   readonly post: PostRecord;
   readonly source: CommentRecord;
   readonly ancestors: readonly CommentRecord[];
   readonly nearby: readonly CommentRecord[];
   readonly images: readonly PostImageRecord[];
+}
+
+export interface PostEmbeddingJob {
+  readonly job_id: string;
+  readonly post_id: string;
+  readonly input_hash: string;
+  readonly embedding_version: string;
+  readonly model: string;
+  readonly input_format_version: number;
+  readonly embedding_input: string;
+  readonly attempt: number;
 }

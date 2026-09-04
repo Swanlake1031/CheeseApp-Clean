@@ -1,5 +1,6 @@
 import Foundation
 import Supabase
+import UIKit
 
 struct ProfileUpdateInput {
     let userId: UUID
@@ -105,6 +106,65 @@ enum ProfileService {
             .execute()
     }
 
+    static func replaceCoverImage(
+        _ image: UIImage,
+        userId: UUID,
+        previousURL: String?
+    ) async throws -> String {
+        let uploadedAsset = try await ImageUploadService.shared.uploadProfileCover(
+            image,
+            userId: userId
+        )
+
+        do {
+            try await updateCoverImageURL(
+                userId: userId,
+                coverImageURL: uploadedAsset.publicURL
+            )
+        } catch {
+            try? await ImageUploadService.shared.deleteUploadedImageAsset(uploadedAsset)
+            throw error
+        }
+
+        if previousURL != uploadedAsset.publicURL {
+            try? await ImageUploadService.shared.deleteOwnedProfileCover(
+                at: previousURL,
+                userId: userId
+            )
+        }
+        return uploadedAsset.publicURL
+    }
+
+    static func deleteCoverImage(
+        userId: UUID,
+        currentURL: String?
+    ) async throws {
+        try await updateCoverImageURL(userId: userId, coverImageURL: nil)
+        try? await ImageUploadService.shared.deleteOwnedProfileCover(
+            at: currentURL,
+            userId: userId
+        )
+    }
+
+    private static func updateCoverImageURL(
+        userId: UUID,
+        coverImageURL: String?
+    ) async throws {
+        try await SupabaseManager.shared
+            .database("profiles")
+            .update(ProfileCoverImageUpdatePayload(coverImageURL: coverImageURL))
+            .eq("id", value: userId.uuidString)
+            .execute()
+    }
+
+}
+
+private struct ProfileCoverImageUpdatePayload: Encodable {
+    let coverImageURL: String?
+
+    enum CodingKeys: String, CodingKey {
+        case coverImageURL = "cover_image_url"
+    }
 }
 
 private struct ProfileUpdatePayload: Encodable {

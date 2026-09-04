@@ -257,11 +257,41 @@ final class ChatAccountIsolationTests: XCTestCase {
         )
     }
 
-    func testRemoteImageRetryPolicyStopsAfterEightAutomaticAttempts() {
-        XCTAssertEqual(RemoteImageRetryPolicy.maximumAutomaticAttemptCount, 8)
-        XCTAssertTrue(RemoteImageRetryPolicy.canRetry(afterFailureCount: 7))
-        XCTAssertFalse(RemoteImageRetryPolicy.canRetry(afterFailureCount: 8))
-        XCTAssertFalse(RemoteImageRetryPolicy.canRetry(afterFailureCount: 9))
+    func testRemoteImageRetryPolicyStopsAfterThreeAutomaticAttempts() {
+        XCTAssertEqual(RemoteImageRetryPolicy.maximumAutomaticAttemptCount, 3)
+        XCTAssertTrue(RemoteImageRetryPolicy.canRetry(afterFailureCount: 2))
+        XCTAssertFalse(RemoteImageRetryPolicy.canRetry(afterFailureCount: 3))
+        XCTAssertFalse(RemoteImageRetryPolicy.canRetry(afterFailureCount: 4))
+    }
+
+    func testMarketplaceImageResolverUsesBucketAndDecodedObjectPath() throws {
+        let original = try XCTUnwrap(URL(string:
+            "https://zeuivahkowbxmfzsnagt.supabase.co/storage/v1/object/public/post-images/user%20one/posts/post/000.jpg"
+        ))
+        let identity = try XCTUnwrap(SupabasePublicImageIdentity(publicURL: original))
+
+        XCTAssertEqual(identity.bucket, "post-images")
+        XCTAssertEqual(identity.objectPath, "user one/posts/post/000.jpg")
+
+        let thumbnail = try XCTUnwrap(identity.url(for: .feedThumbnail))
+        XCTAssertTrue(thumbnail.path.contains("/storage/v1/render/image/public/post-images/"))
+        XCTAssertTrue(thumbnail.path.contains("user one/posts/post/000.jpg"))
+        let query = try XCTUnwrap(URLComponents(url: thumbnail, resolvingAgainstBaseURL: false))
+        XCTAssertEqual(query.queryItems?.first(where: { $0.name == "width" })?.value, "720")
+        XCTAssertEqual(query.queryItems?.first(where: { $0.name == "quality" })?.value, "70")
+        XCTAssertEqual(query.queryItems?.first(where: { $0.name == "resize" })?.value, "contain")
+    }
+
+    func testMarketplaceImageResolverDoesNotDoubleEncodePathSeparators() throws {
+        let transformed = try XCTUnwrap(URL(string:
+            "https://zeuivahkowbxmfzsnagt.supabase.co/storage/v1/render/image/public/post-images/a%2Fb/c%20d.jpg?width=720"
+        ))
+        let identity = try XCTUnwrap(SupabasePublicImageIdentity(publicURL: transformed))
+        XCTAssertEqual(identity.objectPath, "a/b/c d.jpg")
+
+        let detail = try XCTUnwrap(identity.url(for: .detail))
+        XCTAssertFalse(detail.absoluteString.contains("%252F"))
+        XCTAssertEqual(detail.path, "/storage/v1/render/image/public/post-images/a/b/c d.jpg")
     }
 
     func testAccountTransitionDiscardsOnlyChatNotificationRoute() {

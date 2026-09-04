@@ -37,21 +37,8 @@ enum UserPostsViewMemoryCache {
 }
 
 struct UserPostsView: View {
-    private struct ProfileHighlight: Identifiable {
-        let id: String
-        let icon: String
-        let text: String
-        let lineLimit: Int
-
-        init(id: String, icon: String, text: String, lineLimit: Int = 1) {
-            self.id = id
-            self.icon = icon
-            self.text = text
-            self.lineLimit = lineLimit
-        }
-    }
-
     let userId: UUID
+    private let redirectsCurrentUserToProfileTab: Bool
 
     @EnvironmentObject private var authService: AuthService
     @Environment(\.dismiss) private var dismiss
@@ -63,6 +50,7 @@ struct UserPostsView: View {
     @StateObject private var secondhandPostLoader = ProfileSecondhandPostLoader()
 
     @State private var sharingPost: PostSharePayload?
+    @State private var showingAvatarEditor = false
     @State private var selectedResolvedPost: UserPostResolvedDestination?
     @State private var activeConversation: ChatConversationPreview?
     @State private var selectedKindFilter: PostKind
@@ -81,14 +69,20 @@ struct UserPostsView: View {
     @State private var secondhandGridWidth: CGFloat = 0
     @State private var stopPostObservation: (() -> Void)?
     @State private var postRefreshGeneration = 0
+    @State private var isReconcilingPostList = false
+    @State private var needsPostReconciliation = false
+    @State private var profileScrollOffset: CGFloat = 0
 
     private let secondhandGridSpacing: CGFloat = 8
+    private let profileCoverHeight: CGFloat = 350
 
     init(
         userId: UUID,
-        initialKind: PostKind = PostKind.profileDefault
+        initialKind: PostKind = PostKind.profileDefault,
+        redirectsCurrentUserToProfileTab: Bool = true
     ) {
         self.userId = userId
+        self.redirectsCurrentUserToProfileTab = redirectsCurrentUserToProfileTab
         _selectedKindFilter = State(initialValue: initialKind)
     }
 
@@ -104,9 +98,19 @@ struct UserPostsView: View {
         profileSocialService.summary(for: userId)
     }
 
-    private var shouldShowProfileGenderBadge: Bool {
-        (service.profile?.isGenderVisible ?? true)
-            && ["male", "female", "non_binary"].contains(service.profile?.gender ?? "")
+    private var hasProfileCover: Bool {
+        guard let cover = service.profile?.coverImageUrl?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return false
+        }
+        return !cover.isEmpty
+    }
+
+    private var profileScrollCoordinateSpace: String {
+        "cheese-user-profile-scroll-\(userId.uuidString)"
+    }
+
+    private var topBarTransitionProgress: CGFloat {
+        return min(max((-profileScrollOffset - 220) / 58, 0), 1)
     }
 
     private var visiblePosts: [UserPostSummary] {
@@ -143,19 +147,6 @@ struct UserPostsView: View {
         return "\(viewerScopedTaskID):secondhand:\(postRefreshGeneration):\(postKey)"
     }
 
-    private var profileHighlights: [ProfileHighlight] {
-        guard let profile = service.profile else { return [] }
-
-        return [
-            .init(
-                id: "bio",
-                icon: "text.alignleft",
-                text: compactText(profile.bio) ?? "暂无个性签名",
-                lineLimit: 3
-            )
-        ]
-    }
-
     private var initialSurfaceState: CollectionLoadState {
         guard hasCheckedBlockState else { return .initialLoading }
         if isBlockedProfile { return .loaded }
@@ -173,7 +164,7 @@ struct UserPostsView: View {
 
     var body: some View {
         Group {
-            if isCurrentUser {
+            if isCurrentUser && redirectsCurrentUserToProfileTab {
                 currentUserProfileRedirect
             } else {
                 presentedScene
@@ -194,19 +185,25 @@ struct UserPostsView: View {
 
     private var lifecycleScene: some View {
         userPostsScene
-            .cheesePageTopBar(title: "个人主页")
+            .onPreferenceChange(ProfileScrollOffsetPreferenceKey.self) { offset in
+                profileScrollOffset = offset
+            }
+            .navigationBarBackButtonHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                profileTopBar
+            }
+            .enableSwipeBackGesture()
             .overlay(alignment: .top) {
                 refreshOverlay
             }
             .task(id: viewerScopedTaskID) {
                 activateCurrentViewer()
-                await loadInitialSurface()
-            }
-            .onAppear {
+                // Start listening before the auxiliary profile requests
+                // finish. A cached post surface should not wait on social or
+                // block-state hydration before it can receive new posts.
                 startPostObservation()
-                if service.hasResolvedInitialSurfaceLoad {
-                    Task { await reconcilePostList() }
-                }
+                await loadInitialSurface()
             }
             .onDisappear {
                 stopPostObservation?()
@@ -220,7 +217,9 @@ struct UserPostsView: View {
                 await forumPostLoader.load(
                     postIDs: forumPostIDs,
                     viewerID: authService.currentUser?.id,
-                    force: postRefreshGeneration > 0
+                    // A user's own profile must not reuse a stale feed model:
+                    // avatar and anonymity changes need to appear immediately.
+                    force: isCurrentUser || postRefreshGeneration > 0
                 )
             }
             .task(id: secondhandPostsTaskID) {
@@ -234,6 +233,11 @@ struct UserPostsView: View {
                 guard PostFeatureEvents.changedAuthorId(from: notification) == userId else { return }
                 Task { await refreshPostListWithIndicator() }
             }
+            .preferredColorScheme(
+                hasProfileCover && topBarTransitionProgress < 0.58
+                    ? .dark
+                    : .light
+            )
     }
 
     private var navigableScene: some View {
@@ -248,6 +252,9 @@ struct UserPostsView: View {
 
     private var presentedScene: some View {
         navigableScene
+            .fullScreenCover(isPresented: $showingAvatarEditor) {
+                EditProfileView(startsWithAvatarActions: true)
+            }
             .cheesePostSharePanel(item: $sharingPost) { message in
                 ShareFeedbackPresenter.show(message) {
                     uidCopyFeedbackMessage = $0
@@ -274,13 +281,59 @@ struct UserPostsView: View {
     }
 
     private var userPostsScene: some View {
-        ZStack {
-            AppColors.pageBackground
-                .ignoresSafeArea()
+        GeometryReader { contentProxy in
+            ZStack {
+                AppColors.pageBackground
+                    .ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
-                userPostsSurfaceContent
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        GeometryReader { markerProxy in
+                            Color.clear.preference(
+                                key: ProfileScrollOffsetPreferenceKey.self,
+                                value: markerProxy.frame(
+                                    in: .named(profileScrollCoordinateSpace)
+                                ).minY
+                            )
+                        }
+                        .frame(height: 0)
+
+                        userPostsSurfaceContent
+                    }
+                    .frame(
+                        width: max(contentProxy.size.width - 32, 0),
+                        alignment: .top
+                    )
+                    .padding(.horizontal, 16)
+                }
+                .coordinateSpace(name: profileScrollCoordinateSpace)
+                .ignoresSafeArea(edges: .top)
+                .refreshable {
+                    await refreshPostListWithIndicator()
+                }
             }
+        }
+    }
+
+    private var profileTopBar: some View {
+        ProfileOverlayTopBar(transitionProgress: topBarTransitionProgress) {
+            Button {
+                dismiss()
+            } label: {
+                ZStack {
+                    PostToolbarIconCircle(
+                        icon: "chevron.left",
+                        tint: hasProfileCover ? .white : AppColors.textPrimary
+                    )
+                        .opacity(1 - topBarTransitionProgress)
+                    PostToolbarIconCircle(icon: "chevron.left", tint: AppColors.textPrimary)
+                        .opacity(topBarTransitionProgress)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.tr("Back", "返回"))
+        } trailing: {
+            EmptyView()
         }
     }
 
@@ -310,13 +363,17 @@ struct UserPostsView: View {
         } else {
             VStack(spacing: 0) {
                 profileHeader
-                categoryFilterBar
-                    .padding(.top, 10)
-                postListSection
-                    .padding(.top, 12)
+
+                ProfileRoundedContentSurface {
+                    VStack(spacing: 0) {
+                        publishedSectionHeader
+                        categoryFilterBar
+                            .padding(.top, 10)
+                        postListSection
+                            .padding(.top, 12)
+                    }
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
             .padding(.bottom, 120)
         }
     }
@@ -341,131 +398,139 @@ struct UserPostsView: View {
     }
 
     private var profileHeader: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 14) {
+        ProfileHeaderSurface(
+            profile: service.profile,
+            postCount: service.posts.count,
+            publicID: service.profile?.publicID,
+            coverHeight: profileCoverHeight,
+            contentBottomPadding: 32,
+            onUIDCopied: showUIDCopiedFeedback
+        ) {
+            otherProfileAvatar
+        } socialContent: {
+            HStack(spacing: 18) {
+                NavigationLink(destination: ProfileFollowListView(userId: userId, mode: .followers)) {
+                    ProfileHeaderMetric(
+                        count: socialSummary.followerCount,
+                        label: "粉丝",
+                        onDarkBackground: hasProfileCover
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink(destination: ProfileFollowListView(userId: userId, mode: .following)) {
+                    ProfileHeaderMetric(
+                        count: socialSummary.followingCount,
+                        label: "关注",
+                        onDarkBackground: hasProfileCover
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+            }
+        } actionContent: {
+            if !isCurrentUser {
+                HStack(spacing: 10) {
+                    Button {
+                        Task { await toggleFollow() }
+                    } label: {
+                        Text(followButtonTitle)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(socialSummary.amFollowing ? AppColors.textPrimary : .black)
+                            .frame(width: 72, height: 36)
+                            .background(socialSummary.amFollowing ? Color.white : AppColors.accent)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(
+                                        AppColors.textMuted.opacity(socialSummary.amFollowing ? 0.3 : 0),
+                                        lineWidth: 1
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .allowsHitTesting(!isTogglingFollow && !isLoadingSocialSummary)
+
+                    Button {
+                        Task { await startChat() }
+                    } label: {
+                        Text("私信")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .frame(width: 72, height: 36)
+                            .background(AppColors.accent)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.horizontal, -16)
+    }
+
+    @ViewBuilder
+    private var otherProfileAvatar: some View {
+        if isCurrentUser && service.profile?.isOfficialAccount != true {
+            Button {
+                showingAvatarEditor = true
+            } label: {
                 avatarView(
                     urlString: service.profile?.avatarUrl,
                     fallbackName: service.profile?.fullName ?? service.profile?.email ?? "U",
-                    isOfficial: service.profile?.isOfficialAccount == true
+                    isOfficial: false
                 )
-                    .frame(width: 64, height: 64)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(service.profile?.fullName ?? service.profile?.email ?? "用户")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(AppColors.textPrimary)
-                            .singleLineEllipsized()
-                        if service.profile?.isOfficialAccount == true {
-                            OfficialVerificationBadge()
-                        }
-                        if service.profile?.hasMcMasterStudentBadge == true {
-                            McMasterStudentBadge(style: .label)
-                        }
-                    }
-
-                    Text("\(visiblePosts.count) 条帖子")
-                        .font(.system(size: 14))
-                        .foregroundStyle(AppColors.textMuted)
-                }
-
-                Spacer()
             }
-
-            HStack(spacing: 16) {
-                socialMetric(count: socialSummary.followerCount, label: "粉丝")
-                socialMetric(count: socialSummary.followingCount, label: "关注")
-                Spacer()
-            }
-
-            if !profileHighlights.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(profileHighlights) { item in
-                        profileHighlightRow(item)
-                    }
-                }
-            }
-
-            HStack(spacing: 8) {
-                if shouldShowProfileGenderBadge {
-                    ProfileGenderBadge(gender: service.profile?.gender)
-                }
-
-                if let publicID = service.profile?.publicID {
-                    ProfileUIDBadge(publicID: publicID) {
-                        ShareFeedbackPresenter.show(
-                            L10n.tr(
-                                "Cheese ID copied. Paste it into Search to find this profile.",
-                                "奶酪 ID 已复制，可粘贴到搜索中查找该用户"
-                            )
-                        ) {
-                            uidCopyFeedbackMessage = $0
-                        }
-                    }
-                }
-
-                Spacer()
-            }
-
-            HStack(spacing: 10) {
-                Button {
-                    Task { await toggleFollow() }
-                } label: {
-                    Text(
-                        socialSummary.isMutualFollow
-                            ? "已互关"
-                            : socialSummary.amFollowing
-                            ? "已关注"
-                            : (socialSummary.followsMe ? "回关" : "关注")
-                    )
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(socialSummary.amFollowing ? AppColors.textPrimary : .black)
-                        .frame(width: 72, height: 36)
-                        .background(socialSummary.amFollowing ? Color.white : AppColors.accent)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(AppColors.textMuted.opacity(socialSummary.amFollowing ? 0.3 : 0), lineWidth: 1)
-                        )
-                }
-                .buttonStyle(.plain)
-                .allowsHitTesting(!isTogglingFollow && !isLoadingSocialSummary)
-
-                Button {
-                    Task { await startChat() }
-                } label: {
-                    Text("私信")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 9)
-                        .background(AppColors.accent)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.tr("Change avatar", "更换头像"))
+        } else {
+            avatarView(
+                urlString: service.profile?.avatarUrl,
+                fallbackName: service.profile?.fullName ?? service.profile?.email ?? "U",
+                isOfficial: service.profile?.isOfficialAccount == true
+            )
+            .tappableAvatarPreview(service.profile?.avatarUrl)
         }
-        .padding(.vertical, 14)
     }
 
-    private func profileHighlightRow(_ item: ProfileHighlight) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: item.icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(AppColors.textMuted)
-                .frame(width: 20, alignment: .center)
+    private var followButtonTitle: String {
+        if socialSummary.isMutualFollow { return "已互关" }
+        if socialSummary.amFollowing { return "已关注" }
+        return socialSummary.followsMe ? "回关" : "关注"
+    }
 
-            Text(item.text)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(AppColors.textMuted)
-                .lineLimit(item.lineLimit)
-                .truncationMode(.tail)
+    private func showUIDCopiedFeedback() {
+        ShareFeedbackPresenter.show(
+            L10n.tr(
+                "Cheese ID copied. Paste it into Search to find this profile.",
+                "奶酪 ID 已复制，可粘贴到搜索中查找该用户"
+            )
+        ) {
+            uidCopyFeedbackMessage = $0
         }
+    }
+
+    private var publishedSectionHeader: some View {
+        HStack {
+            VStack(spacing: 8) {
+                Text("发布")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+
+                Capsule()
+                    .fill(AppColors.accent)
+                    .frame(width: 28, height: 3)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 14)
     }
 
     @ViewBuilder
     private var categoryFilterBar: some View {
-        if service.isLoading || service.posts.isEmpty {
+        if service.isLoading {
             EmptyView()
         } else {
             ProfilePostKindFilterBar(
@@ -494,11 +559,6 @@ struct UserPostsView: View {
                                             // forum model that this shared card displays. Reusing
                                             // it avoids a second network request before navigation.
                                             selectedResolvedPost = .forum(forumPost)
-                                        },
-                                        onBoardTap: {
-                                            selectedResolvedPost = .forumBoard(
-                                                forumPost.boardID
-                                            )
                                         },
                                         onShareTap: {
                                             sharingPost = forumPost.sharePayload
@@ -654,26 +714,6 @@ struct UserPostsView: View {
         }
     }
 
-    private func socialMetric(count: Int, label: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(label)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(AppColors.textMuted)
-            Text("\(count)")
-                .font(.system(size: 14, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(AppColors.textPrimary)
-        }
-        .frame(minWidth: 62, alignment: .leading)
-    }
-
-    private func compactText(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-        return value
-    }
-
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "tray")
@@ -716,30 +756,31 @@ struct UserPostsView: View {
             if userId == CheeseAIIdentity.userID {
                 CheeseAIAvatarView(
                     remoteURLString: urlString,
-                    size: 64
+                    size: 56
                 )
             } else if isOfficial {
-                OfficialAccountAvatar(size: 64)
+                OfficialAccountAvatar(size: 56)
             } else if let urlString, let url = URL(string: urlString) {
-                AsyncImage(url: url) { image in
+                CachedRemoteImage(url: url, targetPixelWidth: 192) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
                     avatarPlaceholder(name: fallbackName)
                 }
+                .frame(width: 56, height: 56)
             } else {
                 avatarPlaceholder(name: fallbackName)
             }
         }
         .clipShape(Circle())
-        .tappableAvatarPreview(urlString)
     }
 
     private func avatarPlaceholder(name: String) -> some View {
         Circle()
             .fill(AppColors.accent)
+            .frame(width: 56, height: 56)
             .overlay {
                 Text(String(name.prefix(1)).uppercased())
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(.white)
             }
     }
@@ -840,8 +881,17 @@ struct UserPostsView: View {
 
     @MainActor
     private func reconcilePostList() async {
-        await service.refreshPosts(userId: userId)
-        postRefreshGeneration &+= 1
+        needsPostReconciliation = true
+        guard !isReconcilingPostList else { return }
+
+        isReconcilingPostList = true
+        defer { isReconcilingPostList = false }
+
+        while needsPostReconciliation {
+            needsPostReconciliation = false
+            await service.refreshPosts(userId: userId)
+            postRefreshGeneration &+= 1
+        }
     }
 
     private func loadSocialSummary(forceRefresh: Bool = false) async {
@@ -938,14 +988,11 @@ extension PostKind {
 private enum UserPostResolvedDestination: Hashable, Identifiable {
     case secondhand(SecondhandItem)
     case forum(ForumPostItem)
-    case forumBoard(UUID)
 
     var id: String {
         switch self {
         case .secondhand(let item): return "secondhand-\(item.id.uuidString)"
         case .forum(let post): return "forum-\(post.id.uuidString)"
-        case .forumBoard(let boardID):
-            return "forum-board-\(boardID.uuidString)"
         }
     }
 }
@@ -959,8 +1006,6 @@ private struct UserPostResolvedDetailRouter: View {
             SecondhandDetailView(item: item)
         case .forum(let post):
             ForumDetailView(post: post)
-        case .forumBoard(let boardID):
-            ForumBoardView(boardID: boardID)
         }
     }
 }

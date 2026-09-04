@@ -42,7 +42,7 @@ export function pageShell({
     : "";
 
   return `<!doctype html>
-<html lang="zh-Hans">
+<html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

@@ -2,6 +2,7 @@
   "name": "奶酪 Cheese",
   "short_name": "Cheese",
   "description": "加拿大留学生校园生活平台",
+  "lang": "zh-CN",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fffdf7",

@@ -12,7 +12,7 @@ final class CourseCatalogService {
         do {
             _ = try await AuthService.shared.requireAuthUserId()
             let rows: [CourseCatalogRow] = try await supabase.client
-                .rpc("get_course_catalog")
+                .rpc("get_course_catalog_v2")
                 .execute()
                 .value
             return rows.map(\.model)

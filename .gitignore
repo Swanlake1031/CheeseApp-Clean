@@ -21,6 +21,8 @@ node_modules/
 Secrets.plist
 GoogleService-Info.plist
 *.log
+__pycache__/
+*.py[cod]
 /Supabase/.temp/
 /Supabase/supabase/
 /Supabase/backups/

@@ -1,5 +1,11 @@
 import Foundation
 
+enum CourseOutlineSourceKind: String, Codable, Hashable {
+    case privateStorage = "private_storage"
+    case externalPDF = "external_pdf"
+    case externalWeb = "external_web"
+}
+
 enum CourseAcademicTerm: String, Codable, Hashable {
     case winter
     case spring
@@ -27,11 +33,15 @@ struct CourseOutline: Identifiable, Hashable {
     let term: CourseAcademicTerm
     let professorName: String?
     let title: String
-    let storagePath: String
-    let originalFilename: String
-    let mimeType: String
-    let fileSizeBytes: Int64
-    let sha256: String
+    let sourceKind: CourseOutlineSourceKind
+    let sourceURL: URL?
+    let sourcePageURL: URL?
+    let sourceName: String
+    let storagePath: String?
+    let originalFilename: String?
+    let mimeType: String?
+    let fileSizeBytes: Int64?
+    let sha256: String?
     let createdAt: Date
 
     var termTitle: String {
@@ -39,9 +49,18 @@ struct CourseOutline: Identifiable, Hashable {
     }
 
     var formattedFileSize: String {
-        ByteCountFormatter.string(
+        guard let fileSizeBytes else {
+            return sourceKind == .externalWeb
+                ? L10n.tr("Official page", "官方页面")
+                : L10n.tr("Official link", "官方链接")
+        }
+        return ByteCountFormatter.string(
             fromByteCount: fileSizeBytes,
             countStyle: .file
         )
+    }
+
+    var isWebDocument: Bool {
+        sourceKind == .externalWeb
     }
 }

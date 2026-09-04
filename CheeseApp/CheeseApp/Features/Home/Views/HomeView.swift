@@ -16,6 +16,31 @@ private struct HomeProfileRoute: Identifiable, Hashable {
     let id: UUID
 }
 
+enum HomeFeedNavigationRoute {
+    case forum
+    case secondhand(SecondhandPost.Category?)
+}
+
+enum HomeFeedNavigationEvents {
+    static let openRoute = Notification.Name("cheese.home-feed.open-route")
+    static let homeReselected = Notification.Name("cheese.home-feed.reselected")
+
+    static func post(
+        _ route: HomeFeedNavigationRoute,
+        center: NotificationCenter = .default
+    ) {
+        center.post(name: openRoute, object: route)
+    }
+
+    static func route(from notification: Notification) -> HomeFeedNavigationRoute? {
+        notification.object as? HomeFeedNavigationRoute
+    }
+
+    static func postHomeReselect(center: NotificationCenter = .default) {
+        center.post(name: homeReselected, object: nil)
+    }
+}
+
 // MARK: - 首页视图
 struct HomeView: View {
     /// Owned by MainTabView so tab changes and root view reconstruction do not
@@ -31,6 +56,7 @@ struct HomeView: View {
     @State private var showSearch = false
     @State private var shouldAutoFocusSearch = false
     @State private var showCustomerSupport = false
+    @State private var showSettings = false
     @State private var selectedForumBoardID: UUID?
     @State private var showCourseDiscovery = false
     @State private var showNavigationDrawer = false
@@ -41,13 +67,19 @@ struct HomeView: View {
     @State private var sharingPost: PostSharePayload?
     @State private var shareActionToastMessage: String?
     @State private var postOpenErrorMessage: String?
-    @State private var selectedFeaturedCategory: HomeFeedTab = .recommended
-    @State private var featuredPagerPosition: HomeFeedTab? = .recommended
+    @State private var selectedFeaturedCategory: HomeFeedTab = .forum
+    // Start without a pager position so the initial forum selection is applied
+    // after the horizontal scroll view has finished creating its targets.
+    // Otherwise SwiftUI can keep the first target (`following`) visible while
+    // the header already highlights `forum`.
+    @State private var featuredPagerPosition: HomeFeedTab?
+    @State private var isFeaturedPagerInitializing = true
     @State private var pendingFeaturedCategory: HomeFeedTab?
     @State private var isFeaturedPagerScrolling = false
     @State private var selectedSecondhandCategory: SecondhandPost.Category?
     @State private var featuredPageHeights: [HomeFeedTab: CGFloat] = [:]
     @State private var contentScrollResetID = UUID()
+    @State private var scrollToTopRequest: UInt = 0
     @State private var promotedCreatedPostID: UUID?
     @State private var highlightedCreatedPostID: UUID?
     @State private var createdPostHighlightToken = UUID()
@@ -72,47 +104,55 @@ struct HomeView: View {
                     .zIndex(40)
 
                 GeometryReader { contentProxy in
-                    ScrollView(showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 0) {
-                            // 横向分页本身至少铺满整个可视内容区。帖子较少时，
-                            // 下方空白仍属于分页页面，而不是外层 ScrollView。
-                            featuredSection(
-                                minimumPagerHeight: max(
-                                    contentProxy.size.height + 24,
-                                    250
+                    ScrollViewReader { scrollProxy in
+                        ScrollView(showsIndicators: false) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                Color.clear
+                                    .frame(height: 0)
+                                    .id(HomeScrollAnchor.top)
+
+                                // 横向分页本身至少铺满整个可视内容区。帖子较少时，
+                                // 下方空白仍属于分页页面，而不是外层 ScrollView。
+                                featuredSection(
+                                    minimumPagerHeight: max(
+                                        contentProxy.size.height + 24,
+                                        250
+                                    )
                                 )
+                                .zIndex(30)
+                            }
+                            .padding(
+                                .horizontal,
+                                Self.featuredPagerHorizontalInset
                             )
-                            .zIndex(30)
+                            .padding(
+                                .bottom,
+                                CheeseTabBarLayout.contentBottomClearance
+                            )
                         }
-                        .padding(
-                            .horizontal,
-                            Self.featuredPagerHorizontalInset
-                        )
-                        .padding(
-                            .bottom,
-                            CheeseTabBarLayout.contentBottomClearance
-                        )
-                    }
-                    .id(contentScrollResetID)
-                    .refreshable {
-                        await viewModel.refresh(userID: authService.currentUser?.id)
-                        clearCreatedPostPromotion()
+                        .id(contentScrollResetID)
+                        .onChange(of: scrollToTopRequest) { _, _ in
+                            var transaction = Transaction(animation: nil)
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) {
+                                scrollProxy.scrollTo(HomeScrollAnchor.top, anchor: .top)
+                            }
+                        }
+                        .refreshable {
+                            await viewModel.refresh(userID: authService.currentUser?.id)
+                            clearCreatedPostPromotion()
+                        }
                     }
                 }
             }
 
             HomeNavigationDrawerContainer(
                 openRequest: navigationDrawerOpenRequest,
-                boards: forumService.boards,
                 onPresentationChange: { showNavigationDrawer = $0 },
                 onForumTap: {
                     selectedForumBoardID = nil
                     showForumList = false
                     selectFeaturedCategory(.forum)
-                },
-                onBoardTap: { board in
-                    selectedForumBoardID = board.id
-                    showForumList = true
                 },
                 onSecondhandTap: {
                     selectedSecondhandCategory = nil
@@ -121,6 +161,9 @@ struct HomeView: View {
                 onSecondhandCategoryTap: { category in
                     selectedSecondhandCategory = category
                     selectFeaturedCategory(.secondhand)
+                },
+                onSettingsTap: {
+                    showSettings = true
                 },
                 onSupportTap: {
                     showCustomerSupport = true
@@ -153,6 +196,9 @@ struct HomeView: View {
         .navigationDestination(isPresented: $showCustomerSupport) {
             CheeseCustomerSupportView()
         }
+        .navigationDestination(isPresented: $showSettings) {
+            SettingsView()
+        }
         .navigationDestination(item: $selectedForumPost) { post in
             ForumDetailView(post: post)
         }
@@ -180,6 +226,21 @@ struct HomeView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { notification in
             handlePostChange(notification)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: HomeFeedNavigationEvents.openRoute)) { notification in
+            guard let route = HomeFeedNavigationEvents.route(from: notification) else { return }
+            switch route {
+            case .forum:
+                selectedForumBoardID = nil
+                showForumList = false
+                selectFeaturedCategory(.forum)
+            case .secondhand(let category):
+                selectedSecondhandCategory = category
+                selectFeaturedCategory(.secondhand)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: HomeFeedNavigationEvents.homeReselected)) { _ in
+            handleHomeReselect()
         }
         .onReceive(NotificationCenter.default.publisher(for: ProfileSocialEvents.followingDidChange)) { notification in
             guard let (targetUserID, isFollowing) = ProfileSocialEvents.change(
@@ -248,7 +309,7 @@ struct HomeView: View {
         return trimmed.isEmpty ? CheeseUniversityOption.defaultSchoolName : trimmed
     }
 
-    // MARK: - 板块内容区
+    // MARK: - 内容分页
     private func featuredSection(minimumPagerHeight: CGFloat) -> some View {
         let pagerHeight = selectedFeaturedPageHeight(
             minimum: minimumPagerHeight
@@ -313,8 +374,29 @@ struct HomeView: View {
             .frame(height: pagerHeight + 8, alignment: .top)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .task {
+            guard isFeaturedPagerInitializing else { return }
+
+            // Ignore the scroll view's transient first-page position during
+            // its initial layout, then explicitly align it with the header.
+            featuredPagerPosition = nil
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                featuredPagerPosition = selectedFeaturedCategory
+            }
+
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            isFeaturedPagerInitializing = false
+        }
         .onChange(of: featuredPagerPosition) { _, category in
-            guard let category else { return }
+            guard !isFeaturedPagerInitializing,
+                  let category
+            else { return }
             pendingFeaturedCategory = category
             commitPendingFeaturedCategoryIfSettled()
         }
@@ -326,8 +408,6 @@ struct HomeView: View {
 
     private func featuredCards(for category: HomeFeedTab) -> [HomeCardItem] {
         switch category {
-        case .recommended:
-            return recommendedTabCards
         case .following:
             return viewModel.followingCards
         case .forum:
@@ -364,20 +444,6 @@ struct HomeView: View {
         viewModel.homeFeaturedForumCards
     }
 
-    private var recommendedTabCards: [HomeCardItem] {
-        let rankedCards = viewModel.recommendedCards
-        guard let promotedCreatedPostID,
-              let createdPost = viewModel.homeCard(id: promotedCreatedPostID)
-        else {
-            return rankedCards
-        }
-        return HomeRecommendationRanker.insertingCreatedPost(
-            createdPost,
-            into: rankedCards,
-            limit: 12
-        )
-    }
-
     private var forumTabCards: [HomeCardItem] {
         let selectedOfficialCards = officialForumCards.filter {
             selectedForumBoardID == nil || $0.boardID == selectedForumBoardID
@@ -398,8 +464,6 @@ struct HomeView: View {
         for category: HomeFeedTab
     ) -> CollectionLoadState {
         switch category {
-        case .recommended:
-            return viewModel.recommendedLoadState
         case .following:
             return viewModel.followingLoadState
         case .forum:
@@ -463,17 +527,17 @@ struct HomeView: View {
             .foregroundStyle(AppColors.textPrimary)
 
             Text(L10n.tr(
-                "Explore recommended posts and follow people you enjoy.",
-                "去推荐中发现感兴趣的内容和作者吧。"
+                "Explore the forum and follow people you enjoy.",
+                "去论坛发现感兴趣的内容和作者吧。"
             ))
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(AppColors.textMuted)
             .multilineTextAlignment(.center)
 
             Button {
-                selectFeaturedCategory(.recommended)
+                selectFeaturedCategory(.forum)
             } label: {
-                Text(L10n.tr("Browse For You", "浏览推荐"))
+                Text(L10n.tr("Browse Forum", "浏览论坛"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Color.black)
                     .padding(.horizontal, 18)
@@ -489,7 +553,7 @@ struct HomeView: View {
     private func retryFeaturedCategoryLoad(_ category: HomeFeedTab) {
         Task {
             switch category {
-            case .recommended, .following, .secondhand, .forum:
+            case .following, .secondhand, .forum:
                 await viewModel.refresh(userID: authService.currentUser?.id)
             }
         }
@@ -517,9 +581,7 @@ struct HomeView: View {
             alignment: .leading,
             spacing: category == .secondhand ? 12 : 4
         ) {
-            if category == .forum {
-                forumCategoryStrip
-            } else if category == .secondhand {
+            if category == .secondhand {
                 secondhandCategoryStrip
                     .padding(
                         .horizontal,
@@ -629,54 +691,14 @@ struct HomeView: View {
         SecondhandCategoryPicker(selection: $selectedSecondhandCategory)
     }
 
-    private var forumCategoryStrip: some View {
-        ExpandableCategoryPicker(
-            selection: Binding(
-                get: {
-                    forumService.boards.first {
-                        $0.id == selectedForumBoardID && $0.status != .archived
-                    }
-                },
-                set: { selectedForumBoardID = $0?.id }
-            ),
-            options: forumService.boards.filter { $0.status != .archived },
-            recommendedTitle: L10n.tr("Recommended", "推荐"),
-            accessibilityTitle: L10n.tr("Forum categories", "论坛分区"),
-            title: { $0.name },
-            icon: { $0.icon }
-        )
-    }
-
     private func featuredCard(
         _ card: HomeCardItem,
         in category: HomeFeedTab
     ) -> some View {
-        ContentCardView(
-            item: card,
-            interaction: viewModel.interactionState(for: card),
-            presentsSecondhandAsForumBoard: category == .recommended
-                && card.category == .secondhand,
-            usesSecondhandRowSurface: category == .following
-                && card.category == .secondhand,
-            onTap: { openFeaturedCard(card) },
-            onBoardTap: boardTapAction(for: card, in: category),
-            onAuthorTap: card.authorId.map { authorID in
-                { selectedProfileRoute = HomeProfileRoute(id: authorID) }
-            },
-            onLikeTap: card.postId == nil || card.category == .secondhand ? nil : {
-                Task { await toggleLike(card) }
-            },
-            onFavoriteTap: card.postId == nil ? nil : {
-                Task { await toggleFavorite(card) }
-            },
-            onShareTap: sharePayload(for: card).map { payload in
-                { sharingPost = payload }
-            }
-        )
+        featuredCardContent(card, in: category)
         .overlay {
             if highlightedCreatedPostID == card.postId {
-                if card.category == .forum
-                    || (category == .recommended && card.category == .secondhand) {
+                if card.category == .forum {
                     VStack(spacing: 0) {
                         Rectangle()
                             .fill(AppColors.accent)
@@ -714,19 +736,70 @@ struct HomeView: View {
         .animation(.easeInOut(duration: 0.24), value: highlightedCreatedPostID)
     }
 
+    @ViewBuilder
+    private func featuredCardContent(
+        _ card: HomeCardItem,
+        in category: HomeFeedTab
+    ) -> some View {
+        if card.category == .forum,
+           let postID = card.postId,
+           let post = viewModel.forumPost(id: postID) {
+            ForumPostCardView(
+                post: post,
+                isOwnPost: false,
+                recommendationContext: viewModel.recommendationContext(for: card),
+                onTap: { openFeaturedCard(card) },
+                onLikeTap: { await toggleLike(card) },
+                onFavoriteTap: { await toggleFavorite(card) },
+                onEditTap: nil,
+                onShareTap: sharePayload(for: card).map { payload in
+                    {
+                        sharingPost = payload
+                        Task {
+                            await ForumService.shared.recordRecommendationEvent(
+                                postID: post.id,
+                                type: .share,
+                                context: viewModel.recommendationContext(for: card)
+                            )
+                        }
+                    }
+                },
+                onAuthorTap: card.authorId.map { authorID in
+                    { selectedProfileRoute = HomeProfileRoute(id: authorID) }
+                }
+            )
+        } else {
+            ContentCardView(
+                item: card,
+                interaction: viewModel.interactionState(for: card),
+                presentsSecondhandAsForumBoard: false,
+                usesSecondhandRowSurface: category == .following
+                    && card.category == .secondhand,
+                showsCategoryMetadata: true,
+                onTap: { openFeaturedCard(card) },
+                onBoardTap: boardTapAction(for: card, in: category),
+                onAuthorTap: card.authorId.map { authorID in
+                    { selectedProfileRoute = HomeProfileRoute(id: authorID) }
+                },
+                onLikeTap: card.postId == nil || card.category == .secondhand ? nil : {
+                    Task { await toggleLike(card) }
+                },
+                onFavoriteTap: card.postId == nil ? nil : {
+                    Task { await toggleFavorite(card) }
+                },
+                onShareTap: sharePayload(for: card).map { payload in
+                    { sharingPost = payload }
+                }
+            )
+        }
+    }
+
     private func boardTapAction(
         for card: HomeCardItem,
         in category: HomeFeedTab
     ) -> (() -> Void)? {
         if card.category == .forum, card.boardID != nil {
             return { openForumBoard(card) }
-        }
-
-        if category == .recommended, card.category == .secondhand {
-            return {
-                selectedSecondhandCategory = nil
-                selectFeaturedCategory(.secondhand)
-            }
         }
 
         return nil
@@ -825,6 +898,24 @@ struct HomeView: View {
         }
     }
 
+    private func handleHomeReselect() {
+        showForumList = false
+        showSearch = false
+        shouldAutoFocusSearch = false
+        showCustomerSupport = false
+        showSettings = false
+        showCourseDiscovery = false
+        selectedForumBoardID = nil
+        selectedForumPost = nil
+        selectedFeaturedSecondhandItem = nil
+        selectedProfileRoute = nil
+        selectedSecondhandCategory = nil
+        clearCreatedPostPromotion()
+        selectFeaturedCategory(.forum)
+        scrollToTopRequest &+= 1
+        CheeseTabBarVisibilityController.shared.resetVisibility()
+    }
+
     private func commitPendingFeaturedCategoryIfSettled() {
         guard !isFeaturedPagerScrolling,
               let category = pendingFeaturedCategory,
@@ -865,11 +956,11 @@ struct HomeView: View {
         showForumList = false
         selectedForumBoardID = nil
         selectedSecondhandCategory = nil
-        selectFeaturedCategory(.recommended)
+        selectFeaturedCategory(kind == .forum ? .forum : .secondhand)
         contentScrollResetID = UUID()
 
         ShareFeedbackPresenter.show(
-            kind == .forum ? "论坛帖子发布成功，已显示在推荐" : "二手商品发布成功，已显示在推荐"
+            kind == .forum ? "论坛帖子发布成功，已显示在论坛" : "二手商品发布成功，已显示在二手"
         ) {
             shareActionToastMessage = $0
         }
@@ -1033,15 +1124,12 @@ private struct FeaturedPagerScrollPhaseModifier: ViewModifier {
 }
 
 enum HomeFeedTab: CaseIterable, Hashable {
-    case recommended
     case following
     case forum
     case secondhand
 
     var title: String {
         switch self {
-        case .recommended:
-            return L10n.tr("For You", "推荐")
         case .following:
             return L10n.tr("Following", "关注")
         case .forum:
@@ -1051,6 +1139,10 @@ enum HomeFeedTab: CaseIterable, Hashable {
         }
     }
 
+}
+
+private enum HomeScrollAnchor {
+    static let top = "home-feed-top"
 }
 
 // MARK: - Preview

@@ -148,7 +148,7 @@ class ChatService: ObservableObject {
         conversationRefreshQueued = false
         conversationErrorMessage = nil
         hasResolvedInitialConversationLoad = false
-        RemoteImageCache.shared.removeAll()
+        RemoteImageCache.shared.removeAccountSensitiveContent()
     }
 
     private func isCurrentAccountRequest(userID: UUID, generation: UInt64) -> Bool {

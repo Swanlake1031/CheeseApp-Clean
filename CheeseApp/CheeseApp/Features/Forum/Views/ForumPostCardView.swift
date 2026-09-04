@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIKit
 extension ForumPostItem {
     var editableSummary: UserPostSummary {
         UserPostSummary(
@@ -35,13 +36,15 @@ extension ForumPostItem {
     }
 
     var forumFeedCardItem: HomeCardItem {
-        let avatar = authorAvatar
-            .flatMap(URL.init(string:))
-            .map(ImageSource.url) ?? .placeholder
+        let avatar = isAnonymous
+            ? ImageSource.placeholder
+            : authorAvatar
+                .flatMap(URL.init(string:))
+                .map(ImageSource.url) ?? .placeholder
 
         return HomeCardItem(
             postId: id,
-            authorId: authorId,
+            authorId: isAnonymous ? nil : authorId,
             image: imageUrls.first
                 .flatMap(URL.init(string:))
                 .map(ImageSource.url) ?? .placeholder,
@@ -51,6 +54,8 @@ extension ForumPostItem {
             title: title,
             subtitle: content,
             footer: .posted(name: authorName, avatar: avatar),
+            isAnonymous: isAnonymous,
+            isAuthorOfficial: !isAnonymous && isAuthorOfficial,
             isAuthorMcMasterVerified: !isAnonymous && isAuthorMcMasterVerified,
             category: .forum,
             viewCount: views,
@@ -72,13 +77,13 @@ struct ForumPostCardView: View {
 
     let post: ForumPostItem
     let isOwnPost: Bool
-    var headerStyle: ForumCardHeaderStyle = .board
+    var recommendationContext: ForumRecommendationEventContext? = nil
     var onTap: (() -> Void)?
     var onLikeTap: (() async -> Void)?
     var onFavoriteTap: (() async -> Void)?
     var onEditTap: (() -> Void)?
     var onShareTap: (() -> Void)?
-    var onBoardTap: (() -> Void)?
+    var onAuthorTap: (() -> Void)?
 
     private var interaction: PostInteractionState {
         interactionStore.state(
@@ -92,9 +97,8 @@ struct ForumPostCardView: View {
         ContentCardView(
             item: post.forumFeedCardItem,
             interaction: interaction,
-            forumHeaderStyle: headerStyle,
             onTap: onTap,
-            onBoardTap: onBoardTap,
+            onAuthorTap: onAuthorTap,
             onLikeTap: {
                 Task { await onLikeTap?() }
             },
@@ -104,6 +108,12 @@ struct ForumPostCardView: View {
             onShareTap: onShareTap
         )
         .padding(.horizontal, 4)
+        .modifier(
+            RecommendationVisibilityModifier(
+                postID: post.id,
+                context: recommendationContext
+            )
+        )
         .contextMenu {
             if isOwnPost {
                 Button {
@@ -115,6 +125,116 @@ struct ForumPostCardView: View {
         }
     }
 
+}
+
+private struct RecommendationCardFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .null
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+enum ForumRecommendationVisibilityPolicy {
+    static let minimumVisibleFraction = 0.5
+    static let qualifiedImpressionMilliseconds = 1_000
+    static let meaningfulReadMilliseconds = 3_000
+
+    static func qualifies(
+        visibleFraction: Double,
+        dwellMilliseconds: Int
+    ) -> (qualifiedImpression: Bool, meaningfulRead: Bool) {
+        guard visibleFraction >= minimumVisibleFraction else {
+            return (false, false)
+        }
+        return (
+            dwellMilliseconds >= qualifiedImpressionMilliseconds,
+            dwellMilliseconds >= meaningfulReadMilliseconds
+        )
+    }
+}
+
+private struct RecommendationVisibilityModifier: ViewModifier {
+    let postID: UUID
+    let context: ForumRecommendationEventContext?
+
+    @State private var visibilityGeneration: UUID?
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: RecommendationCardFrameKey.self,
+                        value: proxy.frame(in: .global)
+                    )
+                }
+            }
+            .onPreferenceChange(RecommendationCardFrameKey.self) { frame in
+                updateVisibility(frame)
+            }
+            .onDisappear {
+                visibilityGeneration = nil
+            }
+    }
+
+    @MainActor
+    private func updateVisibility(_ frame: CGRect) {
+        guard let context, frame.height > 0, frame.width > 0 else {
+            visibilityGeneration = nil
+            return
+        }
+        let viewport = UIScreen.main.bounds
+        let intersection = frame.intersection(viewport)
+        let fraction = intersection.isNull
+            ? 0
+            : min(max(intersection.height / frame.height, 0), 1)
+        guard fraction >= ForumRecommendationVisibilityPolicy.minimumVisibleFraction else {
+            visibilityGeneration = nil
+            return
+        }
+        guard visibilityGeneration == nil else { return }
+
+        let generation = UUID()
+        visibilityGeneration = generation
+        Task { @MainActor in
+            await ForumService.shared.recordRecommendationEvent(
+                postID: postID,
+                type: .impression,
+                context: context,
+                visibleFraction: fraction
+            )
+            try? await Task.sleep(
+                nanoseconds: UInt64(
+                    ForumRecommendationVisibilityPolicy.qualifiedImpressionMilliseconds
+                ) * 1_000_000
+            )
+            guard visibilityGeneration == generation else { return }
+            await ForumService.shared.recordRecommendationEvent(
+                postID: postID,
+                type: .qualifiedImpression,
+                context: context,
+                visibleFraction: fraction,
+                dwellMilliseconds: ForumRecommendationVisibilityPolicy
+                    .qualifiedImpressionMilliseconds
+            )
+            try? await Task.sleep(
+                nanoseconds: UInt64(
+                    ForumRecommendationVisibilityPolicy.meaningfulReadMilliseconds
+                    - ForumRecommendationVisibilityPolicy.qualifiedImpressionMilliseconds
+                ) * 1_000_000
+            )
+            guard visibilityGeneration == generation else { return }
+            await ForumService.shared.recordRecommendationEvent(
+                postID: postID,
+                type: .meaningfulRead,
+                context: context,
+                visibleFraction: fraction,
+                dwellMilliseconds: ForumRecommendationVisibilityPolicy
+                    .meaningfulReadMilliseconds
+            )
+        }
+    }
 }
 
 // MARK: - Profile forum surface
@@ -215,7 +335,6 @@ final class ProfileForumPostLoader: ObservableObject {
 struct ProfileForumPostCardView: View {
     let post: ForumPostItem
     let onTap: () -> Void
-    var onBoardTap: (() -> Void)?
     var onShareTap: (() -> Void)?
     var onActionError: ((String) -> Void)?
     var showsOwnerAnonymousBadge = false
@@ -227,13 +346,11 @@ struct ProfileForumPostCardView: View {
         ForumPostCardView(
             post: post,
             isOwnPost: false,
-            headerStyle: .board,
             onTap: onTap,
             onLikeTap: { await toggleLike() },
             onFavoriteTap: { await toggleFavorite() },
             onEditTap: nil,
-            onShareTap: onShareTap,
-            onBoardTap: onBoardTap
+            onShareTap: onShareTap
         )
         .overlay(alignment: .topTrailing) {
             if showsOwnerAnonymousBadge {

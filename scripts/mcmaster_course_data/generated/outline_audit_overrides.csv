@@ -1,0 +1,21 @@
+course_code,audit_status,academic_year,term,evidence,rejection_reason
+AUTOTECH 3AE3,approved,2021,fall,"visual: complete official outline; Fall 2021 dates and course code visible",
+CHEMENG 4M03,approved,2025,fall,"visual: Course Outline; Term I, 2025/2026",
+CIVENG 2X03,approved,2025,fall,"visual: Course Outline; Session Offered Fall 2025",
+CIVENG 3K03,approved,2025,fall,"visual: CIVENG 3K03; Fall 2025",
+CIVENG 4A04,approved,2024,fall,"visual: CIVENG 4A04; Fall 2024",
+COMPENG 2DI4,approved,2025,fall,"visual: Course Outline; Academic Year 2025/26; Term Fall",
+COMPENG 3DQ5,approved,2025,fall,"visual: Course Outline; Academic Year 2025/26; Term Fall",
+COMPSCI 4Z03,rejected,,,"visual: department permission form and computer science proposal","not a published course outline"
+ELECENG 2CI4,approved,2025,fall,"visual: Course Outline; Academic Year 2025/26; Term Fall",
+ENGPHYS 4Z04,approved,2026,fall,"visual: ENG PHYS 4Z04/6Z04; Fall 2026; Course Outline",
+GENTECH 1PC3,approved,2023,fall,"visual: GENTECH 1PC3; Fall 2023; complete course information",
+IBEHS 5P06A,approved,2025,fall,"visual: IBEHS 5P06A/B; Fall/Winter Terms 2025-26; A component begins Fall",
+MECHTRON 4RP3,rejected,,,"visual: department permission form and mechatronics proposal","not a published course outline"
+NUCENG 4P03,rejected,,,"network: official URL returns HTTP 404","dead source URL"
+PROCTECH 2EE3,approved,2023,fall,"visual: PROCTECH 2EE3; Fall 2023; full course information",
+PROCTECH 3CE3,approved,2023,fall,"visual: PROCTECH 3CE3; Fall 2023; full course information",
+PROCTECH 3PL3,approved,2023,fall,"visual: PROCTECH 3PL3; Fall 2023; full course information",
+PROCTECH 4SS3,approved,2023,fall,"visual: PROCTECH 4SS3; Fall 2023; full course information",
+PROCTECH 4TR3,approved,2023,fall,"visual: PROCTECH 4TR3; Fall 2023; full course information",
+SFWRENG 4RP3,rejected,,,"visual: department permission form and software engineering proposal","not a published course outline"

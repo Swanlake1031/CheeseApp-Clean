@@ -6,27 +6,58 @@ struct SecondhandBasicInfoSection: View {
     @Binding var price: String
     @Binding var originalPrice: String
     let iconColor: Color
+    let showsTitle: Bool
 
     init(
         title: Binding<String>,
         price: Binding<String>,
         originalPrice: Binding<String>,
-        iconColor: Color = .secondary
+        iconColor: Color = .secondary,
+        showsTitle: Bool = true
     ) {
         self._title = title
         self._price = price
         self._originalPrice = originalPrice
         self.iconColor = iconColor
+        self.showsTitle = showsTitle
     }
 
     var body: some View {
-        PostFormSection(title: "物品信息") {
-            PostFormTextField(
-                icon: "tag",
-                iconColor: iconColor,
-                placeholder: "物品名称",
-                text: $title
+        PostFormSection(title: "物品信息", showsTitle: showsTitle) {
+            SecondhandItemNameField(
+                title: $title,
+                iconColor: iconColor
             )
+            SecondhandPriceFields(
+                price: $price,
+                originalPrice: $originalPrice,
+                iconColor: iconColor
+            )
+        }
+    }
+}
+
+struct SecondhandItemNameField: View {
+    @Binding var title: String
+    let iconColor: Color
+
+    var body: some View {
+        PostFormTextField(
+            icon: "tag",
+            iconColor: iconColor,
+            placeholder: "物品名称",
+            text: $title
+        )
+    }
+}
+
+struct SecondhandPriceFields: View {
+    @Binding var price: String
+    @Binding var originalPrice: String
+    let iconColor: Color
+
+    var body: some View {
+        Group {
             PostCurrencyPriceField(
                 label: "现价",
                 placeholder: "输入现价",
@@ -35,7 +66,7 @@ struct SecondhandBasicInfoSection: View {
             )
             PostCurrencyPriceField(
                 label: "原价",
-                placeholder: "选填",
+                placeholder: "",
                 iconColor: iconColor,
                 emphasis: .secondary,
                 text: $originalPrice
@@ -47,14 +78,20 @@ struct SecondhandBasicInfoSection: View {
 struct SecondhandConditionSection: View {
     @Binding var selection: String
     let accentColor: Color
+    let showsTitle: Bool
 
-    init(selection: Binding<String>, accentColor: Color = .orange) {
+    init(
+        selection: Binding<String>,
+        accentColor: Color = .orange,
+        showsTitle: Bool = true
+    ) {
         self._selection = selection
         self.accentColor = accentColor
+        self.showsTitle = showsTitle
     }
 
     var body: some View {
-        PostFormSection(title: "成色") {
+        PostFormSection(title: "成色", showsTitle: showsTitle) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(SecondhandPost.Condition.allCases, id: \.rawValue) { condition in
@@ -76,14 +113,20 @@ struct SecondhandConditionSection: View {
 struct SecondhandNegotiableSection: View {
     @Binding var isNegotiable: Bool
     let accentColor: Color
+    let showsTitle: Bool
 
-    init(isNegotiable: Binding<Bool>, accentColor: Color = .secondary) {
+    init(
+        isNegotiable: Binding<Bool>,
+        accentColor: Color = .secondary,
+        showsTitle: Bool = true
+    ) {
         self._isNegotiable = isNegotiable
         self.accentColor = accentColor
+        self.showsTitle = showsTitle
     }
 
     var body: some View {
-        PostFormSection(title: "交易设置") {
+        PostFormSection(title: "交易设置", showsTitle: showsTitle) {
             Toggle(isOn: $isNegotiable) {
                 HStack(spacing: 10) {
                     Image(systemName: "tag.circle")

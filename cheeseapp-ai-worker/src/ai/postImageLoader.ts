@@ -93,6 +93,32 @@ function base64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+function matchesMimeSignature(bytes: Uint8Array, mimeType: string): boolean {
+  if (mimeType === "image/jpeg") {
+    return (
+      bytes.length >= 3 &&
+      bytes[0] === 0xff &&
+      bytes[1] === 0xd8 &&
+      bytes[2] === 0xff
+    );
+  }
+  if (mimeType === "image/png") {
+    const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    return (
+      bytes.length >= signature.length &&
+      signature.every((value, index) => bytes[index] === value)
+    );
+  }
+  if (mimeType === "image/webp") {
+    return (
+      bytes.length >= 12 &&
+      String.fromCharCode(...bytes.subarray(0, 4)) === "RIFF" &&
+      String.fromCharCode(...bytes.subarray(8, 12)) === "WEBP"
+    );
+  }
+  return false;
+}
+
 export class SupabasePostImageLoader implements CheeseAIImageLoader {
   private readonly baseUrl: URL;
 
@@ -116,6 +142,10 @@ export class SupabasePostImageLoader implements CheeseAIImageLoader {
       try {
         const response = await this.fetcher(url, {
           headers: { Accept: "image/jpeg,image/png,image/webp" },
+          // workerd intentionally does not implement `redirect: "error"`.
+          // `manual` keeps the request on the validated Supabase origin; the
+          // response.ok check below rejects every redirect without following it.
+          redirect: "manual",
           signal: AbortSignal.timeout(5_000),
         });
         const mimeType = response.headers
@@ -127,7 +157,7 @@ export class SupabasePostImageLoader implements CheeseAIImageLoader {
           continue;
         }
         const bytes = await readBounded(response, MAX_TOTAL_BYTES - totalBytes);
-        if (!bytes || bytes.byteLength === 0) continue;
+        if (!bytes || !matchesMimeSignature(bytes, mimeType)) continue;
         totalBytes += bytes.byteLength;
         loaded.push({ mimeType, data: base64(bytes) });
       } catch {

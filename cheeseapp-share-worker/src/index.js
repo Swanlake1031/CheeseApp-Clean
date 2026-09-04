@@ -520,6 +520,7 @@ function html(markup, options = {}) {
     status,
     headers: {
       "Content-Type": "text/html; charset=UTF-8",
+      "Content-Language": "zh-CN",
       ...headers
     }
   });

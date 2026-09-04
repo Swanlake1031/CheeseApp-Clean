@@ -7,6 +7,22 @@ enum CheeseAIIdentity {
     )!
 }
 
+struct AnonymousAvatarView: View {
+    let size: CGFloat
+
+    var body: some View {
+        Circle()
+            .fill(AppColors.accentStrong)
+            .frame(width: size, height: size)
+            .overlay {
+                Image(systemName: "person.fill")
+                    .font(.system(size: size * 0.42, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .accessibilityHidden(true)
+    }
+}
+
 struct CheeseAIAvatarView: View {
     let remoteURLString: String?
     let size: CGFloat
@@ -256,6 +272,284 @@ struct AvatarCropView: View {
     }
 }
 
+struct CoverImageCropView: View {
+    let image: UIImage
+    let aspectRatio: CGFloat
+    let onCancel: () -> Void
+    let onConfirm: (UIImage) -> Void
+
+    private let previewImage: UIImage
+    @State private var zoom: CGFloat = 1.02
+    @State private var offset: CGSize = .zero
+    @State private var dragOriginOffset: CGSize?
+    @State private var magnificationOriginZoom: CGFloat?
+
+    private let minimumZoom: CGFloat = 1.02
+    private let maximumZoom: CGFloat = 4
+
+    init(
+        image: UIImage,
+        aspectRatio: CGFloat,
+        onCancel: @escaping () -> Void,
+        onConfirm: @escaping (UIImage) -> Void
+    ) {
+        self.image = image
+        self.aspectRatio = max(aspectRatio, 0.5)
+        self.onCancel = onCancel
+        self.onConfirm = onConfirm
+        previewImage = image.preparingThumbnail(
+            of: CGSize(width: 1_600, height: 1_600)
+        ) ?? image
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let availableWidth = max(proxy.size.width - 32, 240)
+            let availableHeight = max(proxy.size.height - 230, 220)
+            let widthForHeight = availableHeight * aspectRatio
+            let cropWidth = min(availableWidth, widthForHeight)
+            let cropSize = CGSize(
+                width: cropWidth,
+                height: cropWidth / aspectRatio
+            )
+
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    Spacer()
+
+                    cropCanvas(cropSize: cropSize)
+
+                    Text("拖动照片调整位置，双指缩放")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.68))
+                        .padding(.top, 18)
+
+                    Spacer()
+
+                    footer(cropSize: cropSize)
+                        .padding(.bottom, max(proxy.safeAreaInsets.bottom, 18))
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func cropCanvas(cropSize: CGSize) -> some View {
+        let renderedSize = CoverCropGeometry.renderedImageSize(
+            imageSize: previewImage.size,
+            cropSize: cropSize,
+            zoom: 1
+        )
+
+        return ZStack {
+            Color.black
+
+            Image(uiImage: previewImage)
+                .resizable()
+                .frame(width: renderedSize.width, height: renderedSize.height)
+                .scaleEffect(zoom)
+                .offset(offset)
+        }
+        .frame(width: cropSize.width, height: cropSize.height)
+        .clipped()
+        .overlay {
+            Rectangle()
+                .stroke(.white.opacity(0.9), lineWidth: 1.5)
+                .allowsHitTesting(false)
+        }
+        .contentShape(Rectangle())
+        .gesture(dragGesture(cropSize: cropSize))
+        .simultaneousGesture(magnificationGesture(cropSize: cropSize))
+    }
+
+    private func footer(cropSize: CGSize) -> some View {
+        HStack {
+            Button(action: onCancel) {
+                Text("取消")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 64, minHeight: 48)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Button {
+                let settledZoom = min(max(zoom, minimumZoom), maximumZoom)
+                let settledOffset = CoverCropGeometry.constrainedOffset(
+                    offset,
+                    imageSize: image.size,
+                    cropSize: cropSize,
+                    zoom: settledZoom
+                )
+                let croppedImage = CoverCropRenderer.render(
+                    image: image,
+                    cropSize: cropSize,
+                    zoom: settledZoom,
+                    offset: settledOffset
+                )
+                onConfirm(croppedImage)
+            } label: {
+                Text("保存")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(minWidth: 92, minHeight: 48)
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .background(AppColors.accent, in: Capsule())
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private func dragGesture(cropSize: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                if dragOriginOffset == nil {
+                    dragOriginOffset = offset
+                }
+                guard let dragOriginOffset else { return }
+
+                offset = CoverCropGeometry.constrainedOffset(
+                    CGSize(
+                        width: dragOriginOffset.width + value.translation.width,
+                        height: dragOriginOffset.height + value.translation.height
+                    ),
+                    imageSize: image.size,
+                    cropSize: cropSize,
+                    zoom: zoom
+                )
+            }
+            .onEnded { value in
+                let origin = dragOriginOffset ?? offset
+                offset = CoverCropGeometry.constrainedOffset(
+                    CGSize(
+                        width: origin.width + value.translation.width,
+                        height: origin.height + value.translation.height
+                    ),
+                    imageSize: image.size,
+                    cropSize: cropSize,
+                    zoom: zoom
+                )
+                dragOriginOffset = nil
+            }
+    }
+
+    private func magnificationGesture(cropSize: CGSize) -> some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                if magnificationOriginZoom == nil {
+                    magnificationOriginZoom = zoom
+                }
+                guard let magnificationOriginZoom else { return }
+
+                let nextZoom = min(
+                    max(magnificationOriginZoom * value, minimumZoom),
+                    maximumZoom
+                )
+                zoom = nextZoom
+                offset = CoverCropGeometry.constrainedOffset(
+                    offset,
+                    imageSize: image.size,
+                    cropSize: cropSize,
+                    zoom: nextZoom
+                )
+            }
+            .onEnded { value in
+                let origin = magnificationOriginZoom ?? zoom
+                let settledZoom = min(max(origin * value, minimumZoom), maximumZoom)
+                zoom = settledZoom
+                offset = CoverCropGeometry.constrainedOffset(
+                    offset,
+                    imageSize: image.size,
+                    cropSize: cropSize,
+                    zoom: settledZoom
+                )
+                magnificationOriginZoom = nil
+            }
+    }
+}
+
+private enum CoverCropGeometry {
+    static func renderedImageSize(
+        imageSize: CGSize,
+        cropSize: CGSize,
+        zoom: CGFloat
+    ) -> CGSize {
+        guard imageSize.width > 0, imageSize.height > 0 else {
+            return cropSize
+        }
+
+        let aspectFillScale = max(
+            cropSize.width / imageSize.width,
+            cropSize.height / imageSize.height
+        )
+        return CGSize(
+            width: imageSize.width * aspectFillScale * zoom,
+            height: imageSize.height * aspectFillScale * zoom
+        )
+    }
+
+    static func constrainedOffset(
+        _ proposedOffset: CGSize,
+        imageSize: CGSize,
+        cropSize: CGSize,
+        zoom: CGFloat
+    ) -> CGSize {
+        let renderedSize = renderedImageSize(
+            imageSize: imageSize,
+            cropSize: cropSize,
+            zoom: zoom
+        )
+        let maximumX = max((renderedSize.width - cropSize.width) / 2, 0)
+        let maximumY = max((renderedSize.height - cropSize.height) / 2, 0)
+
+        return CGSize(
+            width: min(max(proposedOffset.width, -maximumX), maximumX),
+            height: min(max(proposedOffset.height, -maximumY), maximumY)
+        )
+    }
+}
+
+private enum CoverCropRenderer {
+    static func render(
+        image: UIImage,
+        cropSize: CGSize,
+        zoom: CGFloat,
+        offset: CGSize,
+        outputWidth: CGFloat = 1_600
+    ) -> UIImage {
+        let renderedSize = CoverCropGeometry.renderedImageSize(
+            imageSize: image.size,
+            cropSize: cropSize,
+            zoom: zoom
+        )
+        let scale = outputWidth / cropSize.width
+        let outputSize = CGSize(
+            width: outputWidth,
+            height: cropSize.height * scale
+        )
+        let drawRect = CGRect(
+            x: ((cropSize.width - renderedSize.width) / 2 + offset.width) * scale,
+            y: ((cropSize.height - renderedSize.height) / 2 + offset.height) * scale,
+            width: renderedSize.width * scale,
+            height: renderedSize.height * scale
+        )
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+
+        return UIGraphicsImageRenderer(size: outputSize, format: format).image { context in
+            UIColor.black.setFill()
+            context.cgContext.fill(CGRect(origin: .zero, size: outputSize))
+            image.draw(in: drawRect)
+        }
+    }
+}
+
 private enum AvatarCropGeometry {
     static func renderedImageSize(
         imageSize: CGSize,
@@ -466,22 +760,40 @@ struct OfficialAccountAvatar: View {
 }
 
 struct OfficialVerificationBadge: View {
+    enum Style {
+        case icon
+        case label
+    }
+
+    var style: Style = .label
+
     var body: some View {
         HStack(spacing: 3) {
             Text("🧀")
-                .font(.system(size: 12))
-            Text(L10n.tr("Official", "官方帳號"))
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(AppColors.textPrimary)
+                .font(.system(size: style == .label ? 12 : 14))
+
+            if style == .label {
+                Text(L10n.tr("Cheese Official", "奶酪官方"))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+            }
         }
-            .padding(.horizontal, 7)
-            .frame(height: 22)
-            .background(AppColors.accent.opacity(0.2), in: Capsule())
-            .overlay {
+        .padding(.horizontal, style == .label ? 7 : 0)
+        .frame(height: style == .label ? 22 : nil)
+        .background {
+            if style == .label {
+                Capsule().fill(AppColors.accent.opacity(0.2))
+            }
+        }
+        .overlay {
+            if style == .label {
                 Capsule()
                     .stroke(AppColors.accentStrong.opacity(0.28), lineWidth: 1)
             }
-            .accessibilityLabel(Text(L10n.tr("Verified official account", "官方认证账号")))
+        }
+        .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(L10n.tr("Cheese Official", "奶酪官方")))
     }
 }
 

@@ -1,10 +1,26 @@
 import Foundation
 
-enum CourseSubject: String, CaseIterable, Codable, Hashable {
-    case math = "MATH"
-    case stats = "STATS"
-    case econ = "ECON"
-    case commerce = "COMMERCE"
+struct CourseSubject: RawRepresentable, Codable, Hashable {
+    let rawValue: String
+
+    init(rawValue: String) {
+        self.rawValue = rawValue
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        rawValue = try container.decode(String.self)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
+    static let math = CourseSubject(rawValue: "MATH")
+    static let stats = CourseSubject(rawValue: "STATS")
+    static let econ = CourseSubject(rawValue: "ECON")
+    static let commerce = CourseSubject(rawValue: "COMMERCE")
 }
 
 enum CourseYearLevel: Int, CaseIterable, Codable, Hashable {

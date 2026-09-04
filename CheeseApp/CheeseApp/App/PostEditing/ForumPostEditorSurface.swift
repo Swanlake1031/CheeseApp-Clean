@@ -14,6 +14,7 @@ struct ForumPostEditorSurface: View {
     let isEditing: Bool
     let boards: [ForumBoard]
     @Binding var selectedBoardID: UUID?
+    @Binding var isAnonymous: Bool
     @Binding var title: String
     @Binding var content: String
     @Binding var selectedImages: [UIImage]
@@ -113,14 +114,15 @@ struct ForumPostEditorSurface: View {
                     Button {
                         onBoardSelected(board)
                     } label: {
-                        Label(board.name, systemImage: board.icon)
+                        Text("# \(board.name)")
                     }
                 }
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: selectedBoard?.icon ?? "square.grid.2x2")
-                        .foregroundStyle(AppColors.accentStrong)
-                    Text(selectedBoard?.name ?? "选择板块")
+                    Text(
+                        selectedBoard.map { "# \($0.name)" }
+                            ?? L10n.tr("Choose Tag", "选择标签")
+                    )
                         .font(.system(size: 15, weight: .semibold))
                         .lineLimit(1)
                     Image(systemName: "chevron.down")
@@ -190,14 +192,14 @@ struct ForumPostEditorSurface: View {
         ZStack(alignment: .topLeading) {
             if content.isEmpty {
                 Text("正文")
-                    .font(.system(size: 18))
+                    .font(.system(size: 16))
                     .foregroundStyle(AppColors.textMuted)
                     .allowsHitTesting(false)
             }
             AutoFocusTextEditor(
                 text: $content,
                 isFirstResponder: $isContentFocused,
-                fontSize: 18
+                fontSize: 16
             )
             .frame(minHeight: 300)
         }
@@ -218,6 +220,7 @@ struct ForumPostEditorSurface: View {
                                     Color(.systemGray5)
                                 }
                             }
+                            .tappableImagePreview(image.url)
                         } onRemove: {
                             existingImages.removeAll { $0.id == image.id }
                         }
@@ -226,6 +229,7 @@ struct ForumPostEditorSurface: View {
                     ForEach(Array(selectedImages.enumerated()), id: \.offset) { index, image in
                         removableImage {
                             Image(uiImage: image).resizable().scaledToFill()
+                                .tappableImagePreview(image)
                         } onRemove: {
                             selectedImages.remove(at: index)
                         }
@@ -241,20 +245,8 @@ struct ForumPostEditorSurface: View {
         @ViewBuilder content: () -> Content,
         onRemove: @escaping () -> Void
     ) -> some View {
-        ZStack(alignment: .topTrailing) {
+        RemovablePostImageThumbnail(onRemove: onRemove) {
             content()
-                .frame(width: 84, height: 84)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            Button(action: onRemove) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 22, height: 22)
-                    .background(Color.black.opacity(0.72))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .offset(x: 7, y: -7)
         }
     }
 
@@ -276,11 +268,34 @@ struct ForumPostEditorSurface: View {
                     }
                 } label: {
                     Image(systemName: "square.and.pencil")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(AppColors.textPrimary)
                         .frame(width: 44, height: 44)
                 }
             }
+
+            Toggle(isOn: $isAnonymous) {
+                HStack(spacing: 4) {
+                    Image(systemName: isAnonymous ? "theatermasks.fill" : "theatermasks")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .frame(width: 44, height: 44)
+
+                    Text(L10n.tr("Anonymous", "匿名"))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppColors.textPrimary)
+                }
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .tint(AppColors.accentStrong)
+            .fixedSize()
+            .accessibilityLabel(
+                isAnonymous
+                    ? L10n.tr("Posting anonymously", "已选择匿名发布")
+                    : L10n.tr("Post anonymously", "匿名发布")
+            )
+            .accessibilityAddTraits(isAnonymous ? .isSelected : [])
 
             Spacer()
 

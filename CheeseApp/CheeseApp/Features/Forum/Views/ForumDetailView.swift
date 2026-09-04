@@ -47,6 +47,7 @@ struct ForumDetailView: View {
     @State private var suppressReplyTargetActivationForCurrentTap = false
     @State private var suppressOutsideComposerDismissForCurrentTap = false
     @State private var highlightedCommentID: UUID?
+    @State private var pendingCommentReturnID: UUID?
     @State private var stopCommentObservation: (() -> Void)?
     @State private var isReconcilingRealtimeComments = false
     @State private var needsRealtimeCommentReconcile = false
@@ -100,6 +101,9 @@ struct ForumDetailView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
                     .padding(.bottom, 12)
+                }
+                .onAppear {
+                    Task { await restoreCommentAfterProfileNavigation(using: proxy) }
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .simultaneousGesture(
@@ -253,7 +257,7 @@ struct ForumDetailView: View {
             merged.isLiked = interaction.isLiked
             merged.likes = interaction.likeCount
             merged.views = max(merged.views, post.views)
-            merged.comments = max(merged.comments, post.comments)
+            merged.comments = renderedCommentCount ?? merged.comments
             post = merged
         }
         .onChange(of: authService.currentUser?.id) { _, _ in
@@ -272,13 +276,18 @@ struct ForumDetailView: View {
     private var postHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Label(post.boardName, systemImage: post.boardIcon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(AppColors.textMuted)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color(.systemGray6))
-                    .clipShape(Capsule())
+                NavigationLink {
+                    ForumBoardView(boardID: post.boardID)
+                } label: {
+                    ForumHashtagChip(name: post.boardName)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    L10n.tr(
+                        "Open #\(post.boardName) hashtag",
+                        "查看 #\(post.boardName) Hashtag"
+                    )
+                )
 
                 if post.isPinned {
                     Label(L10n.tr("Pinned", "置顶"), systemImage: "pin.fill")
@@ -295,7 +304,10 @@ struct ForumDetailView: View {
 
             if let authorId = post.authorId, !post.isAnonymous {
                 NavigationLink {
-                    UserPostsView(userId: authorId)
+                    UserPostsView(
+                        userId: authorId,
+                        redirectsCurrentUserToProfileTab: false
+                    )
                 } label: {
                     HStack(spacing: 10) {
                         detailAuthorAvatar(size: 32)
@@ -313,14 +325,7 @@ struct ForumDetailView: View {
                 .buttonStyle(.plain)
             } else {
                 HStack(spacing: 10) {
-                    Circle()
-                        .fill(Color(.systemGray4))
-                        .frame(width: 32, height: 32)
-                        .overlay {
-                            Image(systemName: "theatermasks.fill")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.white)
-                        }
+                    AnonymousAvatarView(size: 32)
 
                     Text(L10n.tr("Anonymous", "匿名"))
                         .font(.system(size: 14, weight: .medium))
@@ -775,11 +780,19 @@ struct ForumDetailView: View {
             commentAvatarView(comment, size: size)
         } else {
             NavigationLink {
-                UserPostsView(userId: comment.userId)
+                UserPostsView(
+                    userId: comment.userId,
+                    redirectsCurrentUserToProfileTab: false
+                )
             } label: {
                 commentAvatarView(comment, size: size)
             }
             .buttonStyle(.plain)
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    pendingCommentReturnID = comment.id
+                }
+            )
             .accessibilityLabel("查看 \(comment.authorName) 的个人资料")
         }
     }
@@ -790,11 +803,19 @@ struct ForumDetailView: View {
             commentAuthorNameLabel(comment)
         } else {
             NavigationLink {
-                UserPostsView(userId: comment.userId)
+                UserPostsView(
+                    userId: comment.userId,
+                    redirectsCurrentUserToProfileTab: false
+                )
             } label: {
                 commentAuthorNameLabel(comment)
             }
             .buttonStyle(.plain)
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    pendingCommentReturnID = comment.id
+                }
+            )
             .accessibilityLabel("查看 \(comment.authorName) 的个人资料")
         }
     }
@@ -809,13 +830,7 @@ struct ForumDetailView: View {
     private func commentAvatarView(_ comment: ForumCommentItem, size: CGFloat) -> some View {
         Group {
             if comment.isAnonymous {
-                Circle()
-                    .fill(Color(.systemGray4))
-                    .overlay {
-                        Image(systemName: "theatermasks.fill")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.white)
-                    }
+                AnonymousAvatarView(size: size)
             } else if comment.isAuthorDeactivated {
                 Circle()
                     .fill(Color(.systemGray4))
@@ -1256,7 +1271,10 @@ struct ForumDetailView: View {
             let latestLikedCommentIds = await service.fetchLikedCommentIds(
                 commentIds: latestComments.map(\.id)
             )
-            post = mergedDetailPost(from: latestPost)
+            post = mergedDetailPost(
+                from: latestPost,
+                resolvedCommentCount: latestComments.count
+            )
             comments = latestComments
             likedCommentIds = latestLikedCommentIds
             commentLikeCountOverrides.removeAll()
@@ -1329,7 +1347,19 @@ struct ForumDetailView: View {
         } while needsRealtimeCommentReconcile
     }
 
-    private func mergedDetailPost(from fetched: ForumPostItem) -> ForumPostItem {
+    private var renderedCommentCount: Int? {
+        switch commentLoadState {
+        case .empty, .loaded:
+            return comments.count
+        case .unresolved, .initialLoading, .error:
+            return nil
+        }
+    }
+
+    private func mergedDetailPost(
+        from fetched: ForumPostItem,
+        resolvedCommentCount: Int? = nil
+    ) -> ForumPostItem {
         let local = service.posts.first(where: { $0.id == fetched.id })
         var merged = fetched
         let resolvedInteraction = interactionStore.state(
@@ -1340,9 +1370,8 @@ struct ForumDetailView: View {
         merged.likes = resolvedInteraction.likeCount
         merged.isLiked = resolvedInteraction.isLiked
         let localViews = local?.views ?? 0
-        let localComments = local?.comments ?? 0
         merged.views = max(fetched.views, max(localViews, post.views))
-        merged.comments = max(fetched.comments, max(localComments, post.comments))
+        merged.comments = resolvedCommentCount ?? renderedCommentCount ?? fetched.comments
         return merged
     }
 
@@ -1483,12 +1512,10 @@ struct ForumDetailView: View {
             }
             comments = try await service.fetchComments(postId: post.id)
             commentLoadState = comments.isEmpty ? .empty : .loaded
+            post.comments = comments.count
             let validRootIds = Set(buildRootCommentIdMap(from: comments).values)
             collapsedRootCommentIds = collapsedRootCommentIds.intersection(validRootIds)
             expandedRootCommentIds = expandedRootCommentIds.intersection(validRootIds)
-            if let updated = service.posts.first(where: { $0.id == post.id }) {
-                post.comments = updated.comments
-            }
             errorMessage = nil
         } catch {
             if let replyTargetBeforeSubmit {
@@ -1636,6 +1663,33 @@ struct ForumDetailView: View {
         }
 
         guard highlightedCommentID == initialCommentID else { return }
+        withAnimation(.easeOut(duration: 0.15)) {
+            highlightedCommentID = nil
+        }
+    }
+
+    @MainActor
+    private func restoreCommentAfterProfileNavigation(
+        using proxy: ScrollViewProxy
+    ) async {
+        guard let commentID = pendingCommentReturnID,
+              comments.contains(where: { $0.id == commentID })
+        else { return }
+
+        pendingCommentReturnID = nil
+        let rootID = rootCommentId(for: commentID)
+        collapsedRootCommentIds.remove(rootID)
+        expandedRootCommentIds.insert(rootID)
+        highlightedCommentID = commentID
+        await Task.yield()
+
+        for delay in [UInt64(40_000_000), 140_000_000, 280_000_000] {
+            try? await Task.sleep(nanoseconds: delay)
+            proxy.scrollTo(commentScrollId(for: commentID), anchor: .center)
+        }
+
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        guard highlightedCommentID == commentID else { return }
         withAnimation(.easeOut(duration: 0.15)) {
             highlightedCommentID = nil
         }

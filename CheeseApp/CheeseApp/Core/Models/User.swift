@@ -17,6 +17,7 @@ struct Profile: Codable, Identifiable {
     let email: String?
     var fullName: String?
     var avatarUrl: String?
+    var coverImageUrl: String?
     var school: String?
     var schoolId: UUID?
     var campusId: UUID?
@@ -44,6 +45,7 @@ struct Profile: Codable, Identifiable {
         case publicID = "public_uid"
         case fullName = "full_name"
         case avatarUrl = "avatar_url"
+        case coverImageUrl = "cover_image_url"
         case school = "university"
         case schoolId = "school_id"
         case campusId = "campus_id"

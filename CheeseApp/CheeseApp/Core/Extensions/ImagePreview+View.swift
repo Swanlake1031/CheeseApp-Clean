@@ -165,6 +165,25 @@ private struct TapToPreviewImageGalleryModifier: ViewModifier {
     }
 }
 
+private struct TapToPreviewLocalImageModifier: ViewModifier {
+    let image: UIImage
+    @State private var showingPreview = false
+
+    func body(content: Content) -> some View {
+        Button {
+            showingPreview = true
+        } label: {
+            content
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .fullScreenCover(isPresented: $showingPreview) {
+            LocalImagePreviewView(image: image)
+                .presentationBackground(.clear)
+        }
+    }
+}
+
 private struct RemoteImageGalleryPreviewView: View {
     let imageURLs: [URL]
     @Environment(\.dismiss) private var dismiss
@@ -535,14 +554,37 @@ enum DetailMediaPagingPolicy {
 struct DetailMediaCarousel: View {
     let urlStrings: [String]
     let metrics: DetailMediaMetrics
+    let remoteImagePurpose: RemoteImagePurpose
+    let loadsAdjacentPagesOnly: Bool
 
     @State private var currentIndex = 0
     @State private var previewInitialIndex = 0
     @State private var showingPreview = false
     @State private var resolvedFirstImageRatio: ResolvedFirstImageRatio?
 
-    private var imageItems: [URL] {
+    init(
+        urlStrings: [String],
+        metrics: DetailMediaMetrics,
+        remoteImagePurpose: RemoteImagePurpose = .original,
+        loadsAdjacentPagesOnly: Bool = false
+    ) {
+        self.urlStrings = urlStrings
+        self.metrics = metrics
+        self.remoteImagePurpose = remoteImagePurpose
+        self.loadsAdjacentPagesOnly = loadsAdjacentPagesOnly
+    }
+
+    private var originalImageItems: [URL] {
         urlStrings.compactMap(URL.init(string:))
+    }
+
+    private var imageItems: [URL] {
+        originalImageItems.map {
+            SupabasePublicImageURLResolver.url(
+                from: $0,
+                purpose: remoteImagePurpose
+            )
+        }
     }
 
     private var firstImageURL: URL? {
@@ -581,8 +623,15 @@ struct DetailMediaCarousel: View {
             } else {
                 TabView(selection: $currentIndex) {
                     ForEach(Array(items.enumerated()), id: \.offset) { index, url in
-                        page(url: url, index: index, imageCount: items.count)
-                            .tag(index)
+                        Group {
+                            if loadsAdjacentPagesOnly,
+                               abs(index - currentIndex) > 1 {
+                                detailPlaceholder
+                            } else {
+                                page(url: url, index: index, imageCount: items.count)
+                            }
+                        }
+                        .tag(index)
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
@@ -629,7 +678,7 @@ struct DetailMediaCarousel: View {
         // image phase. This prevents the first tap from being dismissed when a
         // placeholder is replaced by the downloaded image.
         .fullScreenCover(isPresented: $showingPreview) {
-            let urls = imageItems
+            let urls = originalImageItems
             if urls.count == 1, let imageURL = urls.first {
                 RemoteImagePreviewView(imageURL: imageURL)
                     .presentationBackground(.clear)
@@ -754,6 +803,7 @@ private struct DetailMediaPage: View {
             CachedRemoteImage(
                 url: url,
                 targetPixelWidth: targetPixelWidth,
+                showsRetryButton: true,
                 onImageLoaded: onImageLoaded
             ) { image in
                 image
@@ -777,7 +827,11 @@ private struct RemoteImagePreviewView: View {
 
     var body: some View {
         InteractiveImagePreviewView {
-            CachedRemoteImage(url: imageURL) { image in
+            CachedRemoteImage(
+                url: imageURL,
+                targetPixelWidth: RemoteImagePurpose.original.targetPixelWidth,
+                showsRetryButton: true
+            ) { image in
                 image
                     .resizable()
                     .scaledToFit()
@@ -1134,5 +1188,9 @@ extension View {
                 requestedInitialIndex: initialIndex
             )
         )
+    }
+
+    func tappableImagePreview(_ image: UIImage) -> some View {
+        modifier(TapToPreviewLocalImageModifier(image: image))
     }
 }

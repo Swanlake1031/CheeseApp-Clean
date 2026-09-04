@@ -23,6 +23,7 @@ struct CreateForumView: View {
     var autoRestoreDraft: Bool
     var onCreated: (() -> Void)?
     var onExit: (() -> Void)?
+    var onBusyChanged: ((Bool) -> Void)?
 
     @State private var title = ""
     @State private var content = ""
@@ -41,17 +42,20 @@ struct CreateForumView: View {
     @State private var publishRequestID = UUID()
     @State private var isTitleFocused = false
     @State private var isContentFocused = false
+    @State private var hasFinishedCreateFlow = false
 
     init(
         initialBoard: ForumBoard? = nil,
         autoRestoreDraft: Bool = false,
         onCreated: (() -> Void)? = nil,
-        onExit: (() -> Void)? = nil
+        onExit: (() -> Void)? = nil,
+        onBusyChanged: ((Bool) -> Void)? = nil
     ) {
         self.initialBoard = initialBoard
         self.autoRestoreDraft = autoRestoreDraft
         self.onCreated = onCreated
         self.onExit = onExit
+        self.onBusyChanged = onBusyChanged
         _selectedBoardID = State(initialValue: initialBoard?.id)
     }
 
@@ -65,6 +69,7 @@ struct CreateForumView: View {
             isEditing: false,
             boards: service.boards,
             selectedBoardID: $selectedBoardID,
+            isAnonymous: $isAnonymous,
             title: $title,
             content: $content,
             selectedImages: $selectedImages,
@@ -80,30 +85,27 @@ struct CreateForumView: View {
             onSubmit: attemptSubmit,
             onSaveDraft: {
                 saveDraft(showBanner: false)
-                finishExitNavigation()
+                finishExitNavigation(preservingDraft: true)
             },
             onRestoreDraft: { restoreDraft(showBanner: true) },
             onClearDraft: {
                 CreateDraftStore.clear(.forum)
+                CreateComposerSessionStore.clear(.forum)
                 showDraftBanner(L10n.tr("Draft cleared", "草稿已清空"))
             },
             onBoardSelected: { board in
                 selectedBoardID = board.id
                 errorMessage = nil
-                normalizeAnonymousChoice(
-                    for: board,
-                    showAutomaticAnonymousBanner: board.requiresAnonymousPosts
-                )
             }
         )
         .alert(L10n.tr("Post not published", "帖子尚未发布"), isPresented: $showExitDraftPrompt) {
             Button(L10n.tr("Cancel", "取消"), role: .cancel) {}
             Button(L10n.tr("Discard", "不保存"), role: .destructive) {
-                finishExitNavigation()
+                finishExitNavigation(preservingDraft: false)
             }
             Button(L10n.tr("Save as draft", "存为草稿")) {
                 saveDraft(showBanner: false)
-                finishExitNavigation()
+                finishExitNavigation(preservingDraft: true)
             }
         } message: {
             Text(L10n.tr("Save as draft?", "是否存为草稿"))
@@ -126,8 +128,9 @@ struct CreateForumView: View {
             hasInitialized = true
             if autoRestoreDraft {
                 restoreDraft(showBanner: true)
+            } else {
+                isAnonymous = AuthService.shared.currentUser?.isAnonymousDefault ?? false
             }
-            normalizeAnonymousChoice()
 
             try? await Task.sleep(nanoseconds: 160_000_000)
             guard !Task.isCancelled else { return }
@@ -145,30 +148,18 @@ struct CreateForumView: View {
             guard isFocused else { return }
             isTitleFocused = false
         }
+        .onChange(of: isLoading) { _, isBusy in
+            onBusyChanged?(isBusy)
+        }
+        .onDisappear {
+            preserveInterruptedDraftIfNeeded()
+        }
         .interceptSwipeBack(when: hasDraftableContent, onAttempt: attemptClose)
     }
 
     private func dismissKeyboard() {
         isTitleFocused = false
         isContentFocused = false
-    }
-
-    private func normalizeAnonymousChoice(
-        for resolvedBoard: ForumBoard? = nil,
-        showAutomaticAnonymousBanner: Bool = false
-    ) {
-        guard let board = resolvedBoard ?? selectedBoard else {
-            isAnonymous = false
-            return
-        }
-        if board.requiresAnonymousPosts {
-            isAnonymous = true
-            if showAutomaticAnonymousBanner {
-                showDraftBanner("匿名板块已自动匿名", duration: 2)
-            }
-        } else {
-            isAnonymous = false
-        }
     }
 
     private func attemptSubmit() {
@@ -182,7 +173,7 @@ struct CreateForumView: View {
         }
 
         guard selectedBoard != nil else {
-            presentValidationMessage(L10n.tr("Please choose a board", "请选择板块"))
+            presentValidationMessage(L10n.tr("Please choose a Hashtag", "请选择 Hashtag"))
             return
         }
 
@@ -205,7 +196,7 @@ struct CreateForumView: View {
             return
         }
         guard let board = selectedBoard else {
-            presentValidationMessage(L10n.tr("Please choose a board", "请选择板块"))
+            presentValidationMessage(L10n.tr("Please choose a Hashtag", "请选择 Hashtag"))
             return
         }
 
@@ -226,7 +217,7 @@ struct CreateForumView: View {
                     schoolId: schoolID,
                     title: trimmedTitle,
                     content: content.trimmingCharacters(in: .whitespacesAndNewlines),
-                    isAnonymous: board.requiresAnonymousPosts || isAnonymous,
+                    isAnonymous: isAnonymous,
                     isPrivate: isPrivate,
                     boardID: board.id,
                     mentionedUserIDs: MentionTextLogic.activeUserIDs(
@@ -245,6 +236,8 @@ struct CreateForumView: View {
                 postId: publishedID,
                 change: .created
             )
+            hasFinishedCreateFlow = true
+            CreateComposerSessionStore.clear(.forum)
             onCreated?()
             if onCreated == nil { dismiss() }
         } catch {
@@ -266,6 +259,7 @@ struct CreateForumView: View {
             subtitle: selectedBoard?.name,
             payload: payload
         )
+        CreateComposerSessionStore.save(images: selectedImages, for: .forum)
         if showBanner { showDraftBanner(L10n.tr("Draft saved", "草稿已保存")) }
     }
 
@@ -276,7 +270,7 @@ struct CreateForumView: View {
         selectedBoardID = payload.boardID ?? initialBoard?.id
         isAnonymous = payload.isAnonymous
         isPrivate = payload.isPrivate ?? false
-        normalizeAnonymousChoice()
+        selectedImages = CreateComposerSessionStore.images(for: .forum)
         if showBanner { showDraftBanner(L10n.tr("Draft restored", "草稿已恢复")) }
     }
 
@@ -294,16 +288,27 @@ struct CreateForumView: View {
         if hasDraftableContent {
             showExitDraftPrompt = true
         } else {
-            finishExitNavigation()
+            finishExitNavigation(preservingDraft: false)
         }
     }
 
-    private func finishExitNavigation() {
+    private func finishExitNavigation(preservingDraft: Bool) {
+        hasFinishedCreateFlow = true
+        if preservingDraft {
+            CreateComposerSessionStore.markResumable(.forum)
+        }
         if let onExit {
             onExit()
         } else {
             dismiss()
         }
+    }
+
+    private func preserveInterruptedDraftIfNeeded() {
+        guard !hasFinishedCreateFlow, hasDraftableContent, !isLoading else {
+            return
+        }
+        saveDraft(showBanner: false)
     }
 
     private func showDraftBanner(

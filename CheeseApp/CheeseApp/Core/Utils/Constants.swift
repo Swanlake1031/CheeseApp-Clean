@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import UIKit
 
 enum AppExternalLinks {
     static let courseRadar = URL(string: "https://radar.cheeseapp.org")!
@@ -227,5 +228,38 @@ enum CreateDraftStore {
 
     private static func storageKey(for kind: PostKind) -> String {
         "create_post_draft_\(kind.rawValue)"
+    }
+}
+
+/// Keeps selected draft media alive while the app is running. Text fields are
+/// persisted by `CreateDraftStore`; UIKit images stay in memory so dismissing a
+/// quick composer sheet and reopening it does not drop the current selection.
+@MainActor
+enum CreateComposerSessionStore {
+    private static var imagesByKind: [PostKind: [UIImage]] = [:]
+    private(set) static var resumableKind: PostKind?
+
+    static func save(images: [UIImage], for kind: PostKind) {
+        if images.isEmpty {
+            imagesByKind.removeValue(forKey: kind)
+        } else {
+            imagesByKind[kind] = images
+        }
+        resumableKind = kind
+    }
+
+    static func images(for kind: PostKind) -> [UIImage] {
+        imagesByKind[kind] ?? []
+    }
+
+    static func markResumable(_ kind: PostKind) {
+        resumableKind = kind
+    }
+
+    static func clear(_ kind: PostKind) {
+        imagesByKind.removeValue(forKey: kind)
+        if resumableKind == kind {
+            resumableKind = nil
+        }
     }
 }
