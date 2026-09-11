@@ -123,23 +123,32 @@ final class PostCorrectnessTests: XCTestCase {
     }
 
     func testTransparentPostImageStaysWithinModerationRequestLimit() async throws {
-        let width = 1_600
-        let height = 1_600
+        let width = 1_700
+        let height = 1_700
         let bytesPerRow = width * 4
         var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
         var entropy: UInt32 = 0x51A7_9EED
         for offset in stride(from: 0, to: pixels.count, by: 4) {
             entropy = entropy &* 1_664_525 &+ 1_013_904_223
-            pixels[offset] = UInt8(truncatingIfNeeded: entropy)
+            let red = UInt8(truncatingIfNeeded: entropy >> 8)
             entropy = entropy &* 1_664_525 &+ 1_013_904_223
-            pixels[offset + 1] = UInt8(truncatingIfNeeded: entropy)
+            let green = UInt8(truncatingIfNeeded: entropy >> 8)
             entropy = entropy &* 1_664_525 &+ 1_013_904_223
-            pixels[offset + 2] = UInt8(truncatingIfNeeded: entropy)
-            pixels[offset + 3] = offset.isMultiple(of: 32) ? 0 : 255
+            let blue = UInt8(truncatingIfNeeded: entropy >> 8)
+            let alpha: UInt8 = offset.isMultiple(of: 32) ? 0 : 255
+
+            // The test data uses premultiplied RGBA. Fully transparent pixels
+            // must therefore not retain non-zero color components.
+            pixels[offset] = alpha == 0 ? 0 : red
+            pixels[offset + 1] = alpha == 0 ? 0 : green
+            pixels[offset + 2] = alpha == 0 ? 0 : blue
+            pixels[offset + 3] = alpha
         }
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
-        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue)
-        let image: UIImage = try pixels.withUnsafeMutableBytes { rawBuffer in
+        let bitmapInfo = CGBitmapInfo(rawValue:
+            CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+        let sourcePNGData: Data = try pixels.withUnsafeMutableBytes { rawBuffer in
             guard let context = CGContext(
                 data: rawBuffer.baseAddress,
                 width: width,
@@ -148,12 +157,14 @@ final class PostCorrectnessTests: XCTestCase {
                 bytesPerRow: bytesPerRow,
                 space: colorSpace,
                 bitmapInfo: bitmapInfo.rawValue
-            ), let cgImage = context.makeImage() else {
+            ), let cgImage = context.makeImage(),
+            let data = UIImage(cgImage: cgImage).pngData() else {
                 throw NSError(domain: "PostCorrectnessTests", code: 1)
             }
-            return UIImage(cgImage: cgImage)
+            return data
         }
-        XCTAssertGreaterThan(image.pngData()!.count, 8 * 1024 * 1024)
+        XCTAssertGreaterThan(sourcePNGData.count, 8 * 1024 * 1024)
+        let image = try XCTUnwrap(UIImage(data: sourcePNGData))
 
         let prepared = try await ImageUploadService.shared.preparePostImageForUpload(image)
 

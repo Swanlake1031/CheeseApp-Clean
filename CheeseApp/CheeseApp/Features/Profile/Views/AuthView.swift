@@ -80,6 +80,7 @@ struct AuthView: View {
     @State private var activeSocialProvider: SocialProvider?
     @State private var recentAccountPendingRemoval: RecentLoginAccount?
     @State private var launchAnnouncement: AppLaunchAnnouncement?
+    @State private var isPasswordResetPresented = false
 
     private enum SocialProvider {
         case apple
@@ -159,6 +160,10 @@ struct AuthView: View {
             }
         } message: { announcement in
             Text(announcement.localizedMessage)
+        }
+        .sheet(isPresented: $isPasswordResetPresented) {
+            PasswordResetSheet(initialEmail: email)
+                .environmentObject(authService)
         }
         .task {
             await loadLaunchAnnouncement()
@@ -278,11 +283,14 @@ struct AuthView: View {
             if isLogin {
                 HStack {
                     Spacer()
-                    Button(action: { }) {
+                    Button {
+                        isPasswordResetPresented = true
+                    } label: {
                         Text(L10n.tr("Forgot Password?", "忘记密码？"))
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(AppColors.link)
                     }
+                    .accessibilityHint(L10n.tr("Open the password reset form", "打开密码重置表单"))
                 }
             }
             
@@ -609,6 +617,148 @@ struct AuthView: View {
             return "Apple登录"
         case .password:
             return "使用"
+        }
+    }
+}
+
+enum PasswordResetFormPolicy {
+    static func normalizedEmail(_ rawValue: String) -> String? {
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.count <= 254,
+              !value.isEmpty,
+              !value.contains(where: { $0.isWhitespace }),
+              !value.contains("..")
+        else { return nil }
+
+        let parts = value.split(separator: "@", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              !parts[0].isEmpty,
+              !parts[1].isEmpty,
+              parts[1].contains("."),
+              !parts[1].hasPrefix("."),
+              !parts[1].hasSuffix(".")
+        else { return nil }
+        return value
+    }
+}
+
+private struct PasswordResetSheet: View {
+    @EnvironmentObject private var authService: AuthService
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var email: String
+    @State private var isSubmitting = false
+    @State private var didSend = false
+    @State private var errorMessage: String?
+
+    init(initialEmail: String) {
+        _email = State(initialValue: initialEmail)
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                if didSend {
+                    Label(
+                        L10n.tr("Check your inbox", "请检查邮箱"),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(AppColors.accentStrong)
+
+                    Text(
+                        L10n.tr(
+                            "If an account uses this address, we sent a secure password reset link. The link expires according to the account security policy.",
+                            "如果这个邮箱对应 Cheese 账号，我们已发送安全的密码重置链接。链接有效期遵循账号安全策略。"
+                        )
+                    )
+                    .font(.system(size: 15))
+                    .foregroundStyle(AppColors.textMuted)
+                } else {
+                    Text(
+                        L10n.tr(
+                            "Enter the email used for your Cheese account and we’ll send a reset link.",
+                            "输入 Cheese 账号使用的邮箱，我们会发送重置链接。"
+                        )
+                    )
+                    .font(.system(size: 15))
+                    .foregroundStyle(AppColors.textMuted)
+
+                    TextField(
+                        L10n.tr("Email", "邮箱"),
+                        text: $email
+                    )
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
+                    .padding(12)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(AppColors.cardBorder, lineWidth: 1)
+                    )
+
+                    if let errorMessage {
+                        Label(errorMessage, systemImage: "exclamationmark.circle.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.red)
+                    }
+
+                    Button {
+                        sendResetEmail()
+                    } label: {
+                        HStack {
+                            if isSubmitting {
+                                ProgressView()
+                                    .tint(.white)
+                            }
+                            Text(L10n.tr("Send reset link", "发送重置链接"))
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(AppColors.accentStrong)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .disabled(isSubmitting)
+                }
+
+                Spacer()
+            }
+            .padding(24)
+            .background(AppColors.pageBackground.ignoresSafeArea())
+            .navigationTitle(L10n.tr("Reset password", "重置密码"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("Close", "关闭")) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .interactiveDismissDisabled(isSubmitting)
+    }
+
+    private func sendResetEmail() {
+        guard let normalizedEmail = PasswordResetFormPolicy.normalizedEmail(email) else {
+            errorMessage = L10n.tr("Enter a valid email address.", "请输入有效的邮箱地址。")
+            return
+        }
+
+        isSubmitting = true
+        errorMessage = nil
+        Task { @MainActor in
+            do {
+                try await authService.resetPassword(email: normalizedEmail)
+                didSend = true
+            } catch {
+                errorMessage = AppErrorMessage.userMessage(for: error)
+            }
+            isSubmitting = false
         }
     }
 }

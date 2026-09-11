@@ -68,5 +68,217 @@ RESET ROLE;
 SELECT ok((SELECT raw_user_meta_data - 'deactivated_at'='{}'::jsonb FROM auth.users WHERE id='00000000-0000-0000-0000-000000000002'),'deletion erases all original identity metadata');
 SELECT ok((SELECT phone IS NULL AND wechat_id IS NULL AND cover_image_url IS NULL FROM public.profiles WHERE id='00000000-0000-0000-0000-000000000002'),'deletion erases profile contact data');
 SELECT is((SELECT count(*) FROM auth.identities WHERE user_id='00000000-0000-0000-0000-000000000002'),0::bigint,'sign-in identities removed');
+
+-- A moderator removing a post must queue its exact public image object before
+-- the post is hidden. The same item cannot be duplicated by a later suspension.
+INSERT INTO public.posts(id,user_id,school_id,type,title,description,status,is_anonymous,is_private)
+SELECT
+  '91100000-0000-4000-8000-000000000011',
+  profile.id,
+  profile.school_id,
+  'forum',
+  'Reported public image fixture',
+  'An ordinary fixture whose exact public image must be queued on removal.',
+  'active',
+  FALSE,
+  FALSE
+FROM public.profiles AS profile
+WHERE profile.id='91100000-0000-4000-8000-000000000010';
+
+INSERT INTO public.forum_posts(id,board_id,allow_comments)
+VALUES (
+  '91100000-0000-4000-8000-000000000011',
+  (SELECT id FROM public.forum_boards WHERE slug='questions'),
+  TRUE
+);
+
+INSERT INTO public.moderated_media(bucket,object_path,user_id,sha256,model)
+VALUES (
+  'post-images',
+  '91100000-0000-4000-8000-000000000010/posts/91100000-0000-4000-8000-000000000011/91100000-0000-4000-8000-000000000012/000.jpg',
+  '91100000-0000-4000-8000-000000000010',
+  repeat('d',64),
+  'test'
+);
+
+INSERT INTO storage.objects(bucket_id,name,owner)
+VALUES (
+  'post-images',
+  '91100000-0000-4000-8000-000000000010/posts/91100000-0000-4000-8000-000000000011/91100000-0000-4000-8000-000000000012/000.jpg',
+  '91100000-0000-4000-8000-000000000010'
+);
+
+INSERT INTO public.post_images(post_id,url,order_index,bucket,object_path)
+VALUES (
+  '91100000-0000-4000-8000-000000000011',
+  'https://zeuivahkowbxmfzsnagt.supabase.co/storage/v1/object/public/post-images/91100000-0000-4000-8000-000000000010/posts/91100000-0000-4000-8000-000000000011/91100000-0000-4000-8000-000000000012/000.jpg',
+  0,
+  'post-images',
+  '91100000-0000-4000-8000-000000000010/posts/91100000-0000-4000-8000-000000000011/91100000-0000-4000-8000-000000000012/000.jpg'
+);
+
+INSERT INTO public.post_reports(id,post_id,reporter_id,reason,details)
+VALUES (
+  '91100000-0000-4000-8000-000000000013',
+  '91100000-0000-4000-8000-000000000011',
+  '00000000-0000-0000-0000-000000000003',
+  'inappropriate',
+  'Synthetic reported public image fixture'
+);
+
+SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',true);
+SELECT set_config('request.jwt.claims','{"role":"authenticated","sub":"00000000-0000-0000-0000-000000000001"}',true);
+SET LOCAL ROLE authenticated;
+SELECT is(
+  public.moderation_resolve(
+    'post',
+    '91100000-0000-4000-8000-000000000013',
+    'remove',
+    'Removed public image fixture'
+  ),
+  true,
+  'post removal resolves the report'
+);
+RESET ROLE;
+SELECT is(
+  (SELECT status FROM public.posts WHERE id='91100000-0000-4000-8000-000000000011'),
+  'deleted',
+  'removed post is hidden immediately'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.post_media_cleanup_backlog
+    WHERE post_id='91100000-0000-4000-8000-000000000011'
+      AND bucket='post-images'
+      AND object_path='91100000-0000-4000-8000-000000000010/posts/91100000-0000-4000-8000-000000000011/91100000-0000-4000-8000-000000000012/000.jpg'
+      AND status='pending'
+      AND reason='moderation_post_removed'
+  ),
+  1::bigint,
+  'post removal creates one exact durable public-media cleanup obligation'
+);
+
+-- Suspending a user removes their public surface, clears profile URLs, queues
+-- avatar objects, and cannot leave a formerly privileged moderator active.
+INSERT INTO public.moderated_media(bucket,object_path,user_id,sha256,model)
+VALUES
+  (
+    'avatars',
+    '91100000-0000-4000-8000-000000000010/suspension-avatar.jpg',
+    '91100000-0000-4000-8000-000000000010',
+    repeat('e',64),
+    'test'
+  ),
+  (
+    'avatars',
+    '91100000-0000-4000-8000-000000000010/suspension-cover.jpg',
+    '91100000-0000-4000-8000-000000000010',
+    repeat('f',64),
+    'test'
+  );
+
+INSERT INTO storage.objects(bucket_id,name,owner)
+VALUES
+  (
+    'avatars',
+    '91100000-0000-4000-8000-000000000010/suspension-avatar.jpg',
+    '91100000-0000-4000-8000-000000000010'
+  ),
+  (
+    'avatars',
+    '91100000-0000-4000-8000-000000000010/suspension-cover.jpg',
+    '91100000-0000-4000-8000-000000000010'
+  );
+
+UPDATE public.profiles
+SET
+  avatar_url='https://zeuivahkowbxmfzsnagt.supabase.co/storage/v1/object/public/avatars/91100000-0000-4000-8000-000000000010/suspension-avatar.jpg',
+  cover_image_url='https://zeuivahkowbxmfzsnagt.supabase.co/storage/v1/object/public/avatars/91100000-0000-4000-8000-000000000010/suspension-cover.jpg'
+WHERE id='91100000-0000-4000-8000-000000000010';
+
+INSERT INTO public.content_studio_roles(user_id,role)
+VALUES ('91100000-0000-4000-8000-000000000010','admin')
+ON CONFLICT(user_id) DO UPDATE SET role=EXCLUDED.role;
+
+INSERT INTO public.user_reports(id,reporter_id,reported_user_id,reason,details)
+VALUES (
+  '91100000-0000-4000-8000-000000000014',
+  '00000000-0000-0000-0000-000000000001',
+  '91100000-0000-4000-8000-000000000010',
+  'harassment',
+  'Synthetic suspension fixture'
+);
+
+SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',true);
+SELECT set_config('request.jwt.claims','{"role":"authenticated","sub":"00000000-0000-0000-0000-000000000001"}',true);
+SET LOCAL ROLE authenticated;
+SELECT is(
+  public.moderation_resolve(
+    'user',
+    '91100000-0000-4000-8000-000000000014',
+    'suspend',
+    'Suspend public-media fixture'
+  ),
+  true,
+  'user suspension resolves the report'
+);
+RESET ROLE;
+SELECT ok(
+  (SELECT avatar_url IS NULL AND cover_image_url IS NULL
+   FROM public.profiles
+   WHERE id='91100000-0000-4000-8000-000000000010'),
+  'suspension clears public profile image references immediately'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM moderation_private.account_media_cleanup
+    WHERE user_id='91100000-0000-4000-8000-000000000010'
+      AND bucket='avatars'
+      AND object_path IN (
+        '91100000-0000-4000-8000-000000000010/suspension-avatar.jpg',
+        '91100000-0000-4000-8000-000000000010/suspension-cover.jpg'
+      )
+      AND resolved_at IS NULL
+  ),
+  2::bigint,
+  'suspension queues every exact public avatar object for worker deletion'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.post_media_cleanup_backlog
+    WHERE post_id='91100000-0000-4000-8000-000000000011'
+      AND bucket='post-images'
+      AND object_path='91100000-0000-4000-8000-000000000010/posts/91100000-0000-4000-8000-000000000011/91100000-0000-4000-8000-000000000012/000.jpg'
+      AND status='pending'
+      AND reason='moderation_user_suspended'
+  ),
+  1::bigint,
+  'suspension reuses the existing exact post cleanup item instead of duplicating it'
+);
+
+SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',true);
+SELECT set_config('request.jwt.claims','{"role":"authenticated","sub":"00000000-0000-0000-0000-000000000003"}',true);
+SET LOCAL ROLE authenticated;
+SELECT is(
+  (SELECT count(*) FROM public.profile_public_view WHERE id='91100000-0000-4000-8000-000000000010'),
+  0::bigint,
+  'suspended profile is excluded from the public profile contract'
+);
+RESET ROLE;
+
+SELECT set_config('request.jwt.claim.sub','91100000-0000-4000-8000-000000000010',true);
+SELECT set_config('request.jwt.claims','{"role":"authenticated","sub":"91100000-0000-4000-8000-000000000010"}',true);
+SET LOCAL ROLE authenticated;
+SELECT throws_ok(
+  $$SELECT * FROM public.moderation_queue(1)$$,
+  '42501',
+  'moderation_access_denied',
+  'a suspended Content Studio administrator cannot retain moderation access'
+);
+RESET ROLE;
+
 SELECT * FROM finish();
 ROLLBACK;

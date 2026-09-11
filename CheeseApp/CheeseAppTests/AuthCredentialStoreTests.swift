@@ -66,6 +66,260 @@ final class AuthCredentialStoreTests: XCTestCase {
         XCTAssertFalse(AuthService.isUserCancelledSocialSignIn(failure))
     }
 
+    @MainActor
+    func testSecureNonceRejectsInvalidLengthWithoutCrashing() {
+        XCTAssertThrowsError(try AuthService.makeSecureNonce(length: 0))
+    }
+
+    func testPasswordResetFormNormalizesOnlyPlausibleEmailAddresses() {
+        XCTAssertEqual(
+            PasswordResetFormPolicy.normalizedEmail("  person@example.com  "),
+            "person@example.com"
+        )
+        XCTAssertEqual(
+            PasswordResetFormPolicy.normalizedEmail("person+cheese@example.co.uk"),
+            "person+cheese@example.co.uk"
+        )
+
+        for invalid in [
+            "",
+            "person",
+            "person@",
+            "@example.com",
+            "person@example",
+            "person..name@example.com",
+            "person @example.com",
+            "person@example.com\nspoof"
+        ] {
+            XCTAssertNil(
+                PasswordResetFormPolicy.normalizedEmail(invalid),
+                "Expected invalid email to be rejected: \(invalid)"
+            )
+        }
+    }
+
+    func testAppleCredentialIdentifierStoreIsScopedBySupabaseUser() throws {
+        let store = TestAppleCredentialIdentifierStore()
+        let firstUser = UUID(uuidString: "1a000000-0000-0000-0000-000000000001")!
+        let secondUser = UUID(uuidString: "1a000000-0000-0000-0000-000000000002")!
+
+        try store.save("apple-user-a", for: firstUser)
+        try store.save("apple-user-b", for: secondUser)
+        try store.remove(for: firstUser)
+
+        XCTAssertNil(try store.identifier(for: firstUser))
+        XCTAssertEqual(try store.identifier(for: secondUser), "apple-user-b")
+    }
+
+    func testAppleCredentialRevocationPolicyRequiresAppleLinkAndIdentifier() {
+        let userId = UUID(uuidString: "2a000000-0000-0000-0000-000000000001")!
+
+        XCTAssertNil(
+            AppleCredentialRevocationPolicy.verificationTarget(
+                for: AppleCredentialRevocationSession(
+                    userId: userId,
+                    accessToken: "token",
+                    isAppleLinked: false,
+                    appleUserIdentifier: "apple-user"
+                )
+            )
+        )
+        XCTAssertNil(
+            AppleCredentialRevocationPolicy.verificationTarget(
+                for: AppleCredentialRevocationSession(
+                    userId: userId,
+                    accessToken: "token",
+                    isAppleLinked: true,
+                    appleUserIdentifier: nil
+                )
+            )
+        )
+        XCTAssertEqual(
+            AppleCredentialRevocationPolicy.verificationTarget(
+                for: AppleCredentialRevocationSession(
+                    userId: userId,
+                    accessToken: "token",
+                    isAppleLinked: true,
+                    appleUserIdentifier: " apple-user "
+                )
+            ),
+            AppleCredentialVerificationTarget(
+                userId: userId,
+                accessToken: "token",
+                appleUserIdentifier: "apple-user"
+            )
+        )
+    }
+
+    func testAppleCredentialRevocationPolicyResetsOnlyRevokedOrNotFound() {
+        XCTAssertTrue(AppleCredentialRevocationPolicy.shouldReset(for: .revoked))
+        XCTAssertTrue(AppleCredentialRevocationPolicy.shouldReset(for: .notFound))
+        XCTAssertFalse(AppleCredentialRevocationPolicy.shouldReset(for: .authorized))
+        XCTAssertFalse(AppleCredentialRevocationPolicy.shouldReset(for: .transferred))
+        XCTAssertFalse(AppleCredentialRevocationPolicy.shouldReset(for: .unknown))
+    }
+
+    @MainActor
+    func testAppleCredentialRevocationMonitorResetsOnlyMatchingCurrentAccount() async {
+        let checker = TestAppleCredentialStateChecker()
+        checker.result = .success(.revoked)
+        let firstUser = UUID(uuidString: "3a000000-0000-0000-0000-000000000001")!
+        let secondUser = UUID(uuidString: "3a000000-0000-0000-0000-000000000002")!
+        var currentSession: AppleCredentialRevocationSession? = AppleCredentialRevocationSession(
+            userId: firstUser,
+            accessToken: "first-token",
+            isAppleLinked: true,
+            appleUserIdentifier: "first-apple-user"
+        )
+        var resetTargets: [AppleCredentialVerificationTarget] = []
+        let monitor = AppleCredentialRevocationMonitor(
+            checker: checker,
+            sessionProvider: { currentSession },
+            resetHandler: { resetTargets.append($0) },
+            notificationCenter: NotificationCenter(),
+            notificationName: Notification.Name("AppleCredentialRevocationMonitorTests")
+        )
+
+        await monitor.checkCurrentSession()
+
+        XCTAssertEqual(
+            resetTargets,
+            [
+                AppleCredentialVerificationTarget(
+                    userId: firstUser,
+                    accessToken: "first-token",
+                    appleUserIdentifier: "first-apple-user"
+                )
+            ]
+        )
+
+        currentSession = AppleCredentialRevocationSession(
+            userId: secondUser,
+            accessToken: "second-token",
+            isAppleLinked: false,
+            appleUserIdentifier: nil
+        )
+        await monitor.checkCurrentSession()
+
+        XCTAssertEqual(checker.requestedIdentifiers, ["first-apple-user"])
+        XCTAssertEqual(resetTargets.count, 1)
+    }
+
+    @MainActor
+    func testAppleCredentialRevocationMonitorPreservesAuthorizedErrorAndTransferredStates() async {
+        let checker = TestAppleCredentialStateChecker()
+        let userId = UUID(uuidString: "4a000000-0000-0000-0000-000000000001")!
+        let session = AppleCredentialRevocationSession(
+            userId: userId,
+            accessToken: "token",
+            isAppleLinked: true,
+            appleUserIdentifier: "apple-user"
+        )
+        var resetTargets: [AppleCredentialVerificationTarget] = []
+        let monitor = AppleCredentialRevocationMonitor(
+            checker: checker,
+            sessionProvider: { session },
+            resetHandler: { resetTargets.append($0) },
+            notificationCenter: NotificationCenter(),
+            notificationName: Notification.Name("AppleCredentialRevocationMonitorTests")
+        )
+
+        checker.result = .success(.authorized)
+        await monitor.checkCurrentSession()
+        checker.result = .success(.transferred)
+        await monitor.checkCurrentSession()
+        checker.result = .failure(TestCredentialError.writeFailed)
+        await monitor.checkCurrentSession()
+
+        XCTAssertTrue(resetTargets.isEmpty)
+        XCTAssertEqual(
+            checker.requestedIdentifiers,
+            ["apple-user", "apple-user", "apple-user"]
+        )
+    }
+
+    @MainActor
+    func testAppleCredentialRevocationMonitorIgnoresResultAfterAccountSwitch() async {
+        let checker = DeferredAppleCredentialStateChecker()
+        let firstUser = UUID(uuidString: "5a000000-0000-0000-0000-000000000001")!
+        let secondUser = UUID(uuidString: "5a000000-0000-0000-0000-000000000002")!
+        var currentSession: AppleCredentialRevocationSession? = AppleCredentialRevocationSession(
+            userId: firstUser,
+            accessToken: "first-token",
+            isAppleLinked: true,
+            appleUserIdentifier: "first-apple-user"
+        )
+        var resetTargets: [AppleCredentialVerificationTarget] = []
+        let monitor = AppleCredentialRevocationMonitor(
+            checker: checker,
+            sessionProvider: { currentSession },
+            resetHandler: { resetTargets.append($0) },
+            notificationCenter: NotificationCenter(),
+            notificationName: Notification.Name("AppleCredentialRevocationMonitorTests")
+        )
+
+        let check = Task { @MainActor in
+            await monitor.checkCurrentSession()
+        }
+        for _ in 0..<20 where !checker.isWaiting {
+            await Task.yield()
+        }
+        XCTAssertTrue(checker.isWaiting)
+
+        currentSession = AppleCredentialRevocationSession(
+            userId: secondUser,
+            accessToken: "second-token",
+            isAppleLinked: true,
+            appleUserIdentifier: "second-apple-user"
+        )
+        checker.resume(with: .revoked)
+        await check.value
+
+        XCTAssertTrue(resetTargets.isEmpty)
+    }
+
+    @MainActor
+    func testAppleCredentialRevocationNotificationUsesCurrentSessionCheck() async {
+        let checker = TestAppleCredentialStateChecker()
+        checker.result = .success(.notFound)
+        let center = NotificationCenter()
+        let notification = Notification.Name("AppleCredentialRevocationNotificationTests")
+        let userId = UUID(uuidString: "6a000000-0000-0000-0000-000000000001")!
+        let reset = expectation(description: "reset after notification")
+        var resetTarget: AppleCredentialVerificationTarget?
+        let monitor = AppleCredentialRevocationMonitor(
+            checker: checker,
+            sessionProvider: {
+                AppleCredentialRevocationSession(
+                    userId: userId,
+                    accessToken: "token",
+                    isAppleLinked: true,
+                    appleUserIdentifier: "apple-user"
+                )
+            },
+            resetHandler: {
+                resetTarget = $0
+                reset.fulfill()
+            },
+            notificationCenter: center,
+            notificationName: notification
+        )
+
+        center.post(name: notification, object: nil)
+        await fulfillment(of: [reset], timeout: 1)
+
+        XCTAssertEqual(checker.requestedIdentifiers, ["apple-user"])
+        XCTAssertEqual(
+            resetTarget,
+            AppleCredentialVerificationTarget(
+                userId: userId,
+                accessToken: "token",
+                appleUserIdentifier: "apple-user"
+            )
+        )
+        withExtendedLifetime(monitor) {}
+    }
+
     func testSavedAccountEncodingContainsMetadataOnly() throws {
         let data = try JSONEncoder().encode(makeMetadata())
         let object = try XCTUnwrap(
@@ -271,5 +525,54 @@ private final class TestAuthCredentialStore: AuthCredentialStoring {
     func removeAll() throws {
         removeAllCount += 1
         credentials.removeAll()
+    }
+}
+
+private final class TestAppleCredentialIdentifierStore: AppleCredentialIdentifierStoring {
+    private var identifiers: [UUID: String] = [:]
+
+    func identifier(for userId: UUID) throws -> String? {
+        identifiers[userId]
+    }
+
+    func save(_ identifier: String, for userId: UUID) throws {
+        identifiers[userId] = identifier
+    }
+
+    func remove(for userId: UUID) throws {
+        identifiers.removeValue(forKey: userId)
+    }
+
+    func removeAll() throws {
+        identifiers.removeAll()
+    }
+}
+
+private final class TestAppleCredentialStateChecker: AppleCredentialStateChecking {
+    var result: Result<AppleCredentialState, Error> = .success(.authorized)
+    private(set) var requestedIdentifiers: [String] = []
+
+    func credentialState(for userIdentifier: String) async throws -> AppleCredentialState {
+        requestedIdentifiers.append(userIdentifier)
+        return try result.get()
+    }
+}
+
+private final class DeferredAppleCredentialStateChecker: AppleCredentialStateChecking {
+    private var continuation: CheckedContinuation<AppleCredentialState, Error>?
+    private(set) var isWaiting = false
+
+    func credentialState(for userIdentifier: String) async throws -> AppleCredentialState {
+        isWaiting = true
+        return try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func resume(with state: AppleCredentialState) {
+        let continuation = continuation
+        self.continuation = nil
+        isWaiting = false
+        continuation?.resume(returning: state)
     }
 }

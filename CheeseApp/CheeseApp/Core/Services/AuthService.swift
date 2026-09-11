@@ -95,6 +95,144 @@ enum AuthSessionFailurePolicy {
     }
 }
 
+enum AppleCredentialState: Equatable {
+    case authorized
+    case revoked
+    case notFound
+    case transferred
+    case unknown
+}
+
+protocol AppleCredentialStateChecking {
+    func credentialState(for userIdentifier: String) async throws -> AppleCredentialState
+}
+
+struct SystemAppleCredentialStateChecker: AppleCredentialStateChecking {
+    func credentialState(for userIdentifier: String) async throws -> AppleCredentialState {
+        let state = try await ASAuthorizationAppleIDProvider()
+            .credentialState(forUserID: userIdentifier)
+        switch state {
+        case .authorized:
+            return .authorized
+        case .revoked:
+            return .revoked
+        case .notFound:
+            return .notFound
+        case .transferred:
+            return .transferred
+        @unknown default:
+            return .unknown
+        }
+    }
+}
+
+struct AppleCredentialRevocationSession: Equatable {
+    let userId: UUID
+    let accessToken: String
+    let isAppleLinked: Bool
+    let appleUserIdentifier: String?
+}
+
+struct AppleCredentialVerificationTarget: Equatable {
+    let userId: UUID
+    let accessToken: String
+    let appleUserIdentifier: String
+}
+
+enum AppleCredentialRevocationPolicy {
+    static func verificationTarget(
+        for session: AppleCredentialRevocationSession
+    ) -> AppleCredentialVerificationTarget? {
+        let identifier = session.appleUserIdentifier?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard session.isAppleLinked,
+              let identifier,
+              !identifier.isEmpty
+        else {
+            return nil
+        }
+
+        return AppleCredentialVerificationTarget(
+            userId: session.userId,
+            accessToken: session.accessToken,
+            appleUserIdentifier: identifier
+        )
+    }
+
+    static func shouldReset(for state: AppleCredentialState) -> Bool {
+        state == .revoked || state == .notFound
+    }
+}
+
+@MainActor
+final class AppleCredentialRevocationMonitor {
+    typealias SessionProvider = @MainActor () -> AppleCredentialRevocationSession?
+    typealias ResetHandler = @MainActor (AppleCredentialVerificationTarget) -> Void
+
+    private let checker: AppleCredentialStateChecking
+    private let sessionProvider: SessionProvider
+    private let resetHandler: ResetHandler
+    private let notificationCenter: NotificationCenter
+    private var notificationObserver: NSObjectProtocol?
+
+    init(
+        checker: AppleCredentialStateChecking,
+        sessionProvider: @escaping SessionProvider,
+        resetHandler: @escaping ResetHandler,
+        notificationCenter: NotificationCenter = .default,
+        notificationName: Notification.Name = ASAuthorizationAppleIDProvider.credentialRevokedNotification
+    ) {
+        self.checker = checker
+        self.sessionProvider = sessionProvider
+        self.resetHandler = resetHandler
+        self.notificationCenter = notificationCenter
+        notificationObserver = notificationCenter.addObserver(
+            forName: notificationName,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.checkCurrentSession()
+            }
+        }
+    }
+
+    deinit {
+        if let notificationObserver {
+            notificationCenter.removeObserver(notificationObserver)
+        }
+    }
+
+    func checkCurrentSession() async {
+        guard let initialSession = sessionProvider(),
+              let target = AppleCredentialRevocationPolicy.verificationTarget(
+                for: initialSession
+              )
+        else {
+            return
+        }
+
+        let state: AppleCredentialState
+        do {
+            state = try await checker.credentialState(for: target.appleUserIdentifier)
+        } catch {
+            // Apple recommends retaining a session if its state cannot be read.
+            return
+        }
+
+        guard AppleCredentialRevocationPolicy.shouldReset(for: state),
+              let currentSession = sessionProvider(),
+              AppleCredentialRevocationPolicy.verificationTarget(
+                for: currentSession
+              ) == target
+        else {
+            return
+        }
+
+        resetHandler(target)
+    }
+}
+
 private enum AuthSessionValidationError: Error {
     case identityMismatch
 }
@@ -189,6 +327,7 @@ class AuthService: ObservableObject {
     // 防止重复检查
     private var hasCheckedSession = false
     private let savedAccountPersistence = SavedAuthAccountPersistence()
+    private let appleCredentialIdentifierStore: AppleCredentialIdentifierStoring = KeychainAppleCredentialIdentifierStore()
     private let recentLoginAccountsKey = "auth.recent_login_accounts.v2"
     private let legacyRecentLoginAccountsKey = "auth.recent_login_accounts.v1"
     private let maxSavedAccounts = 3
@@ -211,11 +350,21 @@ class AuthService: ObservableObject {
     private var accountIdentityStatusesRefreshedAt: Date?
     private let accountIdentityStatusesCacheLifetime: TimeInterval = 5 * 60
     private var appleSignInCoordinator: AppleSignInCoordinator?
+    private var appleCredentialRevocationMonitor: AppleCredentialRevocationMonitor?
     
     private init() {
         // 不在 init 中自动检查，避免重复请求
         loadSavedAccounts(currentUserId: supabase.auth.currentSession?.user.id)
         loadRecentLoginAccounts()
+        appleCredentialRevocationMonitor = AppleCredentialRevocationMonitor(
+            checker: SystemAppleCredentialStateChecker(),
+            sessionProvider: { [weak self] in
+                self?.currentAppleCredentialRevocationSession()
+            },
+            resetHandler: { [weak self] target in
+                self?.resetAppleRevokedAuthenticationState(for: target)
+            }
+        )
     }
 
     func configureAccountStateHandlers(
@@ -248,6 +397,11 @@ class AuthService: ObservableObject {
             guard !Task.isCancelled else { return }
             await self?.checkSession(force: true)
         }
+
+        // A revocation can happen while the process is not running, so the
+        // notification observer alone is insufficient. This is a local Apple
+        // credential-state check and only runs for a known Apple-linked session.
+        await appleCredentialRevocationMonitor?.checkCurrentSession()
     }
     
     // MARK: - 检查当前会话
@@ -490,6 +644,111 @@ class AuthService: ObservableObject {
         activateAccountState(nil)
     }
 
+    private func currentAppleCredentialRevocationSession() -> AppleCredentialRevocationSession? {
+        guard let session = supabase.auth.currentSession else { return nil }
+        let appleIdentity = session.user.identities?.first {
+            $0.provider.lowercased() == RecentLoginSignInMethod.apple.rawValue
+        }
+        let isAppleLinked = appleIdentity != nil
+        let appleUserIdentifier: String?
+        if isAppleLinked {
+            let storedIdentifier = try? appleCredentialIdentifierStore.identifier(
+                for: session.user.id
+            )
+            // Sessions created before the dedicated keychain record was added
+            // still carry Apple's opaque `sub` in Supabase identity data.
+            // Use it only as a local compatibility fallback; never display or
+            // send this identifier to a service.
+            appleUserIdentifier = storedIdentifier
+                ?? appleIdentity?.identityData?["sub"]?.stringValue
+        } else {
+            appleUserIdentifier = nil
+        }
+
+        return AppleCredentialRevocationSession(
+            userId: session.user.id,
+            accessToken: session.accessToken,
+            isAppleLinked: isAppleLinked,
+            appleUserIdentifier: appleUserIdentifier
+        )
+    }
+
+    private func persistAppleCredentialIdentifier(
+        _ appleUserIdentifier: String,
+        for session: Session
+    ) async throws {
+        do {
+            try appleCredentialIdentifierStore.save(
+                appleUserIdentifier,
+                for: session.user.id
+            )
+        } catch {
+            // Do not keep a Sign in with Apple session that this device cannot
+            // later match to a revocation notification.
+            guard supabase.auth.currentSession?.accessToken == session.accessToken,
+                  supabase.auth.currentSession?.user.id == session.user.id
+            else {
+                throw error
+            }
+            let sessionOwnsCurrentState = currentUser?.id == session.user.id || !isAuthenticated
+            try? await supabase.auth.signOut(scope: .local)
+            if sessionOwnsCurrentState,
+               (supabase.auth.currentSession?.accessToken == nil
+                    || supabase.auth.currentSession?.accessToken == session.accessToken) {
+                resetAuthState()
+            }
+            throw error
+        }
+    }
+
+    private func resetAppleRevokedAuthenticationState(
+        for target: AppleCredentialVerificationTarget
+    ) {
+        guard let currentSession = currentAppleCredentialRevocationSession(),
+              AppleCredentialRevocationPolicy.verificationTarget(
+                for: currentSession
+              ) == target
+        else {
+            return
+        }
+
+        beginAccountStateTransition()
+        let userId = target.userId
+        let invalidToken = target.accessToken
+
+        // This is scoped to the account whose Apple credential was verified as
+        // revoked. Saved Google/password accounts on the same device stay
+        // intact and can be used to sign back in.
+        try? appleCredentialIdentifierStore.remove(for: userId)
+        removeSavedAccountFromStorage(userId: userId)
+        removeRecentLoginAccountFromStorage(userId: userId)
+        clearLocalAccountData(for: userId)
+        UIApplication.shared.unregisterForRemoteNotifications()
+
+        currentUser = nil
+        isAuthenticated = false
+        requiresProfileCompletion = false
+        profileCompletionReturnSnapshot = nil
+        bootstrapState = .ready
+        hasCheckedSession = false
+        lastSuccessfulSessionValidationAt = nil
+        accountIdentityStatusesCache = nil
+        accountIdentityStatusesCacheUserId = nil
+        accountIdentityStatusesRefreshedAt = nil
+        errorMessage = "Apple 登录授权已撤销，请重新登录。"
+        activateAccountState(nil)
+
+        Task { @MainActor [weak self] in
+            guard let self,
+                  self.supabase.auth.currentSession?.accessToken == invalidToken,
+                  self.supabase.auth.currentSession?.user.id == userId
+            else {
+                return
+            }
+            try? await self.supabase.auth.signOut(scope: .local)
+        }
+    }
+
     private func beginAccountStateTransition(preservingSessionValidation: Bool = false) {
         if !preservingSessionValidation { cancelSessionValidation() }
         accountTransitionGeneration &+= 1
@@ -561,7 +820,7 @@ class AuthService: ObservableObject {
                 throw NativeSocialSignInError.presentationUnavailable
             }
 
-            let rawNonce = Self.makeSecureNonce()
+            let rawNonce = try Self.makeSecureNonce()
             let result = try await nativeGoogleSignIn(
                 with: presenter,
                 nonce: rawNonce
@@ -613,7 +872,7 @@ class AuthService: ObservableObject {
         await clearResidualLoggedOutSessionIfNeeded()
 
         do {
-            let rawNonce = Self.makeSecureNonce()
+            let rawNonce = try Self.makeSecureNonce()
             let coordinator = AppleSignInCoordinator(rawNonce: rawNonce)
             appleSignInCoordinator = coordinator
             defer { appleSignInCoordinator = nil }
@@ -627,6 +886,10 @@ class AuthService: ObservableObject {
                 )
             )
 
+            try await persistAppleCredentialIdentifier(
+                credential.userIdentifier,
+                for: session
+            )
             isAuthenticated = true
             await fetchUserProfile(userId: session.user.id)
             await persistAppleNameIfNeeded(credential.fullName, userId: session.user.id)
@@ -673,8 +936,10 @@ class AuthService: ObservableObject {
         }
     }
 
-    private static func makeSecureNonce(length: Int = 32) -> String {
-        precondition(length > 0)
+    static func makeSecureNonce(length: Int = 32) throws -> String {
+        guard length > 0 else {
+            throw NativeSocialSignInError.secureRandomUnavailable
+        }
         let characters = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
         var result = ""
         var remainingLength = length
@@ -682,7 +947,7 @@ class AuthService: ObservableObject {
         while remainingLength > 0 {
             var random: UInt8 = 0
             guard SecRandomCopyBytes(kSecRandomDefault, 1, &random) == errSecSuccess else {
-                fatalError("Unable to generate a secure Apple sign-in nonce")
+                throw NativeSocialSignInError.secureRandomUnavailable
             }
             if random < characters.count {
                 result.append(characters[Int(random)])
@@ -777,7 +1042,7 @@ class AuthService: ObservableObject {
                 guard let presenter = UIApplication.shared.cheeseTopViewController else {
                     throw NativeSocialSignInError.presentationUnavailable
                 }
-                let rawNonce = Self.makeSecureNonce()
+                let rawNonce = try Self.makeSecureNonce()
                 let result = try await nativeGoogleSignIn(
                     with: presenter,
                     nonce: rawNonce
@@ -794,17 +1059,21 @@ class AuthService: ObservableObject {
                     )
                 )
             case .apple:
-                let rawNonce = Self.makeSecureNonce()
+                let rawNonce = try Self.makeSecureNonce()
                 let coordinator = AppleSignInCoordinator(rawNonce: rawNonce)
                 appleSignInCoordinator = coordinator
                 defer { appleSignInCoordinator = nil }
                 let credential = try await coordinator.authorize()
-                try await supabase.auth.linkIdentityWithIdToken(
+                let session = try await supabase.auth.linkIdentityWithIdToken(
                     credentials: OpenIDConnectCredentials(
                         provider: .apple,
                         idToken: credential.identityToken,
                         nonce: rawNonce
                     )
+                )
+                try await persistAppleCredentialIdentifier(
+                    credential.userIdentifier,
+                    for: session
                 )
             }
         } catch {
@@ -1196,7 +1465,7 @@ class AuthService: ObservableObject {
             guard let presenter = UIApplication.shared.cheeseTopViewController else {
                 throw NativeSocialSignInError.presentationUnavailable
             }
-            let rawNonce = Self.makeSecureNonce()
+            let rawNonce = try Self.makeSecureNonce()
             let result = try await nativeGoogleSignIn(
                 with: presenter,
                 nonce: rawNonce
@@ -1217,7 +1486,7 @@ class AuthService: ObservableObject {
 
     func addAccountWithApple() async throws -> UUID {
         try await addAccountBySigningIn(signInMethod: .apple) {
-            let rawNonce = Self.makeSecureNonce()
+            let rawNonce = try Self.makeSecureNonce()
             let coordinator = AppleSignInCoordinator(rawNonce: rawNonce)
             appleSignInCoordinator = coordinator
             defer { appleSignInCoordinator = nil }
@@ -1228,6 +1497,10 @@ class AuthService: ObservableObject {
                     idToken: credential.identityToken,
                     nonce: rawNonce
                 )
+            )
+            try await persistAppleCredentialIdentifier(
+                credential.userIdentifier,
+                for: session
             )
             await persistAppleNameIfNeeded(credential.fullName, userId: session.user.id)
             return session
@@ -1274,7 +1547,7 @@ class AuthService: ObservableObject {
 
             beginAccountStateTransition()
             try? await supabase.auth.signOut()
-            clearLocalDataAfterAccountDeletion(userId: userId)
+            clearLocalAccountData(for: userId)
             clearSavedAccountsFromStorage()
             removeRecentLoginAccountFromStorage(userId: userId)
             currentUser = nil
@@ -1312,7 +1585,7 @@ class AuthService: ObservableObject {
         }
     }
 
-    private func clearLocalDataAfterAccountDeletion(userId: UUID) {
+    private func clearLocalAccountData(for userId: UUID) {
         UserDefaults.standard.removeObject(forKey: AIProcessingConsent.key(for: userId))
         UserDefaults.standard.removeObject(
             forKey: "media_safety_consent.2026-09-11.\(userId.uuidString)"
@@ -1816,6 +2089,7 @@ class AuthService: ObservableObject {
     }
 
     private func removeSavedAccountFromStorage(userId: UUID) {
+        try? appleCredentialIdentifierStore.remove(for: userId)
         guard let updated = try? savedAccountPersistence.removeAccount(
             userId: userId,
             from: savedAccounts,
@@ -1827,7 +2101,9 @@ class AuthService: ObservableObject {
     }
 
     private func clearSavedAccountsFromStorage() {
-        guard (try? savedAccountPersistence.removeAllAccounts()) != nil else {
+        let removedSavedAccounts = (try? savedAccountPersistence.removeAllAccounts()) != nil
+        try? appleCredentialIdentifierStore.removeAll()
+        guard removedSavedAccounts else {
             return
         }
         savedAccounts = []
@@ -2045,6 +2321,8 @@ private func accountDisplayLabel(displayName: String?, email: String) -> String 
 private enum NativeSocialSignInError: LocalizedError {
     case presentationUnavailable
     case missingIdentityToken
+    case missingAppleUserIdentifier
+    case secureRandomUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -2052,6 +2330,10 @@ private enum NativeSocialSignInError: LocalizedError {
             return "无法显示登录页面，请稍后重试。"
         case .missingIdentityToken:
             return "登录服务没有返回有效身份凭证，请重试。"
+        case .missingAppleUserIdentifier:
+            return "Apple 登录服务没有返回有效账号标识，请重试。"
+        case .secureRandomUnavailable:
+            return "无法生成安全登录凭证，请稍后重试。"
         }
     }
 }
@@ -2059,6 +2341,7 @@ private enum NativeSocialSignInError: LocalizedError {
 private struct AppleNativeCredential {
     let identityToken: String
     let fullName: String?
+    let userIdentifier: String
 }
 
 @MainActor
@@ -2104,11 +2387,19 @@ private final class AppleSignInCoordinator: NSObject,
             finish(.failure(NativeSocialSignInError.missingIdentityToken))
             return
         }
+        guard !credential.user.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            finish(.failure(NativeSocialSignInError.missingAppleUserIdentifier))
+            return
+        }
 
         let formattedName = credential.fullName
             .map { PersonNameComponentsFormatter().string(from: $0) }
             .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty }
-        finish(.success(AppleNativeCredential(identityToken: token, fullName: formattedName)))
+        finish(.success(AppleNativeCredential(
+            identityToken: token,
+            fullName: formattedName,
+            userIdentifier: credential.user
+        )))
     }
 
     func authorizationController(

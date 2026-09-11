@@ -18,6 +18,18 @@ protocol AuthCredentialStoring {
     func removeAll() throws
 }
 
+/// Stores the opaque Sign in with Apple user identifier separately from
+/// Supabase refresh credentials. The active account intentionally has no
+/// saved-account credential in `KeychainAuthCredentialStore`, so placing this
+/// value in that payload would make revocation checks disappear for the active
+/// session.
+protocol AppleCredentialIdentifierStoring {
+    func identifier(for userId: UUID) throws -> String?
+    func save(_ identifier: String, for userId: UUID) throws
+    func remove(for userId: UUID) throws
+    func removeAll() throws
+}
+
 enum AuthCredentialStoreError: LocalizedError {
     case invalidStoredCredential
     case keychainFailure(OSStatus)
@@ -77,6 +89,90 @@ final class KeychainAuthCredentialStore: AuthCredentialStoring {
         let query = baseQuery(for: userId)
         let attributes: [String: Any] = [
             kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+
+        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecSuccess {
+            return
+        }
+        guard updateStatus == errSecItemNotFound else {
+            throw AuthCredentialStoreError.keychainFailure(updateStatus)
+        }
+
+        var insert = query
+        attributes.forEach { insert[$0.key] = $0.value }
+        let insertStatus = SecItemAdd(insert as CFDictionary, nil)
+        guard insertStatus == errSecSuccess else {
+            throw AuthCredentialStoreError.keychainFailure(insertStatus)
+        }
+    }
+
+    func remove(for userId: UUID) throws {
+        let status = SecItemDelete(baseQuery(for: userId) as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw AuthCredentialStoreError.keychainFailure(status)
+        }
+    }
+
+    func removeAll() throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrSynchronizable as String: kCFBooleanFalse as Any
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw AuthCredentialStoreError.keychainFailure(status)
+        }
+    }
+
+    private func baseQuery(for userId: UUID) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: userId.uuidString.lowercased(),
+            kSecAttrSynchronizable as String: kCFBooleanFalse as Any
+        ]
+    }
+}
+
+final class KeychainAppleCredentialIdentifierStore: AppleCredentialIdentifierStoring {
+    private let service: String
+
+    init(service: String = "\(Bundle.main.bundleIdentifier ?? "com.cheeseapp").auth.apple-credential-identifiers") {
+        self.service = service
+    }
+
+    func identifier(for userId: UUID) throws -> String? {
+        var query = baseQuery(for: userId)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound {
+            return nil
+        }
+        guard status == errSecSuccess,
+              let data = item as? Data,
+              let identifier = String(data: data, encoding: .utf8),
+              !identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            throw AuthCredentialStoreError.invalidStoredCredential
+        }
+        return identifier
+    }
+
+    func save(_ identifier: String, for userId: UUID) throws {
+        let normalized = identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            throw AuthCredentialStoreError.invalidStoredCredential
+        }
+
+        let query = baseQuery(for: userId)
+        let attributes: [String: Any] = [
+            kSecValueData as String: Data(normalized.utf8),
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
 
