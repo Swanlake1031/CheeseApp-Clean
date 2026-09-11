@@ -107,6 +107,13 @@ export class SupabaseRepository {
     );
   }
 
+  async hasAIConsent(userId: string): Promise<boolean> {
+    const consent = await this.restOne<{ user_id: string }>(
+      `ai_processing_consents?select=user_id&user_id=eq.${encodeURIComponent(userId)}&version=eq.2026-09-11&limit=1`,
+    );
+    return consent !== null;
+  }
+
   async getPost(postId: string): Promise<PostRecord | null> {
     return this.restOne<PostRecord>(
       `posts?select=id,user_id,type,title,description,status,is_private&id=eq.${encodeURIComponent(postId)}&limit=1`,

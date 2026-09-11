@@ -211,7 +211,7 @@ struct AccountSwitcherView: View {
             try await authService.switchToAccount(userId: userId)
             dismiss()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 }
@@ -293,7 +293,7 @@ struct AddAccountView: View {
                 }
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -321,7 +321,7 @@ struct AddAccountView: View {
             if AuthService.isUserCancelledSocialSignIn(error) {
                 return
             }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -349,7 +349,7 @@ struct AddAccountView: View {
             if AuthService.isUserCancelledSocialSignIn(error) {
                 return
             }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 

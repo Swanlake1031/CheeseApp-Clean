@@ -165,7 +165,7 @@ final class ChatRoomMessageState<MessageType: ChatRoomTimelineMessage>: Observab
             hasResolvedInitialLoad = true
         } catch {
             guard lifecycle.acceptsEvents(for: sessionID) else { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
 
         guard lifecycle.acceptsEvents(for: sessionID) else { return }
@@ -206,7 +206,7 @@ final class ChatRoomMessageState<MessageType: ChatRoomTimelineMessage>: Observab
             guard lifecycle.acceptsEvents(for: sessionID),
                   historyRequestID == requestID
             else { return }
-            historyErrorMessage = error.localizedDescription
+            historyErrorMessage = AppErrorMessage.userMessage(for: error)
         }
 
         guard historyRequestID == requestID else { return }
@@ -249,7 +249,7 @@ final class ChatRoomMessageState<MessageType: ChatRoomTimelineMessage>: Observab
             mergeOutgoing(sent)
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
             return false
         }
     }

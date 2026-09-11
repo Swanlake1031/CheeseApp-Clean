@@ -187,7 +187,7 @@ private struct ReportFormSheet: View {
             try await submit(reason, details)
             dismiss()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 }

@@ -68,7 +68,7 @@ final class SearchPaginationViewModelTests: XCTestCase {
         model.updateSearch(text: "query", category: .all)
         await waitUntil { !model.isSearching }
         model.updateSearch(text: "query", category: .secondhand)
-        XCTAssertEqual(model.searchPageErrorMessage, "failed")
+        XCTAssertEqual(model.searchPageErrorMessage, "暂时无法完成操作，请重试；若问题持续，请联络客服。")
         model.updateSearch(text: "query", category: .forum)
         XCTAssertEqual(model.filteredResults.map(\.id), [result.id])
         XCTAssertNil(model.searchPageErrorMessage)
@@ -128,7 +128,7 @@ final class SearchPaginationViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.filteredResults.map(\.id), [first.id])
         XCTAssertTrue(viewModel.hasMoreSearchResults)
-        XCTAssertEqual(viewModel.searchPageErrorMessage, "failed")
+        XCTAssertEqual(viewModel.searchPageErrorMessage, "暂时无法完成操作，请重试；若问题持续，请联络客服。")
         XCTAssertFalse(viewModel.isLoadingMoreSearchResults)
     }
 

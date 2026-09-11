@@ -759,7 +759,7 @@ struct EditProfileView: View {
 
     private func normalizedSaveErrorMessage(from error: Error) -> String {
         let fallback = L10n.tr("Unable to save profile. Please try again.", "无法保存个人资料，请稍后重试")
-        let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        let message = AppErrorMessage.userMessage(for: error).trimmingCharacters(in: .whitespacesAndNewlines)
         if message.isEmpty || message == "The operation couldn’t be completed." {
             return fallback
         }

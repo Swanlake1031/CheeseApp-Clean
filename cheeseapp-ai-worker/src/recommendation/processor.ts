@@ -64,7 +64,16 @@ export class RecommendationProcessor {
         );
         return;
       }
+      const post = await this.repository.getPost(job.post_id);
+      if (!post || !await this.repository.hasAIConsent(post.user_id)) {
+        await this.repository.failPostEmbeddingJob(job.job_id, "ai_consent_required", false);
+        return;
+      }
       const embedding = await this.provider.embed(job.embedding_input);
+      if (!await this.repository.hasAIConsent(post.user_id)) {
+        await this.repository.failPostEmbeddingJob(job.job_id, "ai_consent_required", false);
+        return;
+      }
       const committed = await this.repository.completePostEmbeddingJob(
         job.job_id,
         job.input_hash,

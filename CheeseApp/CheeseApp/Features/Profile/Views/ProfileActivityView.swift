@@ -615,7 +615,7 @@ struct ProfileActivityView: View {
         } catch {
             guard openingRequestID == requestID else { return }
             if error.isCancellationLike { return }
-            navigationErrorMessage = error.localizedDescription
+            navigationErrorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -671,7 +671,7 @@ struct ProfileActivityView: View {
         } catch {
             guard editingRequestID == requestID else { return }
             if error.isCancellationLike { return }
-            navigationErrorMessage = error.localizedDescription
+            navigationErrorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -711,7 +711,7 @@ struct ProfileActivityView: View {
             refreshGeneration &+= 1
         } catch {
             if error.isCancellationLike { return }
-            navigationErrorMessage = error.localizedDescription
+            navigationErrorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -1172,7 +1172,7 @@ private struct ProfileActivityPageView: View {
             )
         } catch {
             if error.isCancellationLike { return }
-            onActionError(error.localizedDescription)
+            onActionError(AppErrorMessage.userMessage(for: error))
         }
     }
 

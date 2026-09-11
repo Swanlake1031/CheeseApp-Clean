@@ -60,7 +60,7 @@ struct ChatSharedForumDetailLoaderView: View {
             post = try await ForumService.shared.fetchPost(postId: postId)
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 }

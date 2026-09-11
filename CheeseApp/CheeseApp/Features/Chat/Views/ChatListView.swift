@@ -167,7 +167,7 @@ struct ChatListView: View {
                 activeRoute = .conversation(currentConversationRoute(preview))
                 notificationRouter.consume(action)
             } catch {
-                rowActionErrorMessage = error.localizedDescription
+                rowActionErrorMessage = AppErrorMessage.userMessage(for: error)
             }
 
         case .group(let groupID):
@@ -181,7 +181,7 @@ struct ChatListView: View {
                 activeRoute = .group(currentGroupRoute(preview))
                 notificationRouter.consume(action)
             } catch {
-                rowActionErrorMessage = error.localizedDescription
+                rowActionErrorMessage = AppErrorMessage.userMessage(for: error)
             }
 
         case .systemMessages(_, let category):
@@ -524,7 +524,7 @@ private extension ChatListView {
                 withAnimation(.easeOut(duration: 0.2)) {
                     _ = optimisticallyDeletedConversationIds.remove(conversation.id)
                 }
-                rowActionErrorMessage = "删除失败，已恢复该会话。\n\(error.localizedDescription)"
+                rowActionErrorMessage = "删除失败，已恢复该会话。\n\(AppErrorMessage.userMessage(for: error))"
             }
         }
     }
@@ -549,7 +549,7 @@ private extension ChatListView {
                 withAnimation(.easeOut(duration: 0.2)) {
                     _ = optimisticallyDeletedGroupIds.remove(group.id)
                 }
-                rowActionErrorMessage = "删除失败，已恢复该群聊。\n\(error.localizedDescription)"
+                rowActionErrorMessage = "删除失败，已恢复该群聊。\n\(AppErrorMessage.userMessage(for: error))"
             }
         }
     }

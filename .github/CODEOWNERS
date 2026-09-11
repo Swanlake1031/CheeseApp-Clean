@@ -1,0 +1,8 @@
+# Repository owner; add a second reviewer before requiring independent approval.
+* @Swanlake1031
+/CheeseApp/CheeseApp/Core/Services/Auth* @Swanlake1031
+/Supabase/ @Swanlake1031
+/cheeseapp-*/ @Swanlake1031
+/CheeseApp/Configuration/ @Swanlake1031
+/CheeseApp/CheeseApp/Resources/ @Swanlake1031
+/.github/ @Swanlake1031

@@ -638,3 +638,32 @@ Final diff review and searches confirmed no manual tag picker or choose-tag
 validation remains in the create/edit surfaces. Historical board metadata and
 reproduction fixtures remain intentionally. Physical-device composer UX and live
 post-reembedding classifier calibration have not been verified in this local task.
+
+
+## 12. App Store privacy boundary — pending rollout (2026-09-11)
+
+The App Store audit adds `ai_processing_consents` and checks the post author's
+explicit permission before the Worker sends text to Gemini for a new embedding.
+The SQL claim function skips authors without permission, preventing them from
+starving consented work. A Worker-side revocation race fails the job with `ai_consent_required`;
+consenting requeues authored forum posts. Withdrawal deletes the author's stored
+post vectors, invalidating dependent scores through existing triggers. Ranking
+weights, model versions, pagination and the threshold remain unchanged. This can
+reduce semantic/cross-school coverage until authors consent; missing eligible
+scores continue to fail closed. Previously computed vectors remain until normal
+invalidation or explicit withdrawal. No historical content is newly sent to Gemini
+without permission. All participants in AI reply context must also consent.
+
+Code is pending coordinated migration/Worker/client rollout. Do not claim this
+privacy boundary is deployed solely because the client builds. Review the dated
+App Store report for actual verification and remaining release blockers.
+
+Release gate: the new media moderation flag is deliberately `false` in the
+checked-in Worker deployment configuration. The existing Gemini API provider's
+age restrictions conflict with the current App Store 13+ audience; explicit AI
+consent does not resolve that restriction. Neither the new consent migrations
+nor the updated Worker were deployed by this audit. Resolve the provider/audience
+contract and verify paid-service privacy before enabling this coordinated release.
+Embedding completion locks and rechecks the consent row so withdrawal cannot be
+followed by a late job re-creating a deleted vector. Signup metadata cannot import
+unreviewed external avatars; new profiles start with a placeholder.

@@ -667,7 +667,7 @@ struct UserPostsView: View {
             )
         } catch {
             if error.isCancellationLike { return }
-            actionErrorMessage = error.localizedDescription
+            actionErrorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -922,7 +922,7 @@ struct UserPostsView: View {
                 try await profileSocialService.follow(targetUserId: userId)
             }
         } catch {
-            actionErrorMessage = error.localizedDescription
+            actionErrorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -939,7 +939,7 @@ struct UserPostsView: View {
             let conversation = try await chatService.getOrCreateConversation(otherUserId: userId, relatedPostId: nil)
             activeConversation = conversation
         } catch {
-            actionErrorMessage = error.localizedDescription
+            actionErrorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 }

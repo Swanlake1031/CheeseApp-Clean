@@ -325,7 +325,7 @@ final class ProfileForumPostLoader: ObservableObject {
             else { return }
             if error.isCancellationLike { return }
             hasResolved = true
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 }
@@ -415,7 +415,7 @@ struct ProfileForumPostCardView: View {
                 committedIsLiked: nil
             )
             if !error.isCancellationLike {
-                onActionError?(error.localizedDescription)
+                onActionError?(AppErrorMessage.userMessage(for: error))
             }
         }
     }
@@ -446,7 +446,7 @@ struct ProfileForumPostCardView: View {
         } catch {
             store.replace(postID: post.id, with: previous)
             if !error.isCancellationLike {
-                onActionError?(error.localizedDescription)
+                onActionError?(AppErrorMessage.userMessage(for: error))
             }
         }
     }

@@ -275,7 +275,7 @@ struct MentionSuggestionPanel: View {
                 guard !Task.isCancelled else { return }
                 candidates = []
                 isLoading = false
-                errorMessage = error.localizedDescription
+                errorMessage = AppErrorMessage.userMessage(for: error)
             }
         }
     }

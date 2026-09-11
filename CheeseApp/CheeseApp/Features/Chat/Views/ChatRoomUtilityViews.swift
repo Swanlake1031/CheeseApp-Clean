@@ -199,7 +199,7 @@ struct ChatRoomHistoryView: View {
         do {
             messages = try await chatService.fetchMessages(conversationId: conversation.id)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -323,7 +323,7 @@ struct ChatRoomTradeRecordsPlaceholderView: View {
                 conversationId: conversation.id
             )
         } catch {
-            if !error.isCancellationLike { errorMessage = error.localizedDescription }
+            if !error.isCancellationLike { errorMessage = AppErrorMessage.userMessage(for: error) }
         }
     }
 }
@@ -440,7 +440,7 @@ struct GroupChatHistoryView: View {
                 return message.createdAt >= clearedAt
             }
         } catch {
-            if !error.isCancellationLike { errorMessage = error.localizedDescription }
+            if !error.isCancellationLike { errorMessage = AppErrorMessage.userMessage(for: error) }
         }
     }
 }

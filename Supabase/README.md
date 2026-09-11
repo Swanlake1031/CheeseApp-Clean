@@ -24,20 +24,22 @@ immutable. They are not evidence that those features remain active.
 
 ## Local Workflow
 
-Use Supabase CLI against a local/throwaway project:
+For the App Store regression fixture, run from the repository root:
 
 ```sh
-supabase start
-supabase db reset --local --version 195
-supabase storage rm --local --experimental --recursive --yes ss:///course-outlines
-supabase migration up --local
-supabase test db
+scripts/verify-app-store-db.sh
 ```
 
-The two-phase reset is required because immutable historical migrations create
-the retired course bucket. Remove it through the Storage API before applying
-the retirement migration; direct SQL deletion of Storage objects is forbidden.
-Never run a reset against production.
+This creates a separate local project and replays every migration without
+rewriting history. Migration 133 requires an active official profile, so the
+script first applies through 132 and inserts a synthetic local official account.
+It then applies through 195, removes the historical empty `course-outlines`
+bucket through the Storage API, applies the remaining migrations and current
+seed, and checks the selected security/contract suites. It never resets a linked
+production database or copies production backups. Local CLI output stays in a
+private temporary log. The local Supabase image's `supautils` preload crashes on
+auth-schema privilege probes; only that preload is disabled in the test owner
+connection. Tests still exercise actual `SET ROLE`, grants and RLS.
 
 If a throwaway remote schema must be rebuilt manually, follow
 `RESET_INSTRUCTIONS.md`. Apply every migration in filename order through the

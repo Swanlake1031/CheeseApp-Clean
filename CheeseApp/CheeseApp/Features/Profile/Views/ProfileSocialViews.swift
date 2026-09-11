@@ -391,7 +391,7 @@ struct ProfileFollowListView: View {
         } catch {
             snapshot = ProfileFollowListsSnapshot(following: [], followers: [])
             if !error.isCancellationLike {
-                errorMessage = error.localizedDescription
+                errorMessage = AppErrorMessage.userMessage(for: error)
             }
         }
     }
@@ -406,7 +406,7 @@ struct ProfileFollowListView: View {
             try await profileSocialService.removeFollower(followerUserId: entry.id)
             snapshot.removeFollower(userID: entry.id)
         } catch {
-            actionErrorMessage = error.localizedDescription
+            actionErrorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -429,7 +429,7 @@ struct ProfileFollowListView: View {
             }
             snapshot.applyFollowingChange(entry: entry, isFollowing: isFollowing)
         } catch {
-            actionErrorMessage = error.localizedDescription
+            actionErrorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 }

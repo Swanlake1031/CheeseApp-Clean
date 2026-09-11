@@ -60,7 +60,7 @@ final class ChatRoomHistoryViewModel: ObservableObject {
             hasMore = page.nextCursor != nil
         } catch {
             messages = []
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
         isLoading = false
     }
@@ -80,7 +80,7 @@ final class ChatRoomHistoryViewModel: ObservableObject {
             hasMore = page.nextCursor != nil
         } catch {
             guard pageRequestID == requestID else { return }
-            pageErrorMessage = error.localizedDescription
+            pageErrorMessage = AppErrorMessage.userMessage(for: error)
         }
 
         guard pageRequestID == requestID else { return }

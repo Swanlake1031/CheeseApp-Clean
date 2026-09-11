@@ -299,7 +299,7 @@ class ChatService: ObservableObject {
 
             conversationErrorMessage = error.isCancellationLike
                 ? "连接中断，请重试。"
-                : error.localizedDescription
+                : AppErrorMessage.userMessage(for: error)
             hasResolvedInitialConversationLoad = true
         }
     }

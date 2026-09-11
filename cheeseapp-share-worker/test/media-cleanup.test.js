@@ -28,6 +28,11 @@ test("records transient post deletion failure and treats missing chat object as 
     const body = JSON.parse(options.body);
     calls.push({ url, method: options.method, body, headers: options.headers });
 
+    if (url.endsWith("/rpc/claim_account_media_cleanup_batch")) return jsonResponse([{
+      cleanup_id: "44444444-4444-4444-8444-444444444444", bucket: "avatars", object_path: "deleted-user/covers/old.jpg", attempt_count: 0
+    }]);
+    if (url.endsWith("/object/avatars")) return jsonResponse(null, 204);
+    if (url.endsWith("/rpc/complete_account_media_cleanup_job")) return jsonResponse(true);
     if (url.endsWith("/rpc/claim_post_media_cleanup_batch")) {
       return jsonResponse([{
         cleanup_id: "11111111-1111-4111-8111-111111111111",
@@ -72,6 +77,7 @@ test("records transient post deletion failure and treats missing chat object as 
 
   assert.equal(result.skipped, null);
   assert.deepEqual(result.kinds, [
+    { kind: "account", claimed: 1, succeeded: 1, failed: 0 },
     { kind: "post", claimed: 1, succeeded: 0, failed: 1 },
     { kind: "chat", claimed: 1, succeeded: 1, failed: 0 }
   ]);
@@ -98,6 +104,7 @@ test("rejects a claim that crosses its feature-owned bucket", async () => {
   const completions = [];
   const fetchImpl = async (url, options) => {
     const body = JSON.parse(options.body);
+    if (url.endsWith("/rpc/claim_account_media_cleanup_batch")) return jsonResponse([]);
     if (url.endsWith("/rpc/claim_post_media_cleanup_batch")) {
       return jsonResponse([{
         cleanup_id: "33333333-3333-4333-8333-333333333333",

@@ -245,7 +245,7 @@ final class UserPostsService: ObservableObject {
                 generation: requestGeneration
             ) else { return }
             if error.isCancellationLike { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
             hasResolvedInitialSurfaceLoad = true
         }
     }
@@ -269,7 +269,7 @@ final class UserPostsService: ObservableObject {
                 generation: requestGeneration
             ) else { return }
             if error.isCancellationLike { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 

@@ -49,7 +49,7 @@ final class ChatRoomHistoryViewModelTests: XCTestCase {
 
         XCTAssertFalse(viewModel.isLoading)
         XCTAssertTrue(viewModel.messages.isEmpty)
-        XCTAssertEqual(viewModel.errorMessage, "failed")
+        XCTAssertEqual(viewModel.errorMessage, "暂时无法完成操作，请重试；若问题持续，请联络客服。")
     }
 
     func testOlderPageFailurePreservesLoadedMessagesAndCanRetry() async {
@@ -79,7 +79,7 @@ final class ChatRoomHistoryViewModelTests: XCTestCase {
         await viewModel.loadMore()
 
         XCTAssertEqual(viewModel.messages.map(\.id), [newest.id])
-        XCTAssertEqual(viewModel.pageErrorMessage, "failed")
+        XCTAssertEqual(viewModel.pageErrorMessage, "暂时无法完成操作，请重试；若问题持续，请联络客服。")
         XCTAssertTrue(viewModel.hasMore)
 
         await viewModel.loadMore()

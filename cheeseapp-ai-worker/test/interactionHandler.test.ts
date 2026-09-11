@@ -25,6 +25,8 @@ import {
 } from "./fixtures";
 
 class FakeRepository implements CheeseAIRepository {
+  consent = true;
+  async hasAIConsent(): Promise<boolean> { return this.consent; }
   private claimed = false;
   readonly failures: Array<{
     readonly category: string;
@@ -217,4 +219,12 @@ test("loaded post images are forwarded to Gemini as optional context", async () 
 
   assert.equal((await handler.process(SOURCE_COMMENT_ID)).status, "completed");
   assert.deepEqual(provider.lastInput?.images, imageLoader.images);
+});
+
+test('no participant consent means no Gemini call', async () => {
+  const repository = new FakeRepository(); repository.consent = false;
+  const provider = new FakeProvider();
+  const handler = new CheeseAIInteractionHandler(repository, provider, new FakeImageLoader(), TEST_CONFIG);
+  assert.equal((await handler.process(SOURCE_COMMENT_ID)).category, 'ai_consent_required');
+  assert.equal(provider.calls, 0);
 });

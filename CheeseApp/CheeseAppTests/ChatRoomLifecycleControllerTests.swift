@@ -374,7 +374,7 @@ final class ChatRoomViewModelTests: XCTestCase {
         await waitUntil { chatService.muteAttempts == 1 && !viewModel.isApplyingPrivacyAction }
 
         XCTAssertFalse(viewModel.isMuted)
-        XCTAssertEqual(viewModel.displayedRoomError, "send failed")
+        XCTAssertEqual(viewModel.displayedRoomError, "暂时无法完成操作，请重试；若问题持续，请联络客服。")
     }
 
     func testFirstDirectMessageSendsWithoutClassificationConfirmation() async {

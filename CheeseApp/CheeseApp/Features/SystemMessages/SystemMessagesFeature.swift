@@ -658,7 +658,7 @@ final class SystemMessageViewModel: ObservableObject {
         } catch {
             guard ownerID == requestOwner else { return }
             if error.isCancellationLike { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
             hasResolvedInitialLoad = true
         }
     }
@@ -693,7 +693,7 @@ final class SystemMessageViewModel: ObservableObject {
         } catch {
             guard ownerID == requestOwner else { return }
             if error.isCancellationLike { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -706,7 +706,7 @@ final class SystemMessageViewModel: ObservableObject {
             }
         } catch {
             if error.isCancellationLike { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -719,7 +719,7 @@ final class SystemMessageViewModel: ObservableObject {
             }
         } catch {
             if error.isCancellationLike { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 

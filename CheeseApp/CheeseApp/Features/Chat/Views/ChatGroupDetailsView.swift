@@ -705,7 +705,7 @@ private struct AddGroupMembersSheet: View {
                     candidates = try await chatService.fetchMutualFollowProfiles(limit: 200)
                         .filter { !existingMemberIDs.contains($0.id) }
                 } catch {
-                    errorMessage = error.localizedDescription
+                    errorMessage = AppErrorMessage.userMessage(for: error)
                 }
                 isLoading = false
             }

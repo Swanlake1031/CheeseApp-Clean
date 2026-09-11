@@ -159,7 +159,7 @@ struct CreateChatGroupSheet: View {
             errorMessage = nil
         } catch {
             candidates = []
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -176,7 +176,7 @@ struct CreateChatGroupSheet: View {
             onCreated(group)
             dismiss()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 }

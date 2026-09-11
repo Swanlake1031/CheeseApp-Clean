@@ -395,7 +395,7 @@ struct EditPostSheet: View {
             try? await Task.sleep(nanoseconds: 250_000_000)
             dismiss()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 

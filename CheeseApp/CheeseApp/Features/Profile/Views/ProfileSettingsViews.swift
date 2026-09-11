@@ -193,6 +193,28 @@ struct SettingsView: View {
 
                     settingsHeader(title: L10n.tr("Privacy", "隐私"))
                     settingsCard {
+                        Button {
+                            Task {
+                                do { try await AIProcessingConsent.requireConsent() }
+                                catch is CancellationError { }
+                                catch { settingsError = AppErrorMessage.userMessage(for: error) }
+                            }
+                        } label: {
+                            settingsRow(icon: "sparkles", title: L10n.tr("AI Processing Permission", "AI 处理权限"), subtitle: L10n.tr("Review and allow Google Gemini processing", "查看并允许 Google Gemini 处理"))
+                        }
+                        Divider().overlay(AppColors.divider)
+                        Button {
+                            Task {
+                                do {
+                                    let _: Bool = try await SupabaseManager.shared.client.rpc("set_my_ai_consent", params: ["p_allowed": false]).execute().value
+                                    if let id = authService.currentUser?.id { UserDefaults.standard.removeObject(forKey: AIProcessingConsent.key(for: id)) }
+                                } catch { settingsError = AppErrorMessage.userMessage(for: error) }
+                            }
+                        } label: {
+                            settingsRow(icon: "hand.raised", title: L10n.tr("Withdraw AI Permission", "撤回 AI 处理权限"), subtitle: L10n.tr("Stop new AI transfers and remove recommendation vectors", "停止新的 AI 传输并移除推荐向量"))
+                        }
+                        Divider().overlay(AppColors.divider)
+
                         settingsToggleRow(
                             icon: "person.crop.circle.badge.questionmark",
                             title: L10n.tr("Default Anonymous Posting", "默认匿名发文"),
@@ -320,7 +342,7 @@ struct SettingsView: View {
                         try await authService.signOut()
                         dismiss()
                     } catch {
-                        settingsError = error.localizedDescription
+                        settingsError = AppErrorMessage.userMessage(for: error)
                     }
                 }
             }
@@ -510,7 +532,7 @@ struct SettingsView: View {
             await authService.fetchUserProfile(userId: userId)
             settingsError = nil
         } catch {
-            settingsError = error.localizedDescription
+            settingsError = AppErrorMessage.userMessage(for: error)
             defaultAnonymousPosting = authService.currentUser?.isAnonymousDefault ?? false
         }
     }
@@ -605,7 +627,7 @@ struct SettingsView: View {
             if AuthService.isUserCancelledSocialSignIn(error) {
                 return
             }
-            settingsError = error.localizedDescription
+            settingsError = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -627,7 +649,7 @@ struct SettingsView: View {
             if AuthService.isUserCancelledSocialSignIn(error) {
                 return
             }
-            settingsError = error.localizedDescription
+            settingsError = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -655,7 +677,7 @@ struct SettingsView: View {
             try await authService.deactivateCurrentAccount()
             dismiss()
         } catch {
-            settingsError = error.localizedDescription
+            settingsError = AppErrorMessage.userMessage(for: error)
         }
     }
 }
@@ -940,7 +962,7 @@ struct McMasterVerificationView: View {
             status = try await McMasterVerificationService.status()
             message = nil
         } catch {
-            show(error.localizedDescription, asError: true)
+            show(AppErrorMessage.userMessage(for: error), asError: true)
         }
     }
 
@@ -969,7 +991,7 @@ struct McMasterVerificationView: View {
             startCooldown(seconds: result.retryAfterSeconds ?? 60)
             show("邮件服务器已接收验证码邮件，请检查麦马邮箱。", asError: false)
         } catch {
-            show(error.localizedDescription, asError: true)
+            show(AppErrorMessage.userMessage(for: error), asError: true)
         }
     }
 
@@ -987,7 +1009,7 @@ struct McMasterVerificationView: View {
             }
             show("麦马学生认证成功。", asError: false)
         } catch {
-            show(error.localizedDescription, asError: true)
+            show(AppErrorMessage.userMessage(for: error), asError: true)
         }
     }
 
@@ -1011,7 +1033,7 @@ struct McMasterVerificationView: View {
             }
             show("麦马学生认证已解除绑定。", asError: false)
         } catch {
-            show(error.localizedDescription, asError: true)
+            show(AppErrorMessage.userMessage(for: error), asError: true)
         }
     }
 

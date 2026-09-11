@@ -1,0 +1,57 @@
+name: App quality
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: app-quality-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  workers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: python3 scripts/check-repository-secrets.py
+      - run: python3 scripts/export-public-privacy.py && git diff --exit-code -- cheeseapp-share-worker/src/pages/legalContent.js
+      - run: npm ci --prefix cheeseapp-ai-worker
+      - run: npm run check --prefix cheeseapp-ai-worker && npm test --prefix cheeseapp-ai-worker
+      - run: npm run check --prefix cheeseapp-share-worker && npm test --prefix cheeseapp-share-worker
+      - run: |
+          npm run check --prefix cheeseapp-content-studio-api
+          node --test cheeseapp-content-studio-api/test/*.test.js
+          node --check cheeseapp-content-studio/public/app.js
+  ios:
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure simulator with public client values
+        run: cp CheeseApp/Configuration/Production.xcconfig CheeseApp/Configuration/Local.xcconfig.tmp && sed '/#include/d' CheeseApp/Configuration/Local.xcconfig.tmp > CheeseApp/Configuration/Local.xcconfig && rm CheeseApp/Configuration/Local.xcconfig.tmp
+      - name: Build and run on an available iPhone simulator
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for v in d["devices"].values() for x in v if "iPhone" in x["name"]))')
+          xcodebuild -project CheeseApp/CheeseApp.xcodeproj -scheme CheeseApp -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath "$RUNNER_TEMP/CheeseTests" -resultBundlePath "$RUNNER_TEMP/CheeseTests.xcresult" test CODE_SIGNING_ALLOWED=NO
+      - name: Build unsigned Release archive and validate bundled configuration
+        run: |
+          xcodebuild -project CheeseApp/CheeseApp.xcodeproj -scheme CheeseApp -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Cheese.xcarchive" archive CODE_SIGNING_ALLOWED=NO
+          python3 scripts/validate-ios-release.py --app "$RUNNER_TEMP/Cheese.xcarchive/Products/Applications/CheeseApp.app"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-test-results
+          path: ${{ runner.temp }}/CheeseTests.xcresult
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.90.0
+      - run: scripts/verify-app-store-db.sh

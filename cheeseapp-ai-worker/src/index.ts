@@ -1,3 +1,4 @@
+import { handleModeratedUpload } from "./moderation";
 import {
   ConfigurationError,
   loadConfig,
@@ -299,6 +300,7 @@ export async function handleWorkerRequest(
 ): Promise<Response> {
   const url = new URL(request.url);
   try {
+    if (request.method === "POST" && url.pathname === "/v1/media/upload") return handleModeratedUpload(request, env);
     if (request.method === "GET" && url.pathname === "/health") {
       const config = loadConfig(env);
       return json({

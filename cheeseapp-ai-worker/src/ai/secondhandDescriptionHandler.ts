@@ -36,6 +36,7 @@ export class SecondhandDescriptionError extends Error {
 }
 
 export interface SecondhandDescriptionRepository {
+  hasAIConsent(userId: string): Promise<boolean>;
   authenticate(accessToken: string): Promise<AuthUser>;
   getOwnedSecondhandImages(
     ownerId: string,
@@ -195,6 +196,7 @@ export class SecondhandDescriptionHandler {
       throw new SecondhandDescriptionError("rate_limited", 429);
     }
 
+    if (!await this.repository.hasAIConsent(user.id)) throw new SecondhandDescriptionError("ai_consent_required", 403);
     const records = await this.repository.getOwnedSecondhandImages(
       user.id,
       request.images,

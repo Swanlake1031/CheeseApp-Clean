@@ -1288,7 +1288,7 @@ struct ForumDetailView: View {
             errorMessage = nil
         } catch {
             if isCancellation(error) { return }
-            let loadMessage = "\(L10n.tr("Load failed", "载入失败")): \(error.localizedDescription)"
+            let loadMessage = "\(L10n.tr("Load failed", "载入失败")): \(AppErrorMessage.userMessage(for: error))"
             errorMessage = loadMessage
             if comments.isEmpty {
                 commentLoadState = .error(message: loadMessage)
@@ -1430,7 +1430,7 @@ struct ForumDetailView: View {
                 committedIsLiked: nil
             )
             if isCancellation(error) { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -1466,7 +1466,7 @@ struct ForumDetailView: View {
         } catch {
             interactionStore.replace(postID: post.id, with: previous)
             if isCancellation(error) { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -1522,7 +1522,7 @@ struct ForumDetailView: View {
                 replyingToComment = replyTargetBeforeSubmit
             }
             if isCancellation(error) { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -1547,7 +1547,7 @@ struct ForumDetailView: View {
             errorMessage = nil
         } catch {
             if isCancellation(error) { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -1595,7 +1595,7 @@ struct ForumDetailView: View {
             }
             commentLikeCountOverrides[comment.id] = previousCount
             if isCancellation(error) { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 

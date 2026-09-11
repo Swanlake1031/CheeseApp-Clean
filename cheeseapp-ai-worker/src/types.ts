@@ -1,4 +1,6 @@
 export interface Env {
+  readonly MEDIA_MODERATION_RATE_LIMITER?: RateLimit;
+  readonly CHEESE_MEDIA_MODERATION_ENABLED?: string;
   readonly GEMINI_API_KEY?: string;
   readonly CHEESE_AI_USER_ID?: string;
   readonly SUPABASE_URL?: string;

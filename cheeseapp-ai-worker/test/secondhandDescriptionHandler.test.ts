@@ -45,6 +45,8 @@ function record(reference: SecondhandImageReference): PostImageRecord {
 }
 
 class Repository implements SecondhandDescriptionRepository {
+  consent = true;
+  async hasAIConsent(): Promise<boolean> { return this.consent; }
   authenticateCalls = 0;
   failAuthentication = false;
   omitOwnedImage = false;
@@ -186,4 +188,11 @@ test("partial image fetch succeeds, but zero valid images never calls Gemini", a
     (error: unknown) => error instanceof SecondhandDescriptionError && error.category === "no_valid_images",
   );
   assert.equal(empty.provider.calls, 0);
+});
+
+test('description generation requires explicit account AI consent', async () => {
+  const repository = new Repository(); repository.consent = false;
+  const f = makeHandler({ repository });
+  await assert.rejects(f.handler.generate('token', request()), /ai_consent_required/);
+  assert.equal(f.provider.calls, 0);
 });

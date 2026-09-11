@@ -35,6 +35,7 @@
           <button class="nav-item" data-screen="create">新建内容</button>
           <button class="nav-item" data-screen="drafts">草稿</button>
           <button class="nav-item" data-screen="published">已发布</button>
+          <button class="nav-item" data-screen="moderation">举报审核</button>
         </nav>
         <div class="sidebar-footer">
           <span id="viewer-email" class="viewer-email"></span>
@@ -48,6 +49,7 @@
           <button id="top-create" class="primary compact">＋ 新建内容</button>
         </header>
         <p id="toast" class="toast" role="status"></p>
+        <p><label><input id="ai-consent" type="checkbox" />我同意将我的论坛内容用于 Google Gemini 推荐、经同意的讨论内容用于 AI 回复，以及所选图片用于内容安全检查。资料可能在加拿大境外处理，依 Google API 条款使用及保留；取消勾选可撤回同意。</label> <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">Google API 条款</a></p>
 
         <section id="overview-screen" class="screen active">
           <div class="hero-card">
@@ -61,6 +63,12 @@
           </div>
         </section>
 
+        <section id="moderation-screen" class="screen">
+          <h2>统一举报队列</h2>
+          <p>仅管理员可处理。高风险举报目标 4 小时内响应，其他举报 24 小时内响应。每次操作必须记录依据。申诉联系 support@cheeseapp.dev。</p>
+          <button id="refresh-moderation" class="secondary">刷新举报</button><button id="restore-moderated-user" type="button">申诉后恢复帐号</button>
+          <div id="moderation-list" aria-live="polite"></div>
+        </section>
         <section id="create-screen" class="screen">
           <div class="section-heading"><div><h2>新建内容</h2><p>图片会以正式发布链路写入，不会产生独立帖子模型。</p></div><button id="save-draft" class="secondary">保存草稿</button></div>
           <form id="editor-form" class="editor-layout">

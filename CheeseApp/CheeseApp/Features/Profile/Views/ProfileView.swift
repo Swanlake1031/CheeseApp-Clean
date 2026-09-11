@@ -986,7 +986,7 @@ struct ProfileCoverEditorView: View {
             pendingCoverCropImage = image
             showingCoverCropper = true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -1019,7 +1019,7 @@ struct ProfileCoverEditorView: View {
             effectiveCoverURLString = newURL
             onCoverUpdated(newURL)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -1038,7 +1038,7 @@ struct ProfileCoverEditorView: View {
             effectiveCoverURLString = nil
             onCoverUpdated(nil)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 }

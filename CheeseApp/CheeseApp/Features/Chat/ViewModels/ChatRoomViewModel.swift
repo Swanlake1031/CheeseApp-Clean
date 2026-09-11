@@ -289,7 +289,7 @@ final class ChatRoomViewModel: ObservableObject {
                     self.sheetDestination = .secondhandBuyerSelection
                 }
             } catch {
-                self.roomState.setError(error.localizedDescription)
+                self.roomState.setError(AppErrorMessage.userMessage(for: error))
             }
         }
     }
@@ -391,7 +391,7 @@ final class ChatRoomViewModel: ObservableObject {
                 return
             } catch {
                 guard mediaPreparationID == preparationID else { return }
-                roomState.setError(error.localizedDescription)
+                roomState.setError(AppErrorMessage.userMessage(for: error))
             }
             guard mediaPreparationID == preparationID else { return }
             isPreparingMedia = false
@@ -505,7 +505,7 @@ final class ChatRoomViewModel: ObservableObject {
                     pendingQuote = nil
                 }
             } catch {
-                roomState.setError(error.localizedDescription)
+                roomState.setError(AppErrorMessage.userMessage(for: error))
             }
         }
     }
@@ -707,7 +707,7 @@ final class ChatRoomViewModel: ObservableObject {
                 )
             } catch {
                 failedSend = .images
-                roomState.setError(error.localizedDescription)
+                roomState.setError(AppErrorMessage.userMessage(for: error))
                 return
             }
         }
@@ -792,7 +792,7 @@ final class ChatRoomViewModel: ObservableObject {
                 self.secondhandPurchaseIntent = nil
                 await self.refreshSecondhandPurchaseIntent()
             } catch {
-                self.roomState.setError(error.localizedDescription)
+                self.roomState.setError(AppErrorMessage.userMessage(for: error))
             }
         }
     }
@@ -808,7 +808,7 @@ final class ChatRoomViewModel: ObservableObject {
         do {
             try await action()
         } catch {
-            roomState.setError(error.localizedDescription)
+            roomState.setError(AppErrorMessage.userMessage(for: error))
         }
     }
 

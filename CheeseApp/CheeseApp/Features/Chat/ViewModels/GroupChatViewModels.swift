@@ -245,7 +245,7 @@ final class GroupChatRoomViewModel: ObservableObject {
                     pendingQuote = nil
                 }
             } catch {
-                roomState.setError(error.localizedDescription)
+                roomState.setError(AppErrorMessage.userMessage(for: error))
             }
         }
     }
@@ -275,7 +275,7 @@ final class GroupChatRoomViewModel: ObservableObject {
                 return
             } catch {
                 guard mediaPreparationID == preparationID else { return }
-                roomState.setError(error.localizedDescription)
+                roomState.setError(AppErrorMessage.userMessage(for: error))
             }
             guard mediaPreparationID == preparationID else { return }
             isPreparingMedia = false
@@ -406,7 +406,7 @@ final class GroupChatRoomViewModel: ObservableObject {
                 await cancelRemainingImageSend()
                 return
             } catch {
-                roomState.setError(error.localizedDescription)
+                roomState.setError(AppErrorMessage.userMessage(for: error))
                 if let uploadedAsset, !didSend {
                     // Keep the uploaded asset staged so the user can retry without
                     // uploading the same image again.
@@ -554,7 +554,7 @@ final class GroupChatDetailsViewModel: ObservableObject {
             errorMessage = nil
         } catch {
             members = []
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
         isLoading = false
     }
@@ -575,7 +575,7 @@ final class GroupChatDetailsViewModel: ObservableObject {
                 errorMessage = nil
             } catch {
                 isMuted = previousValue
-                errorMessage = error.localizedDescription
+                errorMessage = AppErrorMessage.userMessage(for: error)
             }
             isSavingMute = false
         }
@@ -594,7 +594,7 @@ final class GroupChatDetailsViewModel: ObservableObject {
                 errorMessage = nil
             } catch {
                 isPinned = previous
-                errorMessage = error.localizedDescription
+                errorMessage = AppErrorMessage.userMessage(for: error)
             }
         }
     }
@@ -609,7 +609,7 @@ final class GroupChatDetailsViewModel: ObservableObject {
             errorMessage = nil
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
             return false
         }
     }
@@ -624,7 +624,7 @@ final class GroupChatDetailsViewModel: ObservableObject {
             errorMessage = nil
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
             return false
         }
     }
@@ -643,7 +643,7 @@ final class GroupChatDetailsViewModel: ObservableObject {
             errorMessage = nil
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
             return false
         }
     }
@@ -658,7 +658,7 @@ final class GroupChatDetailsViewModel: ObservableObject {
             errorMessage = nil
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
             return false
         }
     }
@@ -676,7 +676,7 @@ final class GroupChatDetailsViewModel: ObservableObject {
             errorMessage = nil
             return date
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
             return nil
         }
     }
@@ -701,7 +701,7 @@ final class GroupChatDetailsViewModel: ObservableObject {
             errorMessage = nil
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
             return false
         }
     }
@@ -729,7 +729,7 @@ final class GroupChatDetailsViewModel: ObservableObject {
             await chatService.refreshConversations()
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 }

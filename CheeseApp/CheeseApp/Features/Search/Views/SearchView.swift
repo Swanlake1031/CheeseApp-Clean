@@ -308,7 +308,7 @@ struct SearchView: View {
                                     do {
                                         try await viewModel.toggleFollow(profile: profile)
                                     } catch {
-                                        profileActionError = error.localizedDescription
+                                        profileActionError = AppErrorMessage.userMessage(for: error)
                                     }
                                 }
                             },
@@ -328,7 +328,7 @@ struct SearchView: View {
                                         )
                                         activeConversation = conversation
                                     } catch {
-                                        profileActionError = error.localizedDescription
+                                        profileActionError = AppErrorMessage.userMessage(for: error)
                                     }
                                 }
                             }
@@ -448,7 +448,7 @@ struct SearchView: View {
             selectedResolvedResult = nil
             selectedResolvedResult = destination
         } catch {
-            resultOpenErrorMessage = error.localizedDescription
+            resultOpenErrorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -800,7 +800,7 @@ final class SearchViewModel: ObservableObject {
             switch result {
             case .success(let page): pages[key] = page
             case .failure(let error):
-                if !error.isCancellationLike { errors[key] = error.localizedDescription }
+                if !error.isCancellationLike { errors[key] = AppErrorMessage.userMessage(for: error) }
             }
         }
         searchPages = pages
@@ -846,7 +846,7 @@ final class SearchViewModel: ObservableObject {
                   currentPostSearchQuery == query
             else { return }
             if !error.isCancellationLike {
-                searchErrors[category] = error.localizedDescription
+                searchErrors[category] = AppErrorMessage.userMessage(for: error)
                 applySelectedSearchPage()
             }
         }

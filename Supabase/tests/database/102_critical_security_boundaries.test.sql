@@ -124,18 +124,17 @@ VALUES
   )
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.post_images (post_id, url, order_index)
-VALUES
-  (
-    '51000000-0000-0000-0000-000000000003'::UUID,
-    'https://storage.invalid/private-forum-secret.jpg',
-    0
-  ),
-  (
-    '52000000-0000-0000-0000-000000000001'::UUID,
-    'https://storage.invalid/private-market-secret.jpg',
-    0
-  );
+-- Synthetic server approvals for fixture images; the production client cannot
+-- insert these receipts. Separate safety tests prove missing receipts fail.
+INSERT INTO public.moderated_media(bucket,object_path,user_id,sha256,model)
+SELECT 'post-images', path, '00000000-0000-0000-0000-000000000001',repeat('a',64),'test-fixture'
+FROM (VALUES ('00000000-0000-0000-0000-000000000001/private-forum-secret.jpg'),
+ ('00000000-0000-0000-0000-000000000001/private-market-secret.jpg')) fixture(path);
+INSERT INTO public.post_images(post_id,url,order_index,bucket,object_path)
+SELECT id,'https://zeuivahkowbxmfzsnagt.supabase.co/storage/v1/object/public/post-images/'||path,0,'post-images',path
+FROM (VALUES
+ ('51000000-0000-0000-0000-000000000003'::uuid,'00000000-0000-0000-0000-000000000001/private-forum-secret.jpg'),
+ ('52000000-0000-0000-0000-000000000001'::uuid,'00000000-0000-0000-0000-000000000001/private-market-secret.jpg')) fixture(id,path);
 
 INSERT INTO public.conversations (
   id,
@@ -237,10 +236,10 @@ SELECT is(
     WHERE namespace.nspname = 'public'
       AND procedure.prosecdef
       AND has_function_privilege('anon', procedure.oid, 'EXECUTE')
-      AND procedure.oid <> 'public.get_public_forum_share_post(uuid)'::REGPROCEDURE
+      AND procedure.oid NOT IN ('public.get_public_forum_share_post(uuid)'::REGPROCEDURE, 'public.get_public_secondhand_share_post(uuid)'::REGPROCEDURE)
   ),
   0::BIGINT,
-  'anon can execute no definer except the narrow public Forum share RPC'
+  'anon can execute only the two narrow public share RPCs'
 );
 
 SELECT is(

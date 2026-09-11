@@ -53,7 +53,7 @@ final class ChatFollowSearchViewModel: ObservableObject {
 
             await reloadResults(query: normalizedQuery)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -92,7 +92,7 @@ final class ChatFollowSearchViewModel: ObservableObject {
         } catch {
             guard !Task.isCancelled, normalized == normalizedQuery else { return }
             results = []
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
             isLoading = false
         }
     }

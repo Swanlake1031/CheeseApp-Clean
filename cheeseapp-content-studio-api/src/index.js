@@ -37,6 +37,52 @@ export default {
 
 async function route(request, url, env, context) {
   const { pathname } = url;
+  if (pathname === "/v1/moderation" && request.method === "GET") {
+    if (context.role !== "admin") throw httpError(403, "Administrator access required");
+    return json({ reports: await userRPC(env, context.token, "moderation_queue", { p_limit: 100 }) });
+  }
+  if (pathname === "/v1/moderation/resolve" && request.method === "POST") {
+    if (context.role !== "admin") throw httpError(403, "Administrator access required");
+    const body = await readJSON(request);
+    if (!["post", "comment", "message", "user"].includes(body.kind) ||
+        !["review", "dismiss", "remove", "suspend"].includes(body.action) ||
+        !/^[0-9a-f-]{36}$/i.test(body.id || "") || typeof body.note !== "string" ||
+        body.note.trim().length < 5 || body.note.length > 1000) throw httpError(400, "Choose a report, action and explanatory note");
+    await userRPC(env, context.token, "moderation_resolve", { p_kind: body.kind, p_id: body.id, p_action: body.action, p_note: body.note });
+    return json({ ok: true });
+  }
+  if (pathname === "/v1/moderation/media" && request.method === "GET") {
+    if (context.role !== "admin") throw httpError(403, "Administrator access required");
+    const kind = url.searchParams.get("kind"), id = url.searchParams.get("id");
+    if (!["post", "message", "user"].includes(kind) || !/^[0-9a-f-]{36}$/i.test(id || "")) throw httpError(400, "Invalid report");
+    const media = await userRPC(env, context.token, "moderation_report_media", {p_kind: kind, p_id: id});
+    if (!url.searchParams.has("index")) return json({ count: media.length });
+    const index = Number(url.searchParams.get("index"));
+    const item = Number.isInteger(index) && index >= 0 ? media[index] : null;
+    if (!item || !["avatars", "post-images", "chat-images"].includes(item.bucket) || !item.object_path) throw httpError(404, "Media unavailable");
+    const response = await serviceStorage(env, "GET", item.bucket, item.object_path);
+    const type = response.headers.get("Content-Type") || "";
+    if (!/^image\/(jpeg|png|webp)(;|$)/i.test(type)) throw httpError(415, "Unsupported review image");
+    return new Response(response.body, {headers:{"Content-Type":type,"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"}});
+  }
+  if (pathname === "/v1/moderation/restore" && request.method === "POST") {
+    if (context.role !== "admin") throw httpError(403, "Administrator access required");
+    const body = await readJSON(request);
+    if (!/^[0-9a-f-]{36}$/i.test(body.userId || "") || typeof body.note !== "string" || body.note.trim().length < 5 || body.note.length > 1000) throw httpError(400, "User and appeal decision required");
+    await userRPC(env, context.token, "moderation_restore_user", {p_user_id:body.userId,p_note:body.note});
+    return json({ok:true});
+  }
+  if (pathname === "/v1/ai-consent" && request.method === "GET") {
+    const rows = await userRest(env, context.token, "/ai_processing_consents?select=version&limit=1");
+    return json({allowed: rows.some(row => row.version === "2026-09-11")});
+  }
+  if (pathname === "/v1/ai-consent" && request.method === "POST") {
+    const body = await readJSON(request);
+    if (body.allowed !== true && body.allowed !== false) throw httpError(400, "Explicit permission required");
+    await userRPC(env, context.token, "set_my_ai_consent", { p_allowed: body.allowed });
+    return json({ ok: true });
+  }
+
 
   if (request.method === "GET" && pathname === "/v1/bootstrap") {
     const boards = await userRest(
@@ -96,11 +142,10 @@ async function requireStudioUser(request, env) {
   const token = bearerToken(request);
   const config = readConfig(env);
   const userResponse = await fetch(`${config.url}/auth/v1/user`, {
-    headers: { apikey: config.publishableKey, Authorization: `Bearer ${token}` }
+    headers: { apikey: config.publishableKey, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000)
   });
   if (!userResponse.ok) {
-    const detail = (await userResponse.text()).slice(0, 240);
-    console.log(JSON.stringify({ event: "content_studio_session_validation_failed", status: userResponse.status, detail }));
+    console.log(JSON.stringify({ event: "content_studio_session_validation_failed", status: userResponse.status }));
     throw httpError(401, "CMS session validation failed");
   }
   const user = await userResponse.json();
@@ -371,7 +416,11 @@ async function prepareAndUploadMedia({ env, context, kind, postID, operationID, 
   for (const plan of plans) {
     const source = await serviceStorage(env, "GET", DRAFT_BUCKET, plan.sourcePath);
     if (!source.ok || !source.body) throw httpError(409, "A draft image could not be read");
-    await userStorage(env, context.token, "PUT", POST_BUCKET, plan.object_path, source.body, "image/jpeg");
+    const moderated = await fetch(`https://ai.cheeseapp.org/v1/media/upload?bucket=${POST_BUCKET}&path=${encodeURIComponent(plan.object_path)}`, {
+      method: "POST", headers: { Authorization: `Bearer ${context.token}`, "Content-Type": "image/jpeg", "X-Cheese-AI-Consent": "2026-09-11" },
+      body: source.body, signal: AbortSignal.timeout(60000)
+    });
+    if (!moderated.ok) throw httpError(422, "Image review failed. Check AI permission and Community Rules, or try again later.");
     await userRPC(env, context.token, "mark_post_media_uploaded", {
       p_operation_id: operationID,
       p_order_index: plan.order_index
@@ -421,7 +470,7 @@ async function serviceRest(env, path, init = {}) {
     ...init,
     headers: {
       apikey: config.serviceRoleKey,
-      Authorization: `Bearer ${config.serviceRoleKey}`,
+      ...(config.serviceRoleKey.startsWith("sb_secret_") ? {} : { Authorization: `Bearer ${config.serviceRoleKey}` }),
       "Content-Type": "application/json",
       ...(init.headers || {})
     }
@@ -462,18 +511,19 @@ async function storageRequest(env, method, bucket, path, body, contentType, toke
     method,
     headers: {
       apikey: serviceRole ? config.serviceRoleKey : config.publishableKey,
-      Authorization: `Bearer ${token}`,
+      ...(serviceRole && token.startsWith("sb_secret_") ? {} : { Authorization: `Bearer ${token}` }),
       ...(contentType ? { "Content-Type": contentType } : {}),
       ...(method === "PUT" ? { "x-upsert": "true" } : {})
     },
-    body
+    body,
+    signal: AbortSignal.timeout(30000)
   });
   if (!response.ok) throw await asSupabaseError(response);
   return response;
 }
 
 async function supabaseJSON(url, init) {
-  const response = await fetch(url, init);
+  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw await asSupabaseError(response);
   if (response.status === 204) return null;
   const raw = await response.text();
@@ -481,13 +531,9 @@ async function supabaseJSON(url, init) {
 }
 
 async function asSupabaseError(response) {
-  const fallback = response.status === 401 || response.status === 403 ? "Request was not authorized" : "Supabase request failed";
-  try {
-    const payload = await response.json();
-    return httpError(response.status, payload.message || payload.error || fallback);
-  } catch {
-    return httpError(response.status, fallback);
-  }
+  console.log(JSON.stringify({ event: "content_studio_upstream_failed", status: response.status }));
+  const message = response.status === 401 ? "Your session expired. Sign in again." : response.status === 403 ? "This action is not permitted." : "Unable to save. Check the content and your permissions, then try again.";
+  return httpError(response.status, message);
 }
 
 function normaliseDraftPayload(payload, contentType) {
@@ -619,7 +665,7 @@ function httpError(status, message) {
 
 function safeMessage(error) {
   if (error?.status && error.status < 500) return error.message;
-  console.error("Content Studio API failure", error);
+  console.error(JSON.stringify({ event: "content_studio_request_failed", status: error?.status || 500 }));
   return "The request could not be completed";
 }
 

@@ -181,7 +181,7 @@ struct ChatRoomCreateGroupSheet: View {
             }
         } catch {
             candidates = []
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -198,7 +198,7 @@ struct ChatRoomCreateGroupSheet: View {
             onCreated(group)
             dismiss()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 }

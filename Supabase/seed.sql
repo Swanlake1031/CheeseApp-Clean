@@ -110,21 +110,21 @@ FROM (
     '00000000-0000-0000-0000-000000000001',
     'alice@test.com',
     'Alice',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=alice',
+    '',
     TRUE
   ),
   (
     '00000000-0000-0000-0000-000000000002',
     'bob@test.com',
     'Bob',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=bob',
+    '',
     FALSE
   ),
   (
     '00000000-0000-0000-0000-000000000003',
     'carol@test.com',
     'Carol',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=carol',
+    '',
     FALSE
   ),
   (
@@ -185,10 +185,8 @@ INSERT INTO secondhand_posts (
 )
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO post_images (post_id, url, order_index)
-VALUES
-  ('20000000-0000-0000-0000-000000000001', 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200', 0)
-ON CONFLICT DO NOTHING;
+-- Image fixtures must be uploaded through the moderated media boundary.
+-- Do not seed unreviewed third-party image URLs or forge approval receipts.
 
 -- ============================================
 -- 4) Forum

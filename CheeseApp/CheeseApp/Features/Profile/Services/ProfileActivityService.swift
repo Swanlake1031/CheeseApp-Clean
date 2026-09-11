@@ -193,7 +193,7 @@ final class CompletedSecondhandTransactionsService: ObservableObject {
             }
             if error.isCancellationLike { return }
             hasResolved = true
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -451,7 +451,7 @@ final class ProfileActivityService: ObservableObject {
                 publishedVisibility: requestVisibility
             ) else { return }
             if error.isCancellationLike { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
             hasResolvedInitialLoad = true
             cacheCurrentPageIfResolved()
         }
@@ -520,7 +520,7 @@ final class ProfileActivityService: ObservableObject {
                 publishedVisibility: requestVisibility
             ) else { return }
             if error.isCancellationLike { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
             cacheCurrentPageIfResolved()
         }
     }
@@ -544,7 +544,7 @@ final class ProfileActivityService: ObservableObject {
             errorMessage = nil
         } catch {
             if error.isCancellationLike { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 

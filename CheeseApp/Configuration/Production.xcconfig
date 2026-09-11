@@ -1,0 +1,5 @@
+// Public client configuration. Never put service-role, APNs or provider secrets here.
+#include "Shared.xcconfig"
+// Explicit production values override developer Local.xcconfig for Release.
+SUPABASE_URL = https:/$()/zeuivahkowbxmfzsnagt.supabase.co
+SUPABASE_PUBLISHABLE_KEY = sb_publishable_29EL6LWWqeED8kLtLDk6_A_Ez8OXwf1

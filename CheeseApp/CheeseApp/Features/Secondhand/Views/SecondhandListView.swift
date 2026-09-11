@@ -294,7 +294,7 @@ struct SecondhandListView: View {
                 currentlyFavorited: interaction.isFavorited
             )
         } catch {
-            interactionErrorMessage = error.localizedDescription
+            interactionErrorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -553,7 +553,7 @@ final class ProfileSecondhandPostLoader: ObservableObject {
             else { return }
             if error.isCancellationLike { return }
             hasResolved = true
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 }
@@ -901,7 +901,7 @@ struct SecondhandDetailView: View {
             if (error as NSError).code == 409 {
                 hasSentContactCard = true
             }
-            chatErrorMessage = error.localizedDescription
+            chatErrorMessage = AppErrorMessage.userMessage(for: error)
             return false
         }
 
@@ -935,7 +935,7 @@ struct SecondhandDetailView: View {
             if (error as NSError).code == 409 {
                 hasSentContactCard = true
             }
-            chatErrorMessage = error.localizedDescription
+            chatErrorMessage = AppErrorMessage.userMessage(for: error)
             return false
         }
     }
@@ -974,7 +974,7 @@ struct SecondhandDetailView: View {
             interactionStore.setFavorite(postID: item.id, isFavorited: confirmed)
         } catch {
             interactionStore.replace(postID: item.id, with: previous)
-            interactionErrorMessage = error.localizedDescription
+            interactionErrorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 

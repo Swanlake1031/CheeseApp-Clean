@@ -208,7 +208,7 @@ struct ForumSearchView: View {
         } catch {
             guard !error.isCancellationLike else { return }
             guard activeRequestID == requestID else { return }
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -236,7 +236,7 @@ struct ForumSearchView: View {
         } catch {
             guard activeRequestID == requestID else { return }
             if !error.isCancellationLike {
-                pageErrorMessage = error.localizedDescription
+                pageErrorMessage = AppErrorMessage.userMessage(for: error)
             }
         }
     }

@@ -103,13 +103,7 @@ class ImageUploadService {
             .storage(StorageBuckets.avatars)
             .getPublicURL(path: path)
 
-        try await SupabaseManager.shared
-            .storage(StorageBuckets.avatars)
-            .upload(
-                path,
-                data: data,
-                options: FileOptions(contentType: "image/jpeg")
-            )
+        try await uploadModerated(data, bucket: StorageBuckets.avatars, path: path, contentType: "image/jpeg")
 
         return UploadedImageAsset(
             publicURL: publicURL.absoluteString,
@@ -170,13 +164,7 @@ class ImageUploadService {
             .storage(bucket)
             .getPublicURL(path: path)
 
-        try await SupabaseManager.shared
-            .storage(bucket)
-            .upload(
-                path,
-                data: data,
-                options: FileOptions(contentType: "image/jpeg")
-            )
+        try await uploadModerated(data, bucket: bucket, path: path, contentType: "image/jpeg")
 
         return UploadedImageAsset(
             publicURL: publicURL.absoluteString,
@@ -199,13 +187,7 @@ class ImageUploadService {
         path: String
     ) async throws -> UploadedImageAsset {
         let data = try await encodeJPEGData(from: image)
-        try await SupabaseManager.shared
-            .storage(bucket)
-            .upload(
-                path,
-                data: data,
-                options: FileOptions(contentType: "image/jpeg")
-            )
+        try await uploadModerated(data, bucket: bucket, path: path, contentType: "image/jpeg")
 
         return UploadedImageAsset(
             publicURL: "",
@@ -253,24 +235,14 @@ class ImageUploadService {
         }
     }
 
-    /// Uploads one already-recorded post-media plan. Upsert is intentional:
-    /// retrying the same idempotent operation rewrites the same object rather
-    /// than allocating a second path.
+    /// Uploads one recorded plan after server safety review. Retries accept only
+    /// identical bytes; approved object paths are immutable.
     func uploadPostImage(
         _ image: UIImage,
         plan: PostImageUploadPlan
     ) async throws -> UploadedImageAsset {
         let preparedImage = try await preparePostImageForUpload(image)
-        try await SupabaseManager.shared
-            .storage(plan.bucket)
-            .upload(
-                plan.objectPath,
-                data: preparedImage.data,
-                options: FileOptions(
-                    contentType: preparedImage.contentType,
-                    upsert: true
-                )
-            )
+        try await uploadModerated(preparedImage.data, bucket: plan.bucket, path: plan.objectPath, contentType: preparedImage.contentType)
         return plan.uploadedAsset
     }
 
@@ -286,6 +258,25 @@ class ImageUploadService {
                     continuation.resume(throwing: error)
                 }
             }
+        }
+    }
+
+    private func uploadModerated(_ data: Data, bucket: String, path: String, contentType: String) async throws {
+        try await AIProcessingConsent.requireConsent()
+        let session = try await SupabaseManager.shared.auth.session
+        var components = URLComponents(string: "https://ai.cheeseapp.org/v1/media/upload")!
+        components.queryItems = [URLQueryItem(name: "bucket", value: bucket), URLQueryItem(name: "path", value: path)]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        request.setValue("2026-09-11", forHTTPHeaderField: "X-Cheese-AI-Consent")
+        request.httpBody = data
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let response = response as? HTTPURLResponse, response.statusCode == 200 else {
+            throw NSError(domain: "ContentSafety", code: (response as? HTTPURLResponse)?.statusCode ?? 503,
+                          userInfo: [NSLocalizedDescriptionKey: L10n.tr("This image could not be published. Check the Community Rules or try again later.", "这张图片暂时无法发布，请查看社群规则或稍后再试。")])
         }
     }
 
@@ -531,5 +522,49 @@ private struct PostImageInsert: Encodable {
         case postId = "post_id"
         case url
         case orderIndex = "order_index"
+    }
+}
+
+/// Account-scoped, explicit permission before sending selected images to Google.
+/// Declining leaves text-only use available. Settings can withdraw local consent.
+@MainActor
+enum AIProcessingConsent {
+    private static var pending: Task<Bool, Never>?
+    static func key(for userID: UUID) -> String { "ai_processing_consent.2026-09-11.\(userID.uuidString)" }
+
+    static func requireConsent() async throws {
+        guard let userID = SupabaseManager.shared.auth.currentSession?.user.id else { throw URLError(.userAuthenticationRequired) }
+        let consentKey = key(for: userID)
+        if UserDefaults.standard.bool(forKey: consentKey) {
+            struct Consent: Decodable { let version: String }
+            let rows: [Consent] = try await SupabaseManager.shared.database("ai_processing_consents")
+                .select("version").eq("user_id", value: userID.uuidString).limit(1).execute().value
+            if rows.first?.version == "2026-09-11" { return }
+            UserDefaults.standard.removeObject(forKey: consentKey)
+        }
+        let task: Task<Bool, Never>
+        if let pending { task = pending }
+        else {
+            task = Task { @MainActor in
+                await withCheckedContinuation { continuation in
+                    guard let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+                          var presenter = scene.windows.first(where: \.isKeyWindow)?.rootViewController else {
+                        continuation.resume(returning: false); return
+                    }
+                    while let presented = presenter.presentedViewController { presenter = presented }
+                    let alert = UIAlertController(title: L10n.tr("Allow AI processing?", "允许 AI 处理？"),
+                        message: L10n.tr("With your permission, Cheese sends selected images to Google Gemini to check content safety, and your forum posts for recommendations and consented thread content for AI replies. Google processes this data under its API terms, potentially outside Canada; data use and retention depend on those terms. Do not include sensitive personal information. You can decline or withdraw permission in Settings.", "经你同意，Cheese 会将选中的图片发送给 Google Gemini 检查内容安全，并将你的论坛帖子用于推荐、经同意的讨论内容用于 AI 回复。Google 依 API 条款处理资料，处理地点可能在加拿大境外。请勿包含敏感个人资料。你可以拒绝或在设定中撤回同意。"), preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: L10n.tr("Not now", "暂不允许"), style: .cancel) { _ in continuation.resume(returning: false) })
+                    alert.addAction(UIAlertAction(title: L10n.tr("Allow", "允许"), style: .default) { _ in continuation.resume(returning: true) })
+                    presenter.present(alert, animated: true)
+                }
+            }
+            pending = task
+        }
+        let accepted = await task.value
+        pending = nil
+        guard accepted, SupabaseManager.shared.auth.currentSession?.user.id == userID else { throw CancellationError() }
+        let _: Bool = try await SupabaseManager.shared.client.rpc("set_my_ai_consent", params: ["p_allowed": true]).execute().value
+        UserDefaults.standard.set(true, forKey: consentKey)
     }
 }

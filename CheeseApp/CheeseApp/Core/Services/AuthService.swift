@@ -99,15 +99,56 @@ private enum AuthSessionValidationError: Error {
     case identityMismatch
 }
 
+/// A structured task group waits for cancelled children to finish. Session SDK
+/// work may ignore cancellation, so race completion on MainActor instead and
+/// invalidate sessionValidationID before accepting any late network result.
+@MainActor
+final class AuthBootstrapDeadline {
+    private var continuation: CheckedContinuation<Bool, Never>?
+    private var operationTask: Task<Void, Never>?
+    private var timerTask: Task<Void, Never>?
+    private var onTimeout: (@MainActor () -> Void)?
+
+    static func run(timeoutNanoseconds: UInt64, onTimeout: @escaping @MainActor () -> Void = {}, operation: @escaping @MainActor () async -> Void) async -> Bool {
+        let race = AuthBootstrapDeadline()
+        race.onTimeout = onTimeout
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                race.continuation = continuation
+                race.operationTask = Task { @MainActor in
+                    await operation()
+                    race.finish(true)
+                }
+                race.timerTask = Task { @MainActor in
+                    do { try await Task.sleep(nanoseconds: timeoutNanoseconds) }
+                    catch { return }
+                    race.finish(false)
+                }
+                if Task.isCancelled { race.finish(false) }
+            }
+        } onCancel: {
+            Task { @MainActor in race.finish(false) }
+        }
+    }
+
+    private func finish(_ completed: Bool) {
+        guard let continuation else { return }
+        self.continuation = nil
+        if !completed { onTimeout?() }
+        onTimeout = nil
+        operationTask?.cancel()
+        timerTask?.cancel()
+        operationTask = nil
+        timerTask = nil
+        continuation.resume(returning: completed)
+    }
+}
+
 // MARK: - 认证服务
 @MainActor
 class AuthService: ObservableObject {
     typealias AccountTransitionHandler = @MainActor () -> Void
     typealias AccountActivationHandler = @MainActor (UUID?) -> Void
-
-    private enum BootstrapTimeoutError: Error {
-        case timedOut
-    }
 
     private struct SessionRecoverySnapshot {
         let userId: UUID
@@ -161,6 +202,7 @@ class AuthService: ObservableObject {
     private var accountActivationHandler: AccountActivationHandler?
     private var sessionValidationTask: Task<Void, Never>?
     private var sessionValidationID: UUID?
+    private var needsServerProfileRefresh = false
     private var lastSuccessfulSessionValidationAt: Date?
     private var profileCompletionReturnSnapshot: SessionRecoverySnapshot?
     private let sessionValidationCacheLifetime: TimeInterval = 5 * 60
@@ -197,29 +239,14 @@ class AuthService: ObservableObject {
         bootstrapState = .restoringSession
         defer { bootstrapState = .ready }
 
-        do {
-            try await withThrowingTaskGroup(of: Void.self) { group in
-                group.addTask { [weak self] in
-                    guard let self else { return }
-                    await self.checkSession(force: true)
-                }
-                group.addTask { [bootstrapTimeoutNanoseconds] in
-                    try await Task.sleep(nanoseconds: bootstrapTimeoutNanoseconds)
-                    throw BootstrapTimeoutError.timedOut
-                }
-
-                _ = try await group.next()
-                group.cancelAll()
-            }
-
-            if requiresProfileCompletion {
-                await leaveProfileCompletion()
-            }
-        } catch BootstrapTimeoutError.timedOut {
-            cancelSessionValidation()
-            preserveLocalSessionAfterTransientFailure()
-        } catch {
-            handleSessionValidationFailure(error)
+        _ = await AuthBootstrapDeadline.run(timeoutNanoseconds: bootstrapTimeoutNanoseconds, onTimeout: { [weak self] in
+            // Invalidate in the same MainActor turn as the timer, before late
+            // validation can run or the bootstrap continuation is resumed.
+            self?.cancelSessionValidation()
+            self?.preserveLocalSessionAfterTransientFailure()
+        }) { [weak self] in
+            guard !Task.isCancelled else { return }
+            await self?.checkSession(force: true)
         }
     }
     
@@ -272,12 +299,13 @@ class AuthService: ObservableObject {
             let userId = try await requireAuthUserId()
             guard isCurrentSessionValidation(validationID) else { return }
 
-            if currentUser?.id != userId {
-                beginAccountStateTransition()
+            if currentUser?.id != userId || needsServerProfileRefresh {
+                beginAccountStateTransition(preservingSessionValidation: true)
                 currentUser = nil
-                let profile = try? await fetchProfileWithRetry(userId: userId)
+                let profile = try await fetchProfileWithRetry(userId: userId)
                 guard isCurrentSessionValidation(validationID) else { return }
                 currentUser = profile
+                needsServerProfileRefresh = false
             }
             guard isCurrentSessionValidation(validationID) else { return }
 
@@ -336,7 +364,10 @@ class AuthService: ObservableObject {
         }
 
         isAuthenticated = true
-        requiresProfileCompletion = needsProfileCompletion(currentUser)
+        needsServerProfileRefresh = true
+        // An offline placeholder has no school. Missing remote data is not proof
+        // that an established account needs onboarding (which can clear session).
+        requiresProfileCompletion = currentUser?.profileCompleted == false
         // 保持为 nil，确保下次前台恢复不会被 5 分钟缓存窗口跳过。
         lastSuccessfulSessionValidationAt = nil
     }
@@ -445,8 +476,10 @@ class AuthService: ObservableObject {
         sessionValidationTask = nil
         sessionValidationID = nil
         beginAccountStateTransition()
-        Task {
-            try? await supabase.auth.signOut()
+        let invalidToken = supabase.auth.currentSession?.accessToken
+        Task { @MainActor in
+            guard let invalidToken, supabase.auth.currentSession?.accessToken == invalidToken else { return }
+            try? await supabase.auth.signOut(scope: .local)
         }
         currentUser = nil
         isAuthenticated = false
@@ -458,7 +491,8 @@ class AuthService: ObservableObject {
         activateAccountState(nil)
     }
 
-    private func beginAccountStateTransition() {
+    private func beginAccountStateTransition(preservingSessionValidation: Bool = false) {
+        if !preservingSessionValidation { cancelSessionValidation() }
         accountTransitionGeneration &+= 1
         isAccountTransitionInProgress = true
         accountTransitionHandler?()
@@ -507,7 +541,7 @@ class AuthService: ObservableObject {
                 recentSignInMethod: .password
             )
         } catch {
-            errorMessage = "登录失败: \(error.localizedDescription)"
+            errorMessage = "登录失败: \(AppErrorMessage.userMessage(for: error))"
             throw error
         }
     }
@@ -1240,7 +1274,7 @@ class AuthService: ObservableObject {
             hasCheckedSession = false
             activateAccountState(nil)
         } catch {
-            let message = "注销账号失败：\(error.localizedDescription)"
+            let message = "注销账号失败：\(AppErrorMessage.userMessage(for: error))"
             errorMessage = message
             throw NSError(domain: "AuthService", code: 500, userInfo: [NSLocalizedDescriptionKey: message])
         }
@@ -1533,7 +1567,7 @@ class AuthService: ObservableObject {
             let shouldKeepOriginalMessage = nsError.domain == "AuthService"
             let message = shouldKeepOriginalMessage
                 ? nsError.localizedDescription
-                : "添加账号失败：\(error.localizedDescription)"
+                : "添加账号失败：\(AppErrorMessage.userMessage(for: error))"
             errorMessage = message
             throw NSError(domain: "AuthService", code: shouldKeepOriginalMessage ? nsError.code : 500, userInfo: [NSLocalizedDescriptionKey: message])
         }
@@ -1888,7 +1922,7 @@ class AuthService: ObservableObject {
         } else if text.contains("redirect") || text.contains("callback") || text.contains("scheme") {
             message = "\(providerName) 绑定失败：回调地址配置错误。"
         } else {
-            message = "\(providerName) 绑定失败：\(error.localizedDescription)"
+            message = "\(providerName) 绑定失败：\(AppErrorMessage.userMessage(for: error))"
         }
 
         return NSError(
@@ -1906,7 +1940,7 @@ class AuthService: ObservableObject {
         if text.contains("database error saving new user") {
             return "注册失败：数据库用户初始化异常，请先执行最新 Supabase migrations（含 schools / handle_new_user）后重试。"
         }
-        return "注册失败: \(error.localizedDescription)"
+        return "注册失败: \(AppErrorMessage.userMessage(for: error))"
     }
 }
 

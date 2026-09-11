@@ -1,0 +1,9 @@
+import { privacyCopy } from './legalContent.js';
+const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+export function renderLegalPage(kind) {
+  const title = kind === 'privacy' ? 'Privacy Policy · 隐私政策' : 'Support · 帮助与联络';
+  const body = kind === 'privacy'
+    ? privacyCopy.map(row => `<section><p lang="en">${escape(row.english)}</p><p lang="zh-Hans">${escape(row.chinese)}</p></section>`).join('')
+    : '<p>Contact <a href="mailto:support@cheeseapp.dev">support@cheeseapp.dev</a> for account, privacy, marketplace, community or chat help.</p><p>请联络上述邮箱获取帐号、隐私、二手、社群或聊天协助。请勿发送密码或登入验证码。</p><p>Report abusive posts, comments, messages or users using Report in the app. Use Block to stop unwanted interactions. To appeal a moderation decision, include the decision and relevant content identifier.</p><p>请在 App 内举报违规内容或用户，并使用封锁功能。申诉时请提供处置说明与相关内容编号。</p><p>Delete your account in Profile → Settings → Delete Account. If you cannot sign in, contact support for help verifying ownership and processing your request.</p><p>注销帐号：个人页面 → 设定 → 注销帐号。无法登入时，请联络客服核实身分并处理请求。</p>';
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} | Cheese</title><style>body{font:17px/1.65 system-ui,sans-serif;max-width:780px;margin:40px auto;padding:0 24px;color:#24211c;background:#fffdf6}h1{line-height:1.2}section{margin:28px 0;border-bottom:1px solid #ddd}a{color:#655015}</style></head><body><header><a href="/download">Cheese</a><h1>${title}</h1><p>Version 1.1 · September 11, 2026</p></header><main>${body}</main><footer><a href="/privacy">Privacy</a> · <a href="/support">Support</a> · <a href="https://ai.google.dev/gemini-api/terms">Google Gemini API terms</a></footer></body></html>`;
+}

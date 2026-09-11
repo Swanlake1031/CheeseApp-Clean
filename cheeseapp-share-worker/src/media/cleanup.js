@@ -1,6 +1,7 @@
 const DEFAULT_BATCH_LIMIT = 20;
 
 const CLEANUP_KINDS = [
+  { name: "account", claimRPC: "claim_account_media_cleanup_batch", completeRPC: "complete_account_media_cleanup_job" },
   {
     name: "post",
     claimRPC: "claim_post_media_cleanup_batch",
@@ -163,7 +164,7 @@ async function callRPC({
 }
 
 function validateClaim(job, kind) {
-  const expectedBucket = kind === "chat" ? "chat-images" : "post-images";
+  const expectedBucket = kind === "account" ? "avatars" : kind === "chat" ? "chat-images" : "post-images";
   if (
     !job ||
     typeof job.cleanup_id !== "string" ||
@@ -180,7 +181,7 @@ function validateClaim(job, kind) {
 function serviceHeaders(serviceRoleKey) {
   return {
     apikey: serviceRoleKey,
-    authorization: `Bearer ${serviceRoleKey}`,
+    ...(serviceRoleKey.startsWith("sb_secret_") ? {} : { authorization: `Bearer ${serviceRoleKey}` }),
     "content-type": "application/json"
   };
 }

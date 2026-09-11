@@ -28,6 +28,26 @@ final class AuthCredentialStoreTests: XCTestCase {
         super.tearDown()
     }
 
+    @MainActor
+    func testBootstrapDeadlineDoesNotWaitForUncooperativeNetworkAndIgnoresLateCompletion() async {
+        var pending: CheckedContinuation<Void, Never>?
+        let start = Date()
+        let completed = await AuthBootstrapDeadline.run(timeoutNanoseconds: 30_000_000) {
+            await withCheckedContinuation { pending = $0 }
+        }
+        XCTAssertFalse(completed)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 1)
+        XCTAssertNotNil(pending)
+        pending?.resume() // No second resume of the deadline continuation.
+        await Task.yield()
+    }
+
+    @MainActor
+    func testBootstrapSuccessfulValidationWinsDeadline() async {
+        let completed = await AuthBootstrapDeadline.run(timeoutNanoseconds: 1_000_000_000) {}
+        XCTAssertTrue(completed)
+    }
+
     func testAppleAuthorizationCancellationIsRecognized() {
         let cancellation = NSError(
             domain: "com.apple.AuthenticationServices.AuthorizationError",

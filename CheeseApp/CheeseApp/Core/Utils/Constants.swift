@@ -263,3 +263,23 @@ enum CreateComposerSessionStore {
         }
     }
 }
+
+/// UI copy never includes SQL, RPC, hostnames, tokens, or raw server messages.
+enum AppErrorMessage {
+    static func userMessage(for error: Error) -> String {
+        if error is CancellationError { return L10n.tr("Cancelled. You can try again when ready.", "已取消，准备好后可重试。") }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost, .cannotConnectToHost:
+                return L10n.tr("Connection unavailable. Check your network and try again.", "暂时无法连接，请检查网络后重试。")
+            default: break
+            }
+        }
+        let detail = String(describing: error)
+        if detail.contains("content_not_allowed") || detail.contains("media_review_required") || (error as NSError).domain == "ContentSafety" {
+            return L10n.tr("This content could not be published. Check the Community Rules or contact support.", "这项内容无法发布，请查看社群规则或联络客服。")
+        }
+        if detail.contains("account_restricted") { return L10n.tr("This account is restricted. Contact support to request a review.", "此帐号已受限制，请联络客服申请复核。") }
+        return L10n.tr("Unable to complete this action. Please try again. If it continues, contact support.", "暂时无法完成操作，请重试；若问题持续，请联络客服。")
+    }
+}

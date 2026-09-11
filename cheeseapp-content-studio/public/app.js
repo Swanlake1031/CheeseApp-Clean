@@ -189,6 +189,7 @@ function base64URL(bytes) {
 
 async function enterStudio() {
   state.bootstrap = await api("/v1/bootstrap");
+  $("#ai-consent").checked = (await api("/v1/ai-consent")).allowed;
   $("#login-screen").classList.add("hidden");
   $("#studio").classList.remove("hidden");
   $("#viewer-email").textContent = state.bootstrap.viewer.email || state.bootstrap.viewer.id;
@@ -235,9 +236,10 @@ function option(value, label) {
 function goTo(screen) {
   $$(".screen").forEach((item) => item.classList.toggle("active", item.id === `${screen}-screen`));
   $$(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.screen === screen));
-  const title = { overview: "概览", create: "新建内容", drafts: "草稿", published: "已发布" }[screen];
+  const title = { overview: "概览", create: "新建内容", drafts: "草稿", published: "已发布", moderation: "举报审核" }[screen];
   $("#page-title").textContent = title;
   if (screen === "drafts") loadDrafts();
+  if (screen === "moderation") loadModeration();
   if (screen === "published") loadPublished();
 }
 
@@ -637,3 +639,78 @@ function showLoginError(message) { $("#login-error").textContent = message; }
 function showToast(message, isError = false) { const toast = $("#toast"); toast.textContent = message; toast.className = `toast visible${isError ? " error" : ""}`; clearTimeout(showToast.timer); showToast.timer = setTimeout(() => toast.className = "toast", 4200); }
 function formatTime(value) { return new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
 function escapeHTML(value) { return String(value || "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char])); }
+
+
+async function loadModeration() {
+  const container = $("#moderation-list");
+  container.replaceChildren();
+  try {
+    const { reports } = await api("/v1/moderation");
+    if (!reports.length) { container.textContent = "目前没有待处理举报。"; return; }
+    for (const report of reports) {
+      const card = document.createElement("article");
+      card.className = "content-card";
+      const title = document.createElement("h3");
+      title.textContent = `${report.kind} · ${report.reason} · ${report.status}`;
+      const content = document.createElement("p");
+      content.textContent = `${report.content || "内容已移除或为图片，请核对举报对象"}\n举报说明：${report.details || "无"}`;
+      const due = document.createElement("p");
+      due.textContent = `目标响应时间：${new Date(report.due_at).toLocaleString()}`;
+      card.append(title, content, due);
+      if (["post", "message", "user"].includes(report.kind)) {
+        const preview = document.createElement("button");
+        preview.textContent = "查看举报图片（可能含不当内容）";
+        preview.addEventListener("click", async () => {
+          preview.disabled = true;
+          try {
+            const route = `/v1/moderation/media?kind=${encodeURIComponent(report.kind)}&id=${encodeURIComponent(report.id)}`;
+            const {count} = await api(route);
+            if (!count) { preview.textContent = "没有可预览的存储图片"; return; }
+            for (let index = 0; index < Math.min(count, 9); index++) {
+              const response = await fetch(`${stripSlash(config.apiBaseUrl)}${route}&index=${index}`, {headers:{Authorization:`Bearer ${state.session.access_token}`}});
+              if (!response.ok) throw new Error("preview failed");
+              const url = URL.createObjectURL(await response.blob());
+              const img = document.createElement("img"); img.alt = "举报对象的图片"; img.style.maxWidth = "280px";
+              img.onload = img.onerror = () => URL.revokeObjectURL(url); img.src = url; card.append(img);
+            }
+          } catch { preview.textContent = "图片无法载入，请核对权限后重试"; preview.disabled = false; }
+        });
+        card.append(preview);
+      }
+      for (const [action, label] of [["review", "开始审核"], ["dismiss", "驳回举报"], ["remove", "移除内容"], ["suspend", "暂停帐号"]]) {
+        if (report.kind === "user" && action === "remove") continue;
+        const button = document.createElement("button");
+        button.textContent = label;
+        button.addEventListener("click", async () => {
+          const note = prompt(`说明「${label}」的依据（至少 5 字）；请勿填写不必要的个人资料。`);
+          if (!note || note.trim().length < 5) return;
+          button.disabled = true;
+          try { await api("/v1/moderation/resolve", { method: "POST", body: { kind: report.kind, id: report.id, action, note } }); await loadModeration(); }
+          catch { due.textContent = "操作失败，请刷新队列确认状态后重试。"; button.disabled = false; }
+        });
+        card.append(button);
+      }
+      container.append(card);
+    }
+  } catch { container.textContent = "无法载入举报；请确认使用管理员帐号并检查网络。"; }
+}
+$("#refresh-moderation").addEventListener("click", loadModeration);
+$("#ai-consent").addEventListener("change", async (event) => {
+  const input = event.target;
+  const requested = input.checked;
+  input.disabled = true;
+  try { await api("/v1/ai-consent", { method: "POST", body: { allowed: requested } }); }
+  catch {
+    input.checked = !requested;
+    $("#editor-status").textContent = "权限更改未确认；请刷新页面核对服务器状态后重试。";
+  } finally { input.disabled = false; }
+});
+
+$("#restore-moderated-user").addEventListener("click", async () => {
+  const userId = prompt("请输入申诉帐号 UUID（仅恢复本审核系统的暂停）");
+  if (!userId) return;
+  const note = prompt("填写申诉核实及恢复依据（至少 5 字）");
+  if (!note || note.trim().length < 5) return;
+  try { await api("/v1/moderation/restore", {method:"POST",body:{userId,note}}); await loadModeration(); }
+  catch { $("#moderation-list").textContent = "恢复失败，请核对帐号与管理员权限。"; }
+});

@@ -3,6 +3,8 @@ main = "src/index.js"
 compatibility_date = "2026-04-07"
 
 routes = [
+  { pattern = "cheeseapp.org/privacy*", zone_name = "cheeseapp.org" },
+  { pattern = "cheeseapp.org/support*", zone_name = "cheeseapp.org" },
   { pattern = "cheeseapp.org/posts/*", zone_name = "cheeseapp.org" },
   { pattern = "cheeseapp.org/open/*", zone_name = "cheeseapp.org" },
   { pattern = "cheeseapp.org/download*", zone_name = "cheeseapp.org" },

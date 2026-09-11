@@ -119,7 +119,7 @@ struct BlockedUsersView: View {
             blockedUsers = try await chatService.fetchBlockedUsers()
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 
@@ -134,7 +134,7 @@ struct BlockedUsersView: View {
             blockedUsers.removeAll { $0.id == user.id }
             pendingUnblockUser = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AppErrorMessage.userMessage(for: error)
         }
     }
 

@@ -23,6 +23,7 @@ import {
 } from "./postImageLoader";
 
 export interface CheeseAIRepository {
+  hasAIConsent(userId: string): Promise<boolean>;
   enqueue(
     sourceCommentId: string,
     aiUserId: string,
@@ -126,6 +127,16 @@ export class CheeseAIInteractionHandler {
         return { status: "ignored", category: "not_eligible" };
       }
 
+      // No participant can consent on behalf of other people in thread context.
+      const authors = [...new Set([context.post.user_id, context.source.user_id,
+        ...context.ancestors.map(c => c.user_id), ...context.nearby.map(c => c.user_id)])]
+        .filter(id => id !== this.config.aiUserId);
+      const permissions = await Promise.all(authors.map(id => this.repository.hasAIConsent(id)));
+      if (permissions.some(allowed => !allowed)) {
+        await this.repository.fail(sourceCommentId, "ai_consent_required", null);
+        return { status: "ignored", category: "ai_consent_required" };
+      }
+
       const rate = await this.repository.checkRateLimit(
         context.source.user_id,
         this.config.perUserWindowMinutes,
@@ -155,6 +166,10 @@ export class CheeseAIInteractionHandler {
         threadContext,
         images,
       });
+      if ((await Promise.all(authors.map(id => this.repository.hasAIConsent(id)))).some(allowed => !allowed)) {
+        await this.repository.fail(sourceCommentId, "ai_consent_required", null);
+        return { status: "ignored", category: "ai_consent_required" };
+      }
       const outputCommentId = this.uuid();
       await this.repository.complete(
         sourceCommentId,

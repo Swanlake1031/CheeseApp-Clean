@@ -57,8 +57,8 @@ enum LegalDocument: String, Identifiable {
             title: .init("1. Be a constructive community member", "1. 做一个对社群有帮助的人"),
             paragraphs: [
                 .init(
-                    "Cheese is built for students to exchange experiences, housing and second-hand items, discuss courses and connect through chat. Disagreement is welcome; intimidation and abuse are not.",
-                    "Cheese 让学生交流经验、租屋与二手物品、讨论课程并透过聊天建立连结。我们欢迎不同观点，但不接受恐吓、羞辱或滥用。"
+                    "Cheese is built for students to exchange experiences and second-hand items, discuss campus life and connect through chat. Disagreement is welcome; intimidation and abuse are not.",
+                    "Cheese 让学生交流经验与二手物品、讨论校园生活并透过聊天建立连结。我们欢迎不同观点，但不接受恐吓、羞辱或滥用。"
                 )
             ],
             bullets: [
@@ -100,7 +100,7 @@ enum LegalDocument: String, Identifiable {
             ]
         ),
         .init(
-            title: .init("6. Forum, course and professor discussions", "6. 论坛、课程与教授讨论"),
+            title: .init("6. Community discussions", "6. 社群讨论"),
             bullets: [
                 .init("Base reviews on genuine experience and distinguish fact from opinion or hearsay.", "评价应基于真实经验，并清楚区分事实、个人观点与转述。"),
                 .init("Critique teaching, course structure or professional conduct without publishing private personal details or organizing retaliation.", "可评论教学、课程安排或专业行为，但不得公开私人资料或号召报复。"),
@@ -108,12 +108,11 @@ enum LegalDocument: String, Identifiable {
             ]
         ),
         .init(
-            title: .init("7. Housing and second-hand listings", "7. 租屋与二手交易"),
+            title: .init("7. Second-hand listings", "7. 二手交易"),
             bullets: [
                 .init("Describe price, condition, availability, fees, defects and material terms accurately; update or remove unavailable listings.", "应如实说明价格、状况、可用时间、费用、瑕疵与重要条件，失效后请更新或移除刊登。"),
                 .init("No counterfeit, stolen, recalled, regulated or otherwise prohibited goods and services.", "不得刊登仿冒、赃物、召回品、受管制或其他禁止交易的商品与服务。"),
                 .init("Never pressure another user to send deposits, codes, identity documents or irreversible payments. Meet safely and verify before paying.", "不得施压他人交付订金、验证码、身分证件或不可逆付款；面交时注意安全，付款前先验证。"),
-                .init("Housing offers must not contain unlawful discrimination or materially misleading property information.", "租屋刊登不得包含违法歧视或重大不实的房屋资讯。")
             ]
         ),
         .init(
@@ -187,7 +186,7 @@ enum LegalDocument: String, Identifiable {
             title: .init("5. When information is shared", "5. 资料分享情形"),
             bullets: [
                 .init("With other users according to the feature and visibility you select, including message recipients and group members.", "依功能与你选择的可见范围分享给其他用户，包括讯息接收者及群组成员。"),
-                .init("With infrastructure and service providers needed to run Cheese, including Supabase for authentication, database, storage and realtime delivery; Apple and Google for sign-in; and Apple for push notifications.", "分享给维持 Cheese 所需的服务提供者，包括提供验证、资料库、储存与即时传输的 Supabase，提供登入的 Apple 与 Google，以及提供推播的 Apple。"),
+                .init("With infrastructure and service providers needed to run Cheese, including Supabase for authentication, database, storage and realtime delivery; Apple and Google for sign-in; Apple for push notifications; and Cloudflare for hosting, request delivery and security.", "分享给维持 Cheese 所需的服务提供者，包括提供验证、资料库、储存与即时传输的 Supabase，提供登入的 Apple 与 Google，提供推播的 Apple，以及提供托管、请求传输与安全服务的 Cloudflare。"),
                 .init("With authorized reviewers when content is reported or access is necessary to address safety, fraud, support or rule enforcement.", "当内容遭举报，或为处理安全、诈骗、客服及规则执行所必要时，提供给经授权的审查人员。"),
                 .init("When required by law, valid legal process, an emergency involving safety, or a business reorganization subject to appropriate safeguards.", "因法律、有效法律程序、涉及安全的紧急情况，或在具备适当保障的业务重组下提供。")
             ],
@@ -197,6 +196,13 @@ enum LegalDocument: String, Identifiable {
             )
         ),
         .init(
+            title: .init("AI processing permission", "AI 处理权限"),
+            paragraphs: [
+                .init("With your explicit account permission, Google Gemini processes your forum text for semantic recommendations, consented discussion text and up to three post images for AI replies, selected listing images and entered listing details for optional descriptions, and uploaded images for content safety checks before publication. Declining keeps browsing and text-only features available; image uploads require safety processing. Withdraw permission in Settings to stop new transfers and remove your recommendation vectors.", "经你明确同意后，Google Gemini 会处理你的论坛文字以提供语义推荐、经相关作者同意的讨论文字及最多三张贴文图片以生成 AI 回复、所选商品图片与填写的商品资料以生成可选简介，以及上传图片以在发布前检查内容安全。拒绝后仍可浏览并使用纯文字功能；图片上传需要安全处理。你可在设定撤回同意，停止新的传输并移除你的推荐向量。"),
+                .init("Google processes requests under its Gemini API terms. Provider retention, review and model-improvement use depend on the applicable service and billing terms; Cheese does not promise zero provider retention. Processing may occur outside Canada. Avoid sending sensitive personal information. Contact support@cheeseapp.dev for deletion requests, provider information or concerns about a safety decision.", "Google 依 Gemini API 条款处理请求；服务商的保留、审查及模型改进用途取决于适用服务与计费条款，Cheese 不承诺服务商完全不保留资料。处理地点可能在加拿大境外。请勿传送敏感个人资料。如需删除资料、了解服务商资讯或申请复核安全判定，请联络 support@cheeseapp.dev。")
+            ]
+        ),
+        .init(
             title: .init("6. Storage, retention and account deletion", "6. 储存、保留与帐号注销"),
             paragraphs: [
                 .init(
@@ -204,8 +210,8 @@ enum LegalDocument: String, Identifiable {
                     "帐号有效期间内，我们会保留提供服务所需的资料；为解决争议、防止滥用及履行法律义务，也可能在合理必要期间内继续保留。实际期间依资料类型与情境而异。"
                 ),
                 .init(
-                    "Using Delete Account removes your public posts and account activity covered by the deletion process, revokes sign-in identities and de-identifies the profile. A minimal tombstone remains so existing chats can show “Deactivated”. Messages already delivered, reports, security records, backups and copies retained by other users may remain where necessary or outside our control.",
-                    "使用「注销帐号」后，系统会移除注销流程涵盖的公开贴文与帐号活动、撤销登入身分，并将个人档案去识别化。为让既有聊天显示「已注销」，系统会保留最小化的替代纪录；已送达的讯息、举报、安全纪录、备份，以及他人自行保存的副本，可能因必要性或超出我们控制而继续存在。"
+                    "Using Delete Account removes your public posts and account activity covered by the deletion process, revokes sign-in identities and de-identifies the profile. Original email, profile contact details, identity metadata and sign-in credentials are erased. A disabled authentication tombstone and de-identified profile remain so existing chats can show “Deactivated”. Avatar and cover objects enter a retryable deletion queue; this storage cleanup can finish after the account screen closes. Messages already delivered, reports, security records, backups and copies retained by other users may remain where necessary or outside our control.",
+                    "使用「注销帐号」后，系统会移除注销流程涵盖的公开贴文与帐号活动、撤销登入身分，并将个人档案去识别化。原始 Email、个人联系方式、身分资料与登入凭证会被清除。为让既有聊天显示「已注销」，系统会保留停用的验证替代纪录及去识别化档案；头像与封面会进入可重试删除队列，储存清理可能在帐号画面关闭后完成。已送达的讯息、举报、安全纪录、备份，以及他人自行保存的副本，可能因必要性或超出我们控制而继续存在。"
                 )
             ]
         ),
@@ -306,11 +312,11 @@ enum LegalDocument: String, Identifiable {
             ]
         ),
         .init(
-            title: .init("7. Housing and marketplace transactions", "7. 租屋与二手交易"),
+            title: .init("7. Marketplace transactions", "7. 二手交易"),
             paragraphs: [
                 .init(
-                    "Cheese provides listing and communication tools but is not the buyer, seller, landlord, tenant, broker, payment processor or party to user transactions. Users must verify identity, legality, condition, ownership, lease terms and payment safety. Cheese does not guarantee listings, users, transactions or outcomes and does not hold deposits or provide escrow unless a feature expressly says otherwise.",
-                    "Cheese 提供刊登与联络工具，但不是用户交易中的买方、卖方、房东、租客、仲介、付款处理者或契约当事人。用户应自行核实身分、合法性、物品状况、所有权、租约条件与付款安全。除功能明确另有说明外，Cheese 不保证刊登、用户、交易或结果，也不保管订金或提供第三方托管。"
+                    "Cheese provides listing and communication tools but is not the buyer, seller, broker, payment processor or party to user transactions. Users must verify identity, legality, condition, ownership and payment safety. Cheese does not guarantee listings, users, transactions or outcomes and does not hold deposits or provide escrow unless a feature expressly says otherwise.",
+                    "Cheese 提供刊登与联络工具，但不是用户交易中的买方、卖方、仲介、付款处理者或契约当事人。用户应自行核实身分、合法性、物品状况、所有权与付款安全。除功能明确另有说明外，Cheese 不保证刊登、用户、交易或结果，也不保管订金或提供第三方托管。"
                 )
             ]
         ),
@@ -318,8 +324,8 @@ enum LegalDocument: String, Identifiable {
             title: .init("8. Community information", "8. 社群资讯"),
             paragraphs: [
                 .init(
-                    "Posts and comments are informational and may be incomplete, subjective or outdated. They are not official academic, legal, financial, housing or safety advice. Confirm important decisions with the school or another qualified source.",
-                    "贴文与留言仅供参考，可能不完整、主观或已过时，并非官方学业、法律、财务、租屋或安全建议。重要决定请向学校或其他合格来源确认。"
+                    "Posts and comments are informational and may be incomplete, subjective or outdated. They are not official academic, legal, financial or safety advice. Confirm important decisions with the school or another qualified source.",
+                    "贴文与留言仅供参考，可能不完整、主观或已过时，并非官方学业、法律、财务或安全建议。重要决定请向学校或其他合格来源确认。"
                 )
             ]
         ),
@@ -480,7 +486,7 @@ struct LegalDocumentView: View {
 
             Divider().overlay(AppColors.divider)
 
-            Text(L10n.tr("Version 1.0 · Effective August 3, 2026", "版本 1.0 · 2026 年 8 月 3 日生效"))
+            Text(L10n.tr("Version 1.1 · Effective September 11, 2026", "版本 1.1 · 2026 年 9 月 11 日生效"))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(AppColors.textMuted)
         }

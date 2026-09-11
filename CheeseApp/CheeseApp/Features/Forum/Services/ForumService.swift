@@ -764,7 +764,7 @@ class ForumService: ObservableObject {
             if error.isCancellationLike {
                 return
             }
-            errorMessage = "加载失败: \(error.localizedDescription)"
+            errorMessage = AppErrorMessage.userMessage(for: error)
             hasResolvedInitialPostLoad = true
         }
     }
