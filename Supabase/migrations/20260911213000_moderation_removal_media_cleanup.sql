@@ -13,6 +13,23 @@
 
 BEGIN;
 
+CREATE OR REPLACE FUNCTION moderation_private.is_user_suspended(
+  p_user_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, moderation_private, pg_temp
+AS $$
+  SELECT p_user_id IS NOT NULL
+    AND EXISTS (
+      SELECT 1
+      FROM moderation_private.suspensions AS suspension
+      WHERE suspension.user_id = p_user_id
+    );
+$$;
+
 CREATE OR REPLACE FUNCTION moderation_private.require_admin()
 RETURNS void
 LANGUAGE plpgsql
@@ -21,11 +38,7 @@ SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
   IF auth.uid() IS NULL
-     OR EXISTS (
-       SELECT 1
-       FROM moderation_private.suspensions AS suspension
-       WHERE suspension.user_id = auth.uid()
-     )
+     OR moderation_private.is_user_suspended(auth.uid())
      OR NOT EXISTS (
        SELECT 1
        FROM public.content_studio_roles AS role_row
@@ -404,11 +417,7 @@ SELECT
   profile.cover_image_url
 FROM public.profiles AS profile
 WHERE profile.deactivated_at IS NULL
-  AND NOT EXISTS (
-    SELECT 1
-    FROM moderation_private.suspensions AS suspension
-    WHERE suspension.user_id = profile.id
-  )
+  AND NOT moderation_private.is_user_suspended(profile.id)
   AND (
     auth.role() = 'service_role'
     OR (
@@ -443,11 +452,7 @@ AS $$
       FROM public.posts AS post_row
       WHERE post_row.id = p_post_id
         AND post_row.status = 'active'
-        AND NOT EXISTS (
-          SELECT 1
-          FROM moderation_private.suspensions AS suspension
-          WHERE suspension.user_id = post_row.user_id
-        )
+        AND NOT moderation_private.is_user_suspended(post_row.user_id)
         AND (
           post_row.user_id = auth.uid()
           OR (
@@ -478,11 +483,7 @@ FOR SELECT
 TO authenticated
 USING (
   status = 'active'
-  AND NOT EXISTS (
-    SELECT 1
-    FROM moderation_private.suspensions AS suspension
-    WHERE suspension.user_id = posts.user_id
-  )
+  AND NOT moderation_private.is_user_suspended(posts.user_id)
   AND (
     user_id = auth.uid()
     OR (
@@ -544,6 +545,8 @@ $$;
 REVOKE ALL ON FUNCTION moderation_private.enqueue_post_media_cleanup(uuid, uuid, text)
   FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION moderation_private.enqueue_suspension_avatar_cleanup(uuid)
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION moderation_private.is_user_suspended(uuid)
   FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION moderation_private.require_admin()
   FROM PUBLIC, anon, authenticated;
