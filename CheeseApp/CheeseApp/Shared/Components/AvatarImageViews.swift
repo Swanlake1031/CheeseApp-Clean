@@ -5,6 +5,14 @@ enum CheeseAIIdentity {
     static let userID = UUID(
         uuidString: "e5983890-95ad-4b6c-814b-863bfde4e4fc"
     )!
+
+    /// The retained account is historical data while optional Gemini is
+    /// unavailable.  Keep its identifier so old records remain decodable,
+    /// while preventing it from becoming a profile, mention, or other
+    /// user-facing discovery surface in the launch release.
+    static func isVisibleOnUserFacingSurface(_ candidateID: UUID) -> Bool {
+        ReleaseCapabilities.optionalGemini || candidateID != userID
+    }
 }
 
 struct AnonymousAvatarView: View {

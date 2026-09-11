@@ -96,6 +96,12 @@ struct ForumCommentItem: Identifiable, Hashable {
     let isAuthorOfficial: Bool
     var isAuthorMcMasterVerified: Bool = false
     var isAuthorDeactivated: Bool = false
+
+    /// Keep retained automated comments in the database, but do not present
+    /// them as a live account while the optional provider is unavailable.
+    var isVisibleOnUserFacingSurface: Bool {
+        CheeseAIIdentity.isVisibleOnUserFacingSurface(userId)
+    }
 }
 
 struct ForumCreateInput {
@@ -1371,7 +1377,8 @@ class ForumService: ObservableObject {
         // The Worker/database is authoritative for eligibility. Notify for
         // structured mentions and replies so a direct reply to 奶酪AI can
         // continue the existing conversation without another @ mention.
-        if !mentionedUserIds.isEmpty || parentId != nil {
+        if ReleaseCapabilities.optionalGemini,
+           (!mentionedUserIds.isEmpty || parentId != nil) {
             Task {
                 await CheeseAICommentTrigger.notify(sourceCommentID: createdID)
             }
@@ -1727,6 +1734,10 @@ private enum CheeseAICommentTrigger {
     }
 
     static func notify(sourceCommentID: UUID) async {
+        // Keep comments completely independent from the temporarily disabled
+        // provider.  The Worker repeats this check server-side, but avoiding
+        // the request also prevents a visible feature from silently failing.
+        guard ReleaseCapabilities.optionalGemini else { return }
         guard let endpoint = configuredEndpoint() else { return }
 
         do {

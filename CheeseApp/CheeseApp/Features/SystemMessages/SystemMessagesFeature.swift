@@ -144,6 +144,14 @@ struct SystemMessageItem: Decodable, Identifiable, Hashable {
         kind == .follow ? .newFollowers : .activity
     }
 
+    /// Old interaction notifications may still reference the retained
+    /// automated account.  Keep their records server-side, but do not expose
+    /// that account as an active launch-release feature.
+    var isVisibleOnUserFacingSurface: Bool {
+        guard let actorUserID else { return true }
+        return CheeseAIIdentity.isVisibleOnUserFacingSurface(actorUserID)
+    }
+
     var postKind: PostKind? {
         guard let contentKind else { return nil }
         if contentKind == "comment" {
@@ -242,7 +250,10 @@ struct SystemMessageItem: Decodable, Identifiable, Hashable {
         case .viewPost, .secondhandAvailability:
             return postRoute.map(SystemMessageNavigationTarget.post)
         case .viewProfile:
-            return actorUserID.map(SystemMessageNavigationTarget.profile)
+            guard let actorUserID,
+                  CheeseAIIdentity.isVisibleOnUserFacingSurface(actorUserID)
+            else { return nil }
+            return .profile(actorUserID)
         case .none:
             return nil
         }
@@ -347,7 +358,7 @@ final class SystemMessageService: ObservableObject {
         try ensureCurrent(generation: requestGeneration)
 
         return SystemMessagePage(
-            items: rows,
+            items: rows.filter(\.isVisibleOnUserFacingSurface),
             nextCursor: rows.count == limit
                 ? rows.last.map {
                     SystemMessageCursor(createdAt: $0.createdAt, id: $0.id)

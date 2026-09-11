@@ -28,7 +28,6 @@ struct Profile: Codable, Identifiable {
     var phoneNumber: String?
     var gradYear: Int?
     var bio: String?
-    var wechatId: String?
     var profileCompleted: Bool?
     var createdAt: Date?
     var updatedAt: Date?
@@ -56,7 +55,6 @@ struct Profile: Codable, Identifiable {
         case phoneNumber = "phone"
         case gradYear = "grad_year"
         case bio
-        case wechatId = "wechat_id"
         case profileCompleted = "profile_completed"
         case createdAt = "created_at"
         case updatedAt = "updated_at"

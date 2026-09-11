@@ -107,34 +107,6 @@ Then attach the Worker to:
 
 The Worker also has a 1-minute cron trigger to drain the push queue.
 
-## WeChat Open-App Upgrade
-
-The share worker now supports an optional WeChat-specific `/open/{kind}/{id}` upgrade path.
-
-If you want the open page inside WeChat to use `wx-open-launch-app` instead of only a raw `cheeseapp://...` jump, configure:
-
-- `WECHAT_OPEN_APP_ID`
-  - your WeChat Open Platform mobile-app AppID used by `wx-open-launch-app`
-- `WECHAT_JS_SDK_CONFIG_URL`
-  - an HTTPS endpoint that returns JS-SDK signature payload for the current page URL
-
-Expected JSON payload:
-
-```json
-{
-  "appId": "wx1234567890abcdef",
-  "timestamp": 1712800000,
-  "nonceStr": "random-string",
-  "signature": "signed-by-jsapi-ticket"
-}
-```
-
-Notes:
-
-- Without these two values, the `/open/...` page falls back to the current safe manual-open flow.
-- Even with these values, you still need the iOS app registered with WeChat Open Platform. A plain custom URL scheme is not enough to reproduce Xiaohongshu-style WeChat open prompts.
-- This Worker does not generate the JS-SDK signature itself; it expects a separate backend endpoint because the signature depends on the exact current URL.
-
 ## DNS
 
 Add these Cloudflare DNS records and keep them proxied:

@@ -85,13 +85,15 @@ final class MentionService {
         let currentUserID = AuthService.shared.currentUser?.id
         var ordered: [MentionCandidate] = []
 
-        if currentUserID != CheeseAIIdentity.userID,
+        if ReleaseCapabilities.optionalGemini,
+           currentUserID != CheeseAIIdentity.userID,
            let cheeseAI = try? await cheeseAICandidate() {
             ordered.append(cheeseAI)
         }
 
         ordered.append(contentsOf: rows.filter { row in
-            row.id != currentUserID && row.id != CheeseAIIdentity.userID
+            row.id != currentUserID
+                && CheeseAIIdentity.isVisibleOnUserFacingSurface(row.id)
         })
         return Array(ordered.prefix(min(max(limit, 1), 20)))
     }
@@ -321,10 +323,13 @@ struct MentionedProfilesView: View {
         }
         .task(id: "\(postID.uuidString):\(commentID?.uuidString ?? "")") {
             do {
-                mentions = try await MentionService.shared.fetch(
+                let fetchedMentions = try await MentionService.shared.fetch(
                     postID: postID,
                     commentID: commentID
                 )
+                mentions = fetchedMentions.filter {
+                    CheeseAIIdentity.isVisibleOnUserFacingSurface($0.id)
+                }
             } catch {
                 mentions = []
             }
@@ -337,7 +342,8 @@ private struct MentionCandidateRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            if candidate.id == CheeseAIIdentity.userID {
+            if ReleaseCapabilities.optionalGemini,
+               candidate.id == CheeseAIIdentity.userID {
                 CheeseAIAvatarView(
                     remoteURLString: candidate.avatarURL,
                     size: 34

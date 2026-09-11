@@ -11,8 +11,6 @@
     "directory": "./public",
     "run_worker_first": [
       "/health",
-      "/v1/comment-events",
-      "/v1/secondhand/generate-description",
       "/v1/media/upload"
     ]
   },
@@ -21,7 +19,8 @@
     "SUPABASE_URL": "https://zeuivahkowbxmfzsnagt.supabase.co",
     "CHEESE_RECOMMENDATION_JOBS_ENABLED": "true",
     "CHEESE_RECOMMENDATION_SHADOW_ENABLED": "true",
-    "CHEESE_MEDIA_MODERATION_ENABLED": "false"
+    "CHEESE_MEDIA_MODERATION_ENABLED": "true",
+    "CHEESE_GEMINI_RELEASE_ENABLED": "false"
   },
   "ratelimits": [
     {
@@ -51,5 +50,8 @@
     "crons": [
       "* * * * *"
     ]
+  },
+  "ai": {
+    "binding": "AI"
   }
 }

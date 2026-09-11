@@ -292,6 +292,12 @@ final class SecondhandAIDescriptionService {
     private init() {}
 
     func generate(input: SecondhandAIDescriptionInput) async throws -> String {
+        // The launch release must never stage images or contact the optional
+        // provider when Gemini is disabled, even if a future UI regression
+        // reaches this service directly.
+        guard ReleaseCapabilities.optionalGemini else {
+            throw SecondhandAIDescriptionError.serviceUnavailable
+        }
         let normalizedTitle = input.title.trimmingCharacters(
             in: .whitespacesAndNewlines
         )

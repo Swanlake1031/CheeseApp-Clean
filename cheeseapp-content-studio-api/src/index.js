@@ -1,7 +1,14 @@
 const DRAFT_BUCKET = "content-studio-drafts";
 const POST_BUCKET = "post-images";
 const MAX_IMAGES = 6;
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+// The media Worker accepts 10 MiB of raw bytes, then embeds the image in a
+// data URI for Workers AI. Keep the Studio's server-enforced cap below that
+// boundary so a valid draft cannot fail only during final publication.
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+// This is deliberately separate from the optional Gemini consent.  A caller
+// must acknowledge this version before Content Studio forwards any image to
+// the media-safety Worker.
+const MEDIA_SAFETY_CONSENT_VERSION = "2026-09-11-media-v1";
 
 const SECONDHAND_CATEGORIES = new Set([
   "home_appliances",
@@ -72,18 +79,6 @@ async function route(request, url, env, context) {
     await userRPC(env, context.token, "moderation_restore_user", {p_user_id:body.userId,p_note:body.note});
     return json({ok:true});
   }
-  if (pathname === "/v1/ai-consent" && request.method === "GET") {
-    const rows = await userRest(env, context.token, "/ai_processing_consents?select=version&limit=1");
-    return json({allowed: rows.some(row => row.version === "2026-09-11")});
-  }
-  if (pathname === "/v1/ai-consent" && request.method === "POST") {
-    const body = await readJSON(request);
-    if (body.allowed !== true && body.allowed !== false) throw httpError(400, "Explicit permission required");
-    await userRPC(env, context.token, "set_my_ai_consent", { p_allowed: body.allowed });
-    return json({ ok: true });
-  }
-
-
   if (request.method === "GET" && pathname === "/v1/bootstrap") {
     const boards = await userRest(
       env,
@@ -223,7 +218,7 @@ async function uploadDraftMedia(request, env, context) {
   if (!isUUID(draftID)) throw httpError(400, "A valid draft is required");
   if (!(file instanceof File)) throw httpError(400, "Choose an image to upload");
   if (file.type !== "image/jpeg" || file.size === 0 || file.size > MAX_IMAGE_BYTES) {
-    throw httpError(400, "Images must be JPEG files no larger than 10 MB");
+    throw httpError(400, "Images must be JPEG files no larger than 8 MB");
   }
   const draft = await ownedDraft(env, context, draftID);
   const existingMedia = Array.isArray(draft.payload?.media) ? draft.payload.media : [];
@@ -295,11 +290,12 @@ async function publishPost(request, env, context, kind) {
   const payload = normaliseDraftPayload(body.payload ?? draft?.payload, kind);
   validatePublishPayload(payload, kind);
   const draftMedia = payload.media || [];
+  requireMediaSafetyConsent(draftMedia, body.mediaSafetyConsentVersion);
   const postID = crypto.randomUUID();
   const operationID = crypto.randomUUID();
 
-  await prepareAndUploadMedia({ env, context, kind, postID, operationID, draftMedia });
   try {
+    await prepareAndUploadMedia({ env, context, kind, postID, operationID, draftMedia, mediaSafetyConsentVersion: body.mediaSafetyConsentVersion });
     const rpc = kind === "forum"
       ? "publish_forum_post_with_mentions"
       : "publish_secondhand_post_with_mentions";
@@ -361,11 +357,12 @@ async function editPost(request, env, context, kind, postID) {
   if (kind === "secondhand" && keepImageIDs.length + payload.media.length < 1) {
     throw httpError(400, "Secondhand listings need at least one image");
   }
+  requireMediaSafetyConsent(payload.media, body.mediaSafetyConsentVersion);
 
   const operationID = crypto.randomUUID();
   const isPrivate = typeof body.isPrivate === "boolean" ? body.isPrivate : Boolean(existingPost.is_private);
-  await prepareAndUploadMedia({ env, context, kind, postID, operationID, draftMedia: payload.media });
   try {
+    await prepareAndUploadMedia({ env, context, kind, postID, operationID, draftMedia: payload.media, mediaSafetyConsentVersion: body.mediaSafetyConsentVersion });
     if (kind === "forum") {
       await userRPC(env, context.token, "update_forum_post_with_media", {
         p_post_id: postID, p_operation_id: operationID, p_board_id: payload.boardId,
@@ -390,8 +387,9 @@ async function editPost(request, env, context, kind, postID) {
   }
 }
 
-async function prepareAndUploadMedia({ env, context, kind, postID, operationID, draftMedia }) {
+async function prepareAndUploadMedia({ env, context, kind, postID, operationID, draftMedia, mediaSafetyConsentVersion }) {
   if (draftMedia.length > MAX_IMAGES) throw httpError(400, "A post can contain at most six images");
+  requireMediaSafetyConsent(draftMedia, mediaSafetyConsentVersion);
   const plans = draftMedia.map((media, orderIndex) => {
     const sourcePath = text(media.path);
     if (!sourcePath.startsWith(`${context.user.id}/drafts/`)) {
@@ -417,15 +415,36 @@ async function prepareAndUploadMedia({ env, context, kind, postID, operationID, 
     const source = await serviceStorage(env, "GET", DRAFT_BUCKET, plan.sourcePath);
     if (!source.ok || !source.body) throw httpError(409, "A draft image could not be read");
     const moderated = await fetch(`https://ai.cheeseapp.org/v1/media/upload?bucket=${POST_BUCKET}&path=${encodeURIComponent(plan.object_path)}`, {
-      method: "POST", headers: { Authorization: `Bearer ${context.token}`, "Content-Type": "image/jpeg", "X-Cheese-AI-Consent": "2026-09-11" },
+      method: "POST", headers: {
+        Authorization: `Bearer ${context.token}`,
+        "Content-Type": "image/jpeg",
+        "X-Cheese-Media-Safety-Consent": MEDIA_SAFETY_CONSENT_VERSION
+      },
       body: source.body, signal: AbortSignal.timeout(60000)
     });
-    if (!moderated.ok) throw httpError(422, "Image review failed. Check AI permission and Community Rules, or try again later.");
+    if (!moderated.ok) throw mediaSafetyReviewError(moderated.status);
     await userRPC(env, context.token, "mark_post_media_uploaded", {
       p_operation_id: operationID,
       p_order_index: plan.order_index
     });
   }
+}
+
+function requireMediaSafetyConsent(media, version) {
+  if (media.length > 0 && version !== MEDIA_SAFETY_CONSENT_VERSION) {
+    throw httpError(400, "Confirm image safety review before publishing images");
+  }
+}
+
+function mediaSafetyReviewError(status) {
+  if (status === 422) return httpError(422, "This image is not allowed under the Community Rules");
+  if (status === 429) return httpError(429, "Image safety review is busy. Try again shortly.");
+  const error = httpError(503, "Image safety review is temporarily unavailable. Try again later.");
+  // This is a fixed, user-actionable availability message, not an upstream
+  // response. It is safe to return while preserving the generic default for
+  // unexpected server errors.
+  error.expose = true;
+  return error;
 }
 
 async function abandonMediaOperation(env, token, operationID) {
@@ -664,7 +683,7 @@ function httpError(status, message) {
 }
 
 function safeMessage(error) {
-  if (error?.status && error.status < 500) return error.message;
+  if (error?.status && (error.status < 500 || error.expose)) return error.message;
   console.error(JSON.stringify({ event: "content_studio_request_failed", status: error?.status || 500 }));
   return "The request could not be completed";
 }

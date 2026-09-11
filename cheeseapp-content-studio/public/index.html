@@ -49,7 +49,6 @@
           <button id="top-create" class="primary compact">＋ 新建内容</button>
         </header>
         <p id="toast" class="toast" role="status"></p>
-        <p><label><input id="ai-consent" type="checkbox" />我同意将我的论坛内容用于 Google Gemini 推荐、经同意的讨论内容用于 AI 回复，以及所选图片用于内容安全检查。资料可能在加拿大境外处理，依 Google API 条款使用及保留；取消勾选可撤回同意。</label> <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">Google API 条款</a></p>
 
         <section id="overview-screen" class="screen active">
           <div class="hero-card">
@@ -65,7 +64,7 @@
 
         <section id="moderation-screen" class="screen">
           <h2>统一举报队列</h2>
-          <p>仅管理员可处理。高风险举报目标 4 小时内响应，其他举报 24 小时内响应。每次操作必须记录依据。申诉联系 support@cheeseapp.dev。</p>
+          <p>仅管理员可处理。高风险举报目标 4 小时内响应，其他举报 24 小时内响应。每次操作必须记录依据。申诉联系 support.cheeseteam@gmail.com。</p>
           <button id="refresh-moderation" class="secondary">刷新举报</button><button id="restore-moderated-user" type="button">申诉后恢复帐号</button>
           <div id="moderation-list" aria-live="polite"></div>
         </section>
@@ -96,8 +95,9 @@
             </article>
             <aside class="media-card">
               <div class="section-heading slim"><div><h3>图片</h3><p>最多 6 张；浏览器会转换为 JPEG。</p></div><span id="media-count" class="chip">0 / 6</span></div>
-              <label class="upload-zone" for="media-input"><span>＋</span><strong>选择图片</strong><small>JPEG · 最长边 2048px</small></label>
+              <label class="upload-zone" for="media-input"><span>＋</span><strong>选择图片</strong><small>JPEG · 最长边 2048px · 最大 8 MB</small></label>
               <input id="media-input" type="file" accept="image/*" multiple hidden />
+              <p id="media-safety-consent-row" class="hidden"><label><input id="media-safety-consent" type="checkbox" />我确认：发布前，所选图片将发送给 Cloudflare Workers AI 做内容安全审核；审核可能在加拿大境外进行，且仅用于内容安全。不同意仍可发布不含图片的论坛内容；二手商品需要至少一张已审核图片。</label> <a href="https://developers.cloudflare.com/workers-ai/platform/data-usage/" target="_blank" rel="noopener">Cloudflare Workers AI 数据使用说明</a></p>
               <div id="media-grid" class="media-grid"></div>
               <div class="preview-divider"></div>
               <div class="preview-heading"><h3>发布预览</h3><span id="preview-type" class="chip">论坛</span></div>

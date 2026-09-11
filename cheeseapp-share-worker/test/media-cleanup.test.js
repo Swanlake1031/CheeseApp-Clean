@@ -133,6 +133,72 @@ test("rejects a claim that crosses its feature-owned bucket", async () => {
   assert.equal(completions[0].p_error_code, "invalid_cleanup_claim");
 });
 
+test("deletes a post object queued through account deletion cleanup", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    const body = JSON.parse(options.body);
+    calls.push({ url, body });
+
+    if (url.endsWith("/rpc/claim_account_media_cleanup_batch")) {
+      return jsonResponse([{
+        cleanup_id: "55555555-5555-4555-8555-555555555555",
+        bucket: "post-images",
+        object_path: "deleted-user/posts/post/operation/000.jpg",
+        attempt_count: 0
+      }]);
+    }
+    if (url.endsWith("/object/post-images")) return jsonResponse(null, 204);
+    if (url.endsWith("/rpc/complete_account_media_cleanup_job")) return jsonResponse(true);
+    if (url.endsWith("/rpc/claim_post_media_cleanup_batch")) return jsonResponse([]);
+    if (url.endsWith("/rpc/claim_chat_media_cleanup_batch")) return jsonResponse([]);
+    if (url.endsWith("/rpc/get_media_cleanup_backlog_metrics")) return jsonResponse({});
+    throw new Error(`unexpected request: ${url}`);
+  };
+
+  const result = await processMediaCleanup({ config, fetchImpl });
+
+  assert.deepEqual(result.kinds[0], {
+    kind: "account", claimed: 1, succeeded: 1, failed: 0
+  });
+  assert.ok(calls.some((call) =>
+    call.url.endsWith("/object/post-images")
+    && call.body.prefixes[0] === "deleted-user/posts/post/operation/000.jpg"
+  ));
+});
+
+test("deletes a content-studio draft object queued through account deletion cleanup", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    const body = JSON.parse(options.body);
+    calls.push({ url, body });
+
+    if (url.endsWith("/rpc/claim_account_media_cleanup_batch")) {
+      return jsonResponse([{
+        cleanup_id: "66666666-6666-4666-8666-666666666666",
+        bucket: "content-studio-drafts",
+        object_path: "deleted-user/drafts/draft/image.jpg",
+        attempt_count: 0
+      }]);
+    }
+    if (url.endsWith("/object/content-studio-drafts")) return jsonResponse(null, 204);
+    if (url.endsWith("/rpc/complete_account_media_cleanup_job")) return jsonResponse(true);
+    if (url.endsWith("/rpc/claim_post_media_cleanup_batch")) return jsonResponse([]);
+    if (url.endsWith("/rpc/claim_chat_media_cleanup_batch")) return jsonResponse([]);
+    if (url.endsWith("/rpc/get_media_cleanup_backlog_metrics")) return jsonResponse({});
+    throw new Error(`unexpected request: ${url}`);
+  };
+
+  const result = await processMediaCleanup({ config, fetchImpl });
+
+  assert.deepEqual(result.kinds[0], {
+    kind: "account", claimed: 1, succeeded: 1, failed: 0
+  });
+  assert.ok(calls.some((call) =>
+    call.url.endsWith("/object/content-studio-drafts")
+    && call.body.prefixes[0] === "deleted-user/drafts/draft/image.jpg"
+  ));
+});
+
 test("sanitizes observable error codes", () => {
   assert.equal(safeErrorCode({ code: "network timeout / secret=value" }), "network_timeout___secret_value");
   assert.equal(safeErrorCode(null), "cleanup_failed");

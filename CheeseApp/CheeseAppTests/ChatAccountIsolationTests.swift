@@ -3,6 +3,33 @@ import XCTest
 
 @MainActor
 final class ChatAccountIsolationTests: XCTestCase {
+    func testAccountDeletionClearsOnlyDeletedAccountConversationRemarks() {
+        let suiteName = "ChatAccountIsolationTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let deletedAccount = UUID()
+        let retainedAccount = UUID()
+        let service = ChatService(
+            currentUserIDProvider: { deletedAccount },
+            conversationStateLoader: { _ in
+                ChatConversationRepositorySnapshot(
+                    directConversations: [],
+                    groupConversations: []
+                )
+            },
+            defaults: defaults
+        )
+        let deletedKey = ChatService.conversationRemarksStorageKey(for: deletedAccount)
+        let retainedKey = ChatService.conversationRemarksStorageKey(for: retainedAccount)
+        defaults.set(Data("private deleted-account note".utf8), forKey: deletedKey)
+        defaults.set(Data("retained-account note".utf8), forKey: retainedKey)
+
+        service.clearLocalAccountData(for: deletedAccount)
+
+        XCTAssertNil(defaults.data(forKey: deletedKey))
+        XCTAssertNotNil(defaults.data(forKey: retainedKey))
+    }
+
     func testLateAccountARefreshCannotOverwriteAccountB() async throws {
         let accountA = UUID(uuidString: "a1000000-0000-4000-8000-000000000001")!
         let accountB = UUID(uuidString: "b1000000-0000-4000-8000-000000000001")!

@@ -164,11 +164,13 @@ async function callRPC({
 }
 
 function validateClaim(job, kind) {
-  const expectedBucket = kind === "account" ? "avatars" : kind === "chat" ? "chat-images" : "post-images";
+  const expectedBuckets = kind === "account"
+    ? new Set(["avatars", "post-images", "chat-images", "content-studio-drafts"])
+    : new Set([kind === "chat" ? "chat-images" : "post-images"]);
   if (
     !job ||
     typeof job.cleanup_id !== "string" ||
-    job.bucket !== expectedBucket ||
+    !expectedBuckets.has(job.bucket) ||
     typeof job.object_path !== "string" ||
     !job.object_path
   ) {

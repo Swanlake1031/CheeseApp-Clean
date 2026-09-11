@@ -3,6 +3,27 @@ import XCTest
 
 @MainActor
 final class ProfileSocialServiceTests: XCTestCase {
+    func testAccountDeletionClearsOnlyDeletedAccountFollowerSeenState() {
+        let suiteName = "ProfileSocialServiceTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let deletedAccount = UUID()
+        let retainedAccount = UUID()
+        let service = ProfileSocialService(
+            summaryLoader: { _ in .empty },
+            defaults: defaults
+        )
+        let deletedKey = ProfileSocialService.followerSeenStorageKey(for: deletedAccount)
+        let retainedKey = ProfileSocialService.followerSeenStorageKey(for: retainedAccount)
+        defaults.set(123.0, forKey: deletedKey)
+        defaults.set(456.0, forKey: retainedKey)
+
+        service.clearLocalAccountData(for: deletedAccount)
+
+        XCTAssertNil(defaults.object(forKey: deletedKey))
+        XCTAssertEqual(defaults.object(forKey: retainedKey) as? Double, 456.0)
+    }
+
     func testProfileSurfaceCacheKeyIncludesViewerIdentity() {
         let accountA = UUID(uuidString: "a5100000-0000-4000-8000-000000000001")!
         let accountB = UUID(uuidString: "b5100000-0000-4000-8000-000000000001")!

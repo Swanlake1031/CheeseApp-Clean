@@ -87,7 +87,6 @@ struct HomeCardItem: Identifiable {
     let saveCount: Int
     let isSystemPinned: Bool
     let initiallyLiked: Bool
-    let isSeatRadar: Bool
     
     /// 便捷初始化方法
     init(
@@ -116,8 +115,7 @@ struct HomeCardItem: Identifiable {
         commentCount: Int = 0,
         saveCount: Int = 0,
         isSystemPinned: Bool = false,
-        initiallyLiked: Bool = false,
-        isSeatRadar: Bool = false
+        initiallyLiked: Bool = false
     ) {
         self.id = id ?? postId ?? UUID()
         self.postId = postId
@@ -147,7 +145,6 @@ struct HomeCardItem: Identifiable {
         self.saveCount = max(saveCount, 0)
         self.isSystemPinned = isSystemPinned
         self.initiallyLiked = initiallyLiked
-        self.isSeatRadar = isSeatRadar
     }
 }
 

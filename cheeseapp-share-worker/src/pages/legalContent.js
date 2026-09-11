@@ -5,8 +5,8 @@ export const privacyCopy = [
     "chinese": "1. 适用范围与营运者"
   },
   {
-    "english": "This policy describes how Cheese handles personal information when you use the iOS app, community, marketplace, profile, notification and chat features. Cheese is the service operator for this policy. Contact: support@cheeseapp.dev.",
-    "chinese": "本政策说明你使用 Cheese iOS App、社群、二手、个人档案、通知与聊天功能时，我们如何处理个人资料。本政策中的服务营运者为 Cheese；联络信箱：support@cheeseapp.dev。"
+    "english": "This policy describes how Cheese handles personal information when you use the iOS app, community, marketplace, profile, notification and chat features. Cheese is the service operator for this policy. Contact: support.cheeseteam@gmail.com.",
+    "chinese": "本政策说明你使用 Cheese iOS App、社群、二手、个人档案、通知与聊天功能时，我们如何处理个人资料。本政策中的服务营运者为 Cheese；联络信箱：support.cheeseteam@gmail.com。"
   },
   {
     "english": "2. Information we collect",
@@ -17,12 +17,16 @@ export const privacyCopy = [
     "chinese": "帐号资料：Email、帐号识别码，以及 Apple、Google 或验证服务提供者产生的登入与验证纪录。"
   },
   {
-    "english": "Profile data: display name, avatar, school, bio, occupation and preferences you choose to provide.",
-    "chinese": "个人档案：显示名称、头像、学校、简介、职业及你选择提供的偏好。"
+    "english": "Profile data: display name, avatar, school, required gender selection (including the option to prefer not to say), bio, occupation and preferences you choose to provide.",
+    "chinese": "个人档案：显示名称、头像、学校、必填的性别选项（包括「暂不透露」）、简介、职业及你选择提供的偏好。"
   },
   {
-    "english": "Community activity: posts, listings, comments, reactions, favourites, follows, blocks, searches, reports and feedback.",
-    "chinese": "社群活动：贴文、刊登、留言、反应、收藏、追踪、封锁、搜寻、举报与回馈。"
+    "english": "Social activity: follows, blocks and group membership, which form your in-app social graph. Community activity: posts, comments, reactions, favourites, searches, reports and feedback.",
+    "chinese": "社交活动：追踪、封锁与群组成员关系，构成你在 App 内的社交关系图谱。社群活动：贴文、留言、反应、收藏、搜寻、举报与回馈。"
+  },
+  {
+    "english": "Marketplace activity: listings, purchase intents, completed transaction history, prices and buyer or seller role.",
+    "chinese": "二手交易活动：刊登、购买意向、已完成交易纪录、价格及买家或卖家角色。"
   },
   {
     "english": "Messages: direct and group messages, shared media, membership, read state and conversation settings.",
@@ -89,16 +93,16 @@ export const privacyCopy = [
     "chinese": "目前版本的 Cheese 不贩售个人资料，也不使用跨 App 追踪进行定向广告。"
   },
   {
-    "english": "AI processing permission",
-    "chinese": "AI 处理权限"
+    "english": "Media safety review and optional AI",
+    "chinese": "图片安全审核与可选 AI"
   },
   {
-    "english": "With your explicit account permission, Google Gemini processes your forum text for semantic recommendations, consented discussion text and up to three post images for AI replies, selected listing images and entered listing details for optional descriptions, and uploaded images for content safety checks before publication. Declining keeps browsing and text-only features available; image uploads require safety processing. Withdraw permission in Settings to stop new transfers and remove your recommendation vectors.",
-    "chinese": "经你明确同意后，Google Gemini 会处理你的论坛文字以提供语义推荐、经相关作者同意的讨论文字及最多三张贴文图片以生成 AI 回复、所选商品图片与填写的商品资料以生成可选简介，以及上传图片以在发布前检查内容安全。拒绝后仍可浏览并使用纯文字功能；图片上传需要安全处理。你可在设定撤回同意，停止新的传输并移除你的推荐向量。"
+    "english": "Before an image is published, Cheese sends the selected image to Cloudflare Workers AI for automated safety review. This required review may process content outside Canada. Cloudflare says it does not use input or output to train or improve its models without consent. You may decline, or withdraw the local image-review acknowledgement in Settings, and continue using features that do not upload images. Do not include sensitive personal information.",
+    "chinese": "图片发布前，Cheese 会将选中的图片交给 Cloudflare Workers AI 自动检查不当内容。这项必要审核的处理地点可能在加拿大境外。Cloudflare 表示未经同意不会使用输入或输出内容来训练或改进模型。你可以拒绝，或在设定中撤回本机图片审核确认，并继续使用不需上传图片的功能；请勿包含敏感个人资料。"
   },
   {
-    "english": "Google processes requests under its Gemini API terms. Provider retention, review and model-improvement use depend on the applicable service and billing terms; Cheese does not promise zero provider retention. Processing may occur outside Canada. Avoid sending sensitive personal information. Contact support@cheeseapp.dev for deletion requests, provider information or concerns about a safety decision.",
-    "chinese": "Google 依 Gemini API 条款处理请求；服务商的保留、审查及模型改进用途取决于适用服务与计费条款，Cheese 不承诺服务商完全不保留资料。处理地点可能在加拿大境外。请勿传送敏感个人资料。如需删除资料、了解服务商资讯或申请复核安全判定，请联络 support@cheeseapp.dev。"
+    "english": "Optional Google Gemini features are not available in this release. If Cheese restores them in a future release, it will obtain separate account permission before sending forum text, listing details or images. Declining or withdrawing that separate permission will stop new optional transfers and remove pending embedding work, authored embeddings and the associated recommendation vector. Contact support.cheeseteam@gmail.com for deletion requests, provider information or a review of a safety decision.",
+    "chinese": "本版本未提供可选的 Google Gemini 功能。若 Cheese 在未来版本恢复这些功能，会在传送论坛文字、商品资料或图片前另外取得帐号同意。拒绝或撤回该独立同意会停止新的可选传输，并删除待处理嵌入工作、已建立的本人嵌入资料及相关的推荐向量。如需删除资料、了解服务商资讯或申请复核安全处置，请联络 support.cheeseteam@gmail.com。"
   },
   {
     "english": "6. Storage, retention and account deletion",
@@ -109,8 +113,8 @@ export const privacyCopy = [
     "chinese": "帐号有效期间内，我们会保留提供服务所需的资料；为解决争议、防止滥用及履行法律义务，也可能在合理必要期间内继续保留。实际期间依资料类型与情境而异。"
   },
   {
-    "english": "Using Delete Account removes your public posts and account activity covered by the deletion process, revokes sign-in identities and de-identifies the profile. Original email, profile contact details, identity metadata and sign-in credentials are erased. A disabled authentication tombstone and de-identified profile remain so existing chats can show “Deactivated”. Avatar and cover objects enter a retryable deletion queue; this storage cleanup can finish after the account screen closes. Messages already delivered, reports, security records, backups and copies retained by other users may remain where necessary or outside our control.",
-    "chinese": "使用「注销帐号」后，系统会移除注销流程涵盖的公开贴文与帐号活动、撤销登入身分，并将个人档案去识别化。原始 Email、个人联系方式、身分资料与登入凭证会被清除。为让既有聊天显示「已注销」，系统会保留停用的验证替代纪录及去识别化档案；头像与封面会进入可重试删除队列，储存清理可能在帐号画面关闭后完成。已送达的讯息、举报、安全纪录、备份，以及他人自行保存的副本，可能因必要性或超出我们控制而继续存在。"
+    "english": "Using Delete Account removes your posts, listings, comments, direct and group-message content, and associated media from Cheese’s active systems; brief de-identified delivery tombstones may remain only to preserve conversation structure. Original email, profile contact details, identity metadata and sign-in credentials are erased. When the matching Google Sign-In session is present on this device, Cheese asks Google to disconnect it. Sign in with Apple authorization is managed by Apple and may remain in your Apple Account’s Sign in with Apple list until you remove Cheese there. Avatar, cover, post, chat and Content Studio draft objects enter a retryable deletion queue; this storage cleanup can finish after the account screen closes. We do not retain your original message text or photos in those tombstones. We cannot retrieve material another person separately saved or external notifications already delivered; legally required records and protected backups follow their applicable retention rules.",
+    "chinese": "使用「注销帐号」会从 Cheese 的运作中系统移除你的贴文、刊登、评论、私讯与群聊内容，以及相关媒体；为维持对话结构，可能只保留不含原始内容的去识别化投递替代纪录。原始 Email、个人联系方式、身分资料与登入凭证会被清除。若本机存在相符的 Google 登录工作阶段，Cheese 会请求 Google 解除该授权；Apple 登录授权由 Apple 管理，在你于 Apple 帐号的「使用 Apple 登录」中移除 Cheese 前，可能仍会显示。头像、封面、贴文、聊天和 Content Studio 草稿对象会进入可重试删除队列，储存清理可能在帐号画面关闭后完成。我们不会在这些替代纪录中保留你原始的讯息文字或照片。我们无法收回他人另行保存的资料或已经送达的外部通知；依法必须保留的纪录和受保护备份依适用保留规则处理。"
   },
   {
     "english": "7. Your choices and rights",
@@ -129,8 +133,8 @@ export const privacyCopy = [
     "chinese": "从设定中注销帐号。"
   },
   {
-    "english": "Request access, correction, deletion, restriction or portability where applicable by emailing support@cheeseapp.dev. We may verify your identity first.",
-    "chinese": "在适用法律允许的范围内，可寄信至 support@cheeseapp.dev 请求查阅、更正、删除、限制处理或取得可携副本；我们可能先验证你的身分。"
+    "english": "Request access, correction, deletion, restriction or portability where applicable by emailing support.cheeseteam@gmail.com. We may verify your identity first.",
+    "chinese": "在适用法律允许的范围内，可寄信至 support.cheeseteam@gmail.com 请求查阅、更正、删除、限制处理或取得可携副本；我们可能先验证你的身分。"
   },
   {
     "english": "8. Children",
@@ -153,7 +157,7 @@ export const privacyCopy = [
     "chinese": "10. 更新与联络方式"
   },
   {
-    "english": "We may update this policy as Cheese changes. Material changes will be communicated in the app or through another reasonable channel before they take effect where required. Questions or privacy requests: support@cheeseapp.dev.",
-    "chinese": "我们可能随 Cheese 功能调整而更新本政策。若有重大变更，会在法律要求的情况下，于生效前透过 App 或其他合理方式通知。政策问题或隐私请求：support@cheeseapp.dev。"
+    "english": "We may update this policy as Cheese changes. Material changes will be communicated in the app or through another reasonable channel before they take effect where required. Questions or privacy requests: support.cheeseteam@gmail.com.",
+    "chinese": "我们可能随 Cheese 功能调整而更新本政策。若有重大变更，会在法律要求的情况下，于生效前透过 App 或其他合理方式通知。政策问题或隐私请求：support.cheeseteam@gmail.com。"
   }
 ];

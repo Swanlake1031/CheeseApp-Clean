@@ -592,7 +592,7 @@ final class SearchViewModel: ObservableObject {
     @Published private var searchPages: [SearchCategory: SearchPostPage] = [:]
     private var searchErrors: [SearchCategory: String] = [:]
     private var searchPageRequestID: UUID?
-    private let recentSearchesKeyPrefix = "search_recent_queries."
+    private static let recentSearchesKeyPrefix = "search_recent_queries."
     private let searchPageSize = 24
     private let landingPageLimit = 24
     private let searchService = SearchService.shared
@@ -805,7 +805,9 @@ final class SearchViewModel: ObservableObject {
         }
         searchPages = pages
         searchErrors = errors
-        profileResults = people
+        // Keep the presentation boundary closed even when a future loader or
+        // cached response bypasses SearchService.
+        profileResults = people.filter(\.isVisibleOnUserFacingSurface)
         applySelectedSearchPage()
         isSearching = false
     }
@@ -889,6 +891,13 @@ final class SearchViewModel: ObservableObject {
         persistRecentSearches()
     }
 
+    static func clearStoredRecentSearches(
+        for userId: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        defaults.removeObject(forKey: recentSearchesStorageKey(for: userId))
+    }
+
     func count(for category: SearchCategory) -> Int {
         categoryCounts[category] ?? 0
     }
@@ -944,7 +953,11 @@ final class SearchViewModel: ObservableObject {
     }
 
     private var recentSearchesStorageKey: String? {
-        accountOwnerID.map { recentSearchesKeyPrefix + $0.uuidString }
+        accountOwnerID.map { Self.recentSearchesStorageKey(for: $0) }
+    }
+
+    static func recentSearchesStorageKey(for userId: UUID) -> String {
+        recentSearchesKeyPrefix + userId.uuidString
     }
 
     func toggleFollow(profile: SearchProfileResult) async throws {
@@ -1012,7 +1025,7 @@ final class SearchViewModel: ObservableObject {
 
             if Task.isCancelled { return }
             guard requestGeneration == accountGeneration, lastProfileQuery == normalized else { return }
-            profileResults = rows
+            profileResults = rows.filter(\.isVisibleOnUserFacingSurface)
         } catch {
             if Task.isCancelled { return }
             guard requestGeneration == accountGeneration, lastProfileQuery == normalized else { return }

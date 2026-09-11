@@ -1,4 +1,6 @@
 export interface Env {
+  readonly AI?: Ai;
+  readonly CHEESE_GEMINI_RELEASE_ENABLED?: string;
   readonly MEDIA_MODERATION_RATE_LIMITER?: RateLimit;
   readonly CHEESE_MEDIA_MODERATION_ENABLED?: string;
   readonly GEMINI_API_KEY?: string;

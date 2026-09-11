@@ -21,6 +21,12 @@ def validate(values):
         raise ValueError('OAuth redirect does not match the app URL scheme')
     if values.get('CheesePushEnvironment') != 'production':
         raise ValueError('Release APNs environment must be production')
+    # The 13+ launch build deliberately has no optional Gemini endpoint.  Check
+    # the expanded archive as well as the Release build phase so an xcconfig or
+    # plist regression cannot restore a user-invocable provider route.
+    optional_ai_endpoint = values.get('CHEESE_AI_TRIGGER_URL', '')
+    if not isinstance(optional_ai_endpoint, str) or optional_ai_endpoint.strip():
+        raise ValueError('Release must not configure an optional AI endpoint')
 
 
 def main():

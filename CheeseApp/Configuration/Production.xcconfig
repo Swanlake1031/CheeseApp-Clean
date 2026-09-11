@@ -3,3 +3,7 @@
 // Explicit production values override developer Local.xcconfig for Release.
 SUPABASE_URL = https:/$()/zeuivahkowbxmfzsnagt.supabase.co
 SUPABASE_PUBLISHABLE_KEY = sb_publishable_29EL6LWWqeED8kLtLDk6_A_Ez8OXwf1
+// The 13+ launch release has no optional Gemini feature.  Leaving this empty
+// prevents even a future client-side UI regression from reaching its Worker.
+// Restore only as part of a separately audited provider release.
+CHEESE_AI_TRIGGER_URL =

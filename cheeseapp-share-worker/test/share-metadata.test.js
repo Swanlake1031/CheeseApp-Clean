@@ -159,7 +159,7 @@ test("fallback previews and every icon use the current Cheese assets", async () 
   );
 });
 
-test("open routes retain full forum and secondhand web pages with WeChat guidance", () => {
+test("open routes retain full forum and secondhand web pages with app-open guidance", () => {
   const config = {
     canonicalHost: "cheeseapp.org",
     appScheme: "cheeseapp://post",
@@ -202,11 +202,9 @@ test("open routes retain full forum and secondhand web pages with WeChat guidanc
   ];
 
   for (const html of pages) {
-    assert.match(html, /class="wechat-intercept-alert"/);
-    assert.match(html, /如果你正在使用微信/);
-    assert.match(html, /请点击右上角「···」/);
-    assert.match(html, /选择「在浏览器中打开」/);
-    assert.doesNotMatch(html, /MicroMessenger|正在尝试|等待微信|正在请求微信/);
+    assert.match(html, /class="open-guidance"/);
+    assert.match(html, /在 App 中继续/);
+    assert.match(html, /如果 Cheese 没有自动打开/);
     assert.match(html, /class="market-detail-page"/);
     assert.match(html, /cheeseapp:\/\/post\//);
     assert.match(

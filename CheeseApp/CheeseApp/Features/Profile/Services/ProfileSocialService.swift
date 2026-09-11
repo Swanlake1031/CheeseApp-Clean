@@ -150,7 +150,7 @@ final class ProfileSocialService: ObservableObject {
 
     private let supabase = SupabaseManager.shared
     private let defaults: UserDefaults
-    private let seenPrefix = "profile.followers.seen_at."
+    private static let seenPrefix = "profile.followers.seen_at."
     private let injectedSummaryLoader: SummaryLoader?
     private let injectedLatestFollowerLoader: LatestFollowerLoader?
     private var stateOwnerID: UUID?
@@ -187,6 +187,13 @@ final class ProfileSocialService: ObservableObject {
         isAccountTransitionInProgress = false
         guard mustReset else { return }
         resetAccountScopedState(ownerID: userID)
+    }
+
+    func clearLocalAccountData(for userId: UUID) {
+        defaults.removeObject(forKey: Self.followerSeenStorageKey(for: userId))
+        if stateOwnerID == userId {
+            hasUnreadFollowers = false
+        }
     }
 
     private func resetAccountScopedState(ownerID: UUID?) {
@@ -380,8 +387,14 @@ final class ProfileSocialService: ObservableObject {
         }
         let orderedFollowing = orderedFollowIds(from: followingRows, mode: .following)
         let orderedFollowers = orderedFollowIds(from: followerRows, mode: .followers)
+        let visibleFollowingIDs = orderedFollowing.ids.filter {
+            CheeseAIIdentity.isVisibleOnUserFacingSurface($0)
+        }
+        let visibleFollowerIDs = orderedFollowers.ids.filter {
+            CheeseAIIdentity.isVisibleOnUserFacingSurface($0)
+        }
         var seenProfileIDs = Set<UUID>()
-        let profileIDs = (orderedFollowing.ids + orderedFollowers.ids).filter {
+        let profileIDs = (visibleFollowingIDs + visibleFollowerIDs).filter {
             seenProfileIDs.insert($0).inserted
         }
         let profiles: [UUID: Profile] = profileIDs.isEmpty
@@ -391,9 +404,9 @@ final class ProfileSocialService: ObservableObject {
             throw CancellationError()
         }
 
-        let followingIDs = Set(orderedFollowing.ids)
+        let followingIDs = Set(visibleFollowingIDs)
         let followerSeenAt = seenDate(for: userId)
-        let followingEntries = orderedFollowing.ids.compactMap { id -> ProfileFollowListEntry? in
+        let followingEntries = visibleFollowingIDs.compactMap { id -> ProfileFollowListEntry? in
             guard let profile = profiles[id] else { return nil }
             return ProfileFollowListEntry(
                 id: id,
@@ -404,7 +417,7 @@ final class ProfileSocialService: ObservableObject {
                 amFollowing: true
             )
         }
-        let followerEntries = orderedFollowers.ids.compactMap { id -> ProfileFollowListEntry? in
+        let followerEntries = visibleFollowerIDs.compactMap { id -> ProfileFollowListEntry? in
             guard let profile = profiles[id] else { return nil }
             return ProfileFollowListEntry(
                 id: id,
@@ -623,6 +636,10 @@ final class ProfileSocialService: ObservableObject {
     }
 
     private func seenKey(for userId: UUID) -> String {
+        Self.followerSeenStorageKey(for: userId)
+    }
+
+    static func followerSeenStorageKey(for userId: UUID) -> String {
         seenPrefix + userId.uuidString
     }
 }

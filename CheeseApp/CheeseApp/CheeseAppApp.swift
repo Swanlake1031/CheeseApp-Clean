@@ -464,6 +464,21 @@ final class EngagementNotificationService: NSObject, UNUserNotificationCenterDel
         }
     }
 
+    func clearLocalAccountData(for userId: UUID) {
+        for key in Self.accountScopedCounterKeys(for: userId) {
+            defaults.removeObject(forKey: key)
+        }
+        if counterSyncOwnerID == userId {
+            counterSyncOwnerID = nil
+            lastCounterSyncAt = nil
+        }
+        if remoteRegistrationOwnerID == userId {
+            remoteRegistrationOwnerID = nil
+            lastRemoteRegistrationSignature = nil
+            lastRemoteRegistrationAt = nil
+        }
+    }
+
     private var pushEnabled: Bool {
         defaults.object(forKey: pushSettingKey) as? Bool ?? true
     }
@@ -504,7 +519,7 @@ final class EngagementNotificationService: NSObject, UNUserNotificationCenterDel
     }
 
     private func checkMessageUnreadCount(for userId: UUID) async {
-        let key = "notifications.unread.messages.\(userId.uuidString)"
+        let key = Self.messageUnreadStorageKey(for: userId)
         let rows: [UnreadConversationRow]
         do {
             rows = try await supabase.client
@@ -520,9 +535,9 @@ final class EngagementNotificationService: NSObject, UNUserNotificationCenterDel
     }
 
     private func checkForumEngagementCounts(for userId: UUID) async {
-        let commentsKey = "notifications.forum.comment.total.\(userId.uuidString)"
-        let likesKey = "notifications.forum.like.total.\(userId.uuidString)"
-        let activityKey = "notifications.forum.activity.total.\(userId.uuidString)"
+        let commentsKey = Self.forumCommentStorageKey(for: userId)
+        let likesKey = Self.forumLikeStorageKey(for: userId)
+        let activityKey = Self.forumActivityStorageKey(for: userId)
 
         let rows: [OwnForumPostEngagementRow]
         do {
@@ -812,6 +827,31 @@ final class EngagementNotificationService: NSObject, UNUserNotificationCenterDel
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         return environment == "development" ? "ios_sandbox" : "ios"
+    }
+
+    static func accountScopedCounterKeys(for userId: UUID) -> [String] {
+        [
+            messageUnreadStorageKey(for: userId),
+            forumCommentStorageKey(for: userId),
+            forumLikeStorageKey(for: userId),
+            forumActivityStorageKey(for: userId)
+        ]
+    }
+
+    static func messageUnreadStorageKey(for userId: UUID) -> String {
+        "notifications.unread.messages.\(userId.uuidString)"
+    }
+
+    static func forumCommentStorageKey(for userId: UUID) -> String {
+        "notifications.forum.comment.total.\(userId.uuidString)"
+    }
+
+    static func forumLikeStorageKey(for userId: UUID) -> String {
+        "notifications.forum.like.total.\(userId.uuidString)"
+    }
+
+    static func forumActivityStorageKey(for userId: UUID) -> String {
+        "notifications.forum.activity.total.\(userId.uuidString)"
     }
 }
 

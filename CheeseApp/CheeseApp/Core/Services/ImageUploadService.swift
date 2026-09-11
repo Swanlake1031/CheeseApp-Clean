@@ -85,6 +85,11 @@ struct PostMediaCleanupItem: Codable, Identifiable, Hashable {
 
 class ImageUploadService {
     static let shared = ImageUploadService()
+
+    /// The moderation Worker accepts at most 10 MiB of raw request bytes. Keep
+    /// a margin below that transport limit so a transparent PNG is resized
+    /// locally instead of failing only after the user has started publishing.
+    private static let moderatedMediaPreferredMaximumByteCount = 8 * 1024 * 1024
     
     private init() {}
 
@@ -262,7 +267,7 @@ class ImageUploadService {
     }
 
     private func uploadModerated(_ data: Data, bucket: String, path: String, contentType: String) async throws {
-        try await AIProcessingConsent.requireConsent()
+        try await MediaSafetyConsent.requireConsent()
         let session = try await SupabaseManager.shared.auth.session
         var components = URLComponents(string: "https://ai.cheeseapp.org/v1/media/upload")!
         components.queryItems = [URLQueryItem(name: "bucket", value: bucket), URLQueryItem(name: "path", value: path)]
@@ -271,7 +276,7 @@ class ImageUploadService {
         request.timeoutInterval = 60
         request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
-        request.setValue("2026-09-11", forHTTPHeaderField: "X-Cheese-AI-Consent")
+        request.setValue("2026-09-11-media-v1", forHTTPHeaderField: "X-Cheese-Media-Safety-Consent")
         request.httpBody = data
         let (_, response) = try await URLSession.shared.data(for: request)
         guard let response = response as? HTTPURLResponse, response.statusCode == 200 else {
@@ -359,16 +364,39 @@ class ImageUploadService {
         }
 
         if imageRequiresTransparency(image) {
-            let prepared = renderedImage(
-                image,
-                maximumDimension: 2_048,
-                opaque: false
-            )
-            guard let data = prepared.pngData() else { throw imageProcessingError }
+            let maximumDimensions: [CGFloat] = [2_048, 1_792, 1_536, 1_280]
+            var smallestCandidate: (data: Data, size: CGSize)?
+            var previousSize: CGSize?
+
+            for maximumDimension in maximumDimensions {
+                let prepared = renderedImage(
+                    image,
+                    maximumDimension: maximumDimension,
+                    opaque: false
+                )
+                if prepared.size == previousSize { continue }
+                previousSize = prepared.size
+                guard let data = prepared.pngData() else { throw imageProcessingError }
+                if smallestCandidate == nil || data.count < smallestCandidate!.data.count {
+                    smallestCandidate = (data, prepared.size)
+                }
+                if data.count <= moderatedMediaPreferredMaximumByteCount {
+                    return PreparedPostImage(
+                        data: data,
+                        contentType: "image/png",
+                        pixelSize: prepared.size,
+                        preservesTransparency: true
+                    )
+                }
+            }
+
+            guard let smallestCandidate,
+                  smallestCandidate.data.count <= moderatedMediaPreferredMaximumByteCount
+            else { throw imageProcessingError }
             return PreparedPostImage(
-                data: data,
+                data: smallestCandidate.data,
                 contentType: "image/png",
-                pixelSize: prepared.size,
+                pixelSize: smallestCandidate.size,
                 preservesTransparency: true
             )
         }
@@ -525,14 +553,26 @@ private struct PostImageInsert: Encodable {
     }
 }
 
-/// Account-scoped, explicit permission before sending selected images to Google.
-/// Declining leaves text-only use available. Settings can withdraw local consent.
+/// Reserved for a future, separately audited optional-provider release.
+///
+/// Image safety in this launch build is handled by `MediaSafetyConsent` below;
+/// this consent must never be used to authorize media upload processing.
 @MainActor
 enum AIProcessingConsent {
     private static var pending: Task<Bool, Never>?
     static func key(for userID: UUID) -> String { "ai_processing_consent.2026-09-11.\(userID.uuidString)" }
 
     static func requireConsent() async throws {
+        guard ReleaseCapabilities.optionalGemini else {
+            throw NSError(
+                domain: "AIProcessing",
+                code: 503,
+                userInfo: [NSLocalizedDescriptionKey: L10n.tr(
+                    "Optional AI is not available in this release.",
+                    "本版本暂不提供可选 AI 功能。"
+                )]
+            )
+        }
         guard let userID = SupabaseManager.shared.auth.currentSession?.user.id else { throw URLError(.userAuthenticationRequired) }
         let consentKey = key(for: userID)
         if UserDefaults.standard.bool(forKey: consentKey) {
@@ -552,8 +592,8 @@ enum AIProcessingConsent {
                         continuation.resume(returning: false); return
                     }
                     while let presented = presenter.presentedViewController { presenter = presented }
-                    let alert = UIAlertController(title: L10n.tr("Allow AI processing?", "允许 AI 处理？"),
-                        message: L10n.tr("With your permission, Cheese sends selected images to Google Gemini to check content safety, and your forum posts for recommendations and consented thread content for AI replies. Google processes this data under its API terms, potentially outside Canada; data use and retention depend on those terms. Do not include sensitive personal information. You can decline or withdraw permission in Settings.", "经你同意，Cheese 会将选中的图片发送给 Google Gemini 检查内容安全，并将你的论坛帖子用于推荐、经同意的讨论内容用于 AI 回复。Google 依 API 条款处理资料，处理地点可能在加拿大境外。请勿包含敏感个人资料。你可以拒绝或在设定中撤回同意。"), preferredStyle: .alert)
+                    let alert = UIAlertController(title: L10n.tr("Allow optional AI processing?", "允许可选 AI 处理？"),
+                        message: L10n.tr("With your permission, Cheese may send eligible forum text and listing details to an optional AI provider for the features you choose to use. Image safety review is governed separately. Provider processing may occur outside Canada. Do not include sensitive personal information. You can decline or withdraw permission in Settings.", "经你同意，Cheese 可能会将符合资格的论坛文字和商品资料传送给你选择使用的可选 AI 服务商。图片安全审核另行管理。处理地点可能在加拿大境外。请勿包含敏感个人资料；你可以拒绝或在设定中撤回同意。"), preferredStyle: .alert)
                     alert.addAction(UIAlertAction(title: L10n.tr("Not now", "暂不允许"), style: .cancel) { _ in continuation.resume(returning: false) })
                     alert.addAction(UIAlertAction(title: L10n.tr("Allow", "允许"), style: .default) { _ in continuation.resume(returning: true) })
                     presenter.present(alert, animated: true)
@@ -566,5 +606,39 @@ enum AIProcessingConsent {
         guard accepted, SupabaseManager.shared.auth.currentSession?.user.id == userID else { throw CancellationError() }
         let _: Bool = try await SupabaseManager.shared.client.rpc("set_my_ai_consent", params: ["p_allowed": true]).execute().value
         UserDefaults.standard.set(true, forKey: consentKey)
+    }
+}
+
+
+/// Required image safety review is separate from optional generative AI.
+@MainActor
+enum MediaSafetyConsent {
+    private static var pending: [UUID: Task<Bool, Never>] = [:]
+    static func requireConsent() async throws {
+        guard let userID = SupabaseManager.shared.auth.currentSession?.user.id else { throw URLError(.userAuthenticationRequired) }
+        let key = "media_safety_consent.2026-09-11.\(userID.uuidString)"
+        if UserDefaults.standard.bool(forKey: key) { return }
+        let task: Task<Bool, Never>
+        if let existing = pending[userID] { task = existing }
+        else {
+            task = Task { @MainActor in
+                await withCheckedContinuation { continuation in
+                    guard let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+                          var presenter = scene.windows.first(where: \.isKeyWindow)?.rootViewController else { continuation.resume(returning: false); return }
+                    while let presented = presenter.presentedViewController { presenter = presented }
+                    let alert = UIAlertController(title: L10n.tr("Image safety review", "图片安全审核"), message: L10n.tr(
+                        "Before publishing, selected images are sent to Cloudflare Workers AI for safety review. Processing may occur outside Canada. Cloudflare says it does not use this content for model training without consent. This review is required to share images and is separate from optional AI features. Do not include sensitive personal information. Cancel to continue without uploading.",
+                        "发布前，选中的图片会交给 Cloudflare Workers AI 检查不当内容，处理地点可能在加拿大境外。Cloudflare 声明未经同意不会将这些内容用于模型训练。分享图片需要完成安全审核，与可选 AI 功能相互独立。请勿包含敏感个人资料；取消后可以继续使用不需要上传图片的功能。"), preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: L10n.tr("Cancel", "取消"), style: .cancel) { _ in continuation.resume(returning: false) })
+                    alert.addAction(UIAlertAction(title: L10n.tr("Allow image review", "允许图片审核"), style: .default) { _ in continuation.resume(returning: true) })
+                    presenter.present(alert, animated: true)
+                }
+            }
+            pending[userID] = task
+        }
+        let accepted = await task.value
+        pending[userID] = nil
+        guard accepted, SupabaseManager.shared.auth.currentSession?.user.id == userID else { throw CancellationError() }
+        UserDefaults.standard.set(true, forKey: key)
     }
 }

@@ -8,6 +8,67 @@ final class SystemMessageViewModelTests: XCTestCase {
         XCTAssertEqual(SystemMessageKind(rawValue: "comment_reply"), .commentReply)
     }
 
+    func testLaunchReleaseHidesLegacyAutomatedActorAndItsProfileRoute() {
+        let item = SystemMessageItem(
+            id: UUID(),
+            eventID: "legacy-ai-notification",
+            kind: .postComment,
+            title: "Cheese AI replied",
+            body: "Historical response",
+            actorUserID: CheeseAIIdentity.userID,
+            actorName: "Cheese AI",
+            actorAvatarURL: nil,
+            postID: nil,
+            commentID: nil,
+            contentKind: "comment",
+            ctaKind: .viewProfile,
+            readAt: nil,
+            createdAt: Date()
+        )
+
+        XCTAssertFalse(item.isVisibleOnUserFacingSurface)
+        XCTAssertNil(item.navigationTarget)
+    }
+
+    func testLaunchReleaseHidesRetainedAutomatedComments() {
+        let automatedComment = ForumCommentItem(
+            id: UUID(),
+            postId: UUID(),
+            userId: CheeseAIIdentity.userID,
+            parentId: nil,
+            content: "Historical response",
+            isAnonymous: false,
+            likeCount: 0,
+            createdAt: Date(),
+            timeAgo: "now",
+            authorName: "Cheese AI",
+            authorAvatar: nil,
+            isAuthorOfficial: false
+        )
+        let memberComment = ForumCommentItem(
+            id: UUID(),
+            postId: automatedComment.postId,
+            userId: UUID(),
+            parentId: nil,
+            content: "Member response",
+            isAnonymous: false,
+            likeCount: 0,
+            createdAt: Date(),
+            timeAgo: "now",
+            authorName: "Member",
+            authorAvatar: nil,
+            isAuthorOfficial: false
+        )
+
+        XCTAssertFalse(automatedComment.isVisibleOnUserFacingSurface)
+        XCTAssertEqual(
+            [automatedComment, memberComment]
+                .filter(\.isVisibleOnUserFacingSurface)
+                .map(\.id),
+            [memberComment.id]
+        )
+    }
+
     func testNotificationKindsMapToSeparatedInboxCategories() {
         XCTAssertEqual(SystemMessageKind.automatic.category, .system)
         XCTAssertEqual(SystemMessageKind.secondhandAvailability.category, .system)

@@ -658,12 +658,30 @@ Code is pending coordinated migration/Worker/client rollout. Do not claim this
 privacy boundary is deployed solely because the client builds. Review the dated
 App Store report for actual verification and remaining release blockers.
 
-Release gate: the new media moderation flag is deliberately `false` in the
-checked-in Worker deployment configuration. The existing Gemini API provider's
-age restrictions conflict with the current App Store 13+ audience; explicit AI
-consent does not resolve that restriction. Neither the new consent migrations
-nor the updated Worker were deployed by this audit. Resolve the provider/audience
-contract and verify paid-service privacy before enabling this coordinated release.
-Embedding completion locks and rechecks the consent row so withdrawal cannot be
-followed by a late job re-creating a deleted vector. Signup metadata cannot import
-unreviewed external avatars; new profiles start with a placeholder.
+Gemini release gate: the checked-in Worker has both
+`GEMINI_PROVIDER_RELEASED = false` in source and
+`CHEESE_GEMINI_RELEASE_ENABLED = false` in configuration. A dashboard variable
+cannot override the source latch. The public comment and secondhand-generation
+routes are absent from the asset routing and return `404` before authentication,
+parsing, repository creation, or provider construction. The public health
+response exposes only generic release and maintenance state, never Gemini model
+or key-configuration details. Reopening any provider path requires a separately
+audited source change plus explicit operational flags. The existing Gemini API
+provider's age restrictions conflict with the current App Store 13+ audience;
+explicit AI consent does not resolve that restriction.
+
+`CHEESE_RECOMMENDATION_JOBS_ENABLED` remains a separate database-maintenance
+switch. While the Gemini release gate is false, the scheduled worker still
+backfills embedding jobs, backfills recommendation signal state, refreshes
+recommendation metrics and, if separately enabled, creates SQL-only shadow
+sessions from already stored data. It does not claim embedding jobs and therefore
+does not send post content to Gemini. The health endpoint separately reports
+generic `recommendationMaintenanceEnabled`,
+`recommendationProviderEnabled`, and `recommendationShadowEnabled` state.
+
+Neither the new consent migrations nor the updated Worker were deployed by this
+audit. Resolve the provider/audience contract and verify paid-service privacy
+before enabling this coordinated release. Embedding completion locks and rechecks
+the consent row so withdrawal cannot be followed by a late job re-creating a
+deleted vector. Signup metadata cannot import unreviewed external avatars; new
+profiles start with a placeholder.

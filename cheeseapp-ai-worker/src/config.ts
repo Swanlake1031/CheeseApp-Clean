@@ -12,6 +12,11 @@ export const RECOMMENDATION_EMBEDDING_MODEL = "gemini-embedding-2";
 export const RECOMMENDATION_EMBEDDING_DIMENSION = 768;
 export const RECOMMENDATION_INPUT_FORMAT_VERSION = 1;
 
+// The App Store release serves a 13+ audience. Gemini cannot be enabled by a
+// dashboard variable alone: reopening it requires a separately audited source
+// change as well as the operational flags below.
+export const GEMINI_PROVIDER_RELEASED = false;
+
 export interface AppConfig {
   readonly enabled: boolean;
   readonly geminiApiKey: string;
@@ -26,7 +31,10 @@ export interface AppConfig {
 }
 
 export interface RecommendationConfig {
-  readonly enabled: boolean;
+  /** Database-only recommendation upkeep, independent of model release. */
+  readonly maintenanceEnabled: boolean;
+  /** The only switch that permits scheduled embedding calls to Gemini. */
+  readonly embeddingProviderEnabled: boolean;
   readonly shadowEnabled: boolean;
   readonly geminiApiKey: string;
   readonly supabaseUrl: string;
@@ -55,6 +63,18 @@ function positiveInteger(value: string | undefined, fallback: number): number {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function isEnabled(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === "true";
+}
+
+export function isGeminiProviderEnabled(env: Env): boolean {
+  return (
+    GEMINI_PROVIDER_RELEASED &&
+    isEnabled(env.CHEESE_GEMINI_RELEASE_ENABLED) &&
+    isEnabled(env.CHEESE_AI_ENABLED)
+  );
+}
+
 export function loadConfig(env: Env): AppConfig {
   const configuredModel = env.CHEESE_AI_MODEL?.trim() || CHEESE_AI_MODEL;
   const configuredPromptVersion =
@@ -72,11 +92,15 @@ export function loadConfig(env: Env): AppConfig {
   }
 
   return {
-    enabled: (env.CHEESE_AI_ENABLED ?? "false").toLowerCase() === "true",
+    enabled: isGeminiProviderEnabled(env),
     // Keep health checks and controlled failure handling available even when
     // the local Gemini secret has not been configured yet.
     geminiApiKey: env.GEMINI_API_KEY?.trim() ?? "",
-    aiUserId: requireValue(env.CHEESE_AI_USER_ID, "CHEESE_AI_USER_ID"),
+    // The disabled release does not need a legacy bot account. Require it only
+    // if a future audited source release reopens provider execution.
+    aiUserId: isGeminiProviderEnabled(env)
+      ? requireValue(env.CHEESE_AI_USER_ID, "CHEESE_AI_USER_ID")
+      : env.CHEESE_AI_USER_ID?.trim() ?? "",
     supabaseUrl: requireValue(env.SUPABASE_URL, "SUPABASE_URL").replace(
       /\/$/,
       "",
@@ -100,13 +124,13 @@ export function loadConfig(env: Env): AppConfig {
 }
 
 export function loadRecommendationConfig(env: Env): RecommendationConfig {
+  const maintenanceEnabled = isEnabled(env.CHEESE_RECOMMENDATION_JOBS_ENABLED);
   return {
-    enabled:
-      (env.CHEESE_RECOMMENDATION_JOBS_ENABLED ?? "false").toLowerCase() ===
-      "true",
+    maintenanceEnabled,
+    embeddingProviderEnabled:
+      maintenanceEnabled && isGeminiProviderEnabled(env),
     shadowEnabled:
-      (env.CHEESE_RECOMMENDATION_SHADOW_ENABLED ?? "false").toLowerCase() ===
-      "true",
+      maintenanceEnabled && isEnabled(env.CHEESE_RECOMMENDATION_SHADOW_ENABLED),
     geminiApiKey: env.GEMINI_API_KEY?.trim() ?? "",
     supabaseUrl: requireValue(env.SUPABASE_URL, "SUPABASE_URL").replace(/\/$/, ""),
     supabaseServiceRoleKey: requireValue(

@@ -95,11 +95,11 @@ class ChatService: ObservableObject {
     @Published private(set) var accountGeneration: UInt64 = 0
     @Published private(set) var isAccountTransitionInProgress = false
     
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
     private let repository = ChatServiceRepository()
     private let privacyActions = ChatPrivacyActions()
     private let stateUpdater = ChatConversationStateUpdater()
-    private let conversationRemarksKeyPrefix = "chat.conversation.remarks."
+    private static let conversationRemarksKeyPrefix = "chat.conversation.remarks."
     private let currentUserIDProvider: CurrentUserIDProvider
     private let injectedConversationStateLoader: ConversationStateLoader?
     private var remarksOwnerId: UUID?
@@ -107,6 +107,7 @@ class ChatService: ObservableObject {
     private var conversationRefreshQueued = false
 
     private init() {
+        defaults = .standard
         currentUserIDProvider = {
             try await AuthService.shared.requireAuthUserId()
         }
@@ -115,8 +116,10 @@ class ChatService: ObservableObject {
 
     init(
         currentUserIDProvider: @escaping CurrentUserIDProvider,
-        conversationStateLoader: @escaping ConversationStateLoader
+        conversationStateLoader: @escaping ConversationStateLoader,
+        defaults: UserDefaults = .standard
     ) {
+        self.defaults = defaults
         self.currentUserIDProvider = currentUserIDProvider
         injectedConversationStateLoader = conversationStateLoader
     }
@@ -196,7 +199,7 @@ class ChatService: ObservableObject {
     private func ensureConversationRemarksLoaded(for userId: UUID) {
         if remarksOwnerId == userId { return }
 
-        let key = conversationRemarksStorageKey(for: userId)
+        let key = Self.conversationRemarksStorageKey(for: userId)
         guard let data = defaults.data(forKey: key),
               let rawMap = try? JSONDecoder().decode([String: String].self, from: data)
         else {
@@ -221,7 +224,7 @@ class ChatService: ObservableObject {
             guard let normalized = sanitizedOptionalText(value) else { continue }
             rawMap[conversationId.uuidString] = normalized
         }
-        let key = conversationRemarksStorageKey(for: userId)
+        let key = Self.conversationRemarksStorageKey(for: userId)
 
         if rawMap.isEmpty {
             defaults.removeObject(forKey: key)
@@ -233,7 +236,15 @@ class ChatService: ObservableObject {
         }
     }
 
-    private func conversationRemarksStorageKey(for userId: UUID) -> String {
+    func clearLocalAccountData(for userId: UUID) {
+        defaults.removeObject(forKey: Self.conversationRemarksStorageKey(for: userId))
+        if remarksOwnerId == userId {
+            conversationRemarks = [:]
+            remarksOwnerId = nil
+        }
+    }
+
+    static func conversationRemarksStorageKey(for userId: UUID) -> String {
         conversationRemarksKeyPrefix + userId.uuidString
     }
 

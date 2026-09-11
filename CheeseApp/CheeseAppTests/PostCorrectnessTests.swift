@@ -122,6 +122,47 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertNotNil(UIImage(data: prepared.data))
     }
 
+    func testTransparentPostImageStaysWithinModerationRequestLimit() async throws {
+        let width = 1_600
+        let height = 1_600
+        let bytesPerRow = width * 4
+        var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
+        var entropy: UInt32 = 0x51A7_9EED
+        for offset in stride(from: 0, to: pixels.count, by: 4) {
+            entropy = entropy &* 1_664_525 &+ 1_013_904_223
+            pixels[offset] = UInt8(truncatingIfNeeded: entropy)
+            entropy = entropy &* 1_664_525 &+ 1_013_904_223
+            pixels[offset + 1] = UInt8(truncatingIfNeeded: entropy)
+            entropy = entropy &* 1_664_525 &+ 1_013_904_223
+            pixels[offset + 2] = UInt8(truncatingIfNeeded: entropy)
+            pixels[offset + 3] = offset.isMultiple(of: 32) ? 0 : 255
+        }
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue)
+        let image: UIImage = try pixels.withUnsafeMutableBytes { rawBuffer in
+            guard let context = CGContext(
+                data: rawBuffer.baseAddress,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: bytesPerRow,
+                space: colorSpace,
+                bitmapInfo: bitmapInfo.rawValue
+            ), let cgImage = context.makeImage() else {
+                throw NSError(domain: "PostCorrectnessTests", code: 1)
+            }
+            return UIImage(cgImage: cgImage)
+        }
+        XCTAssertGreaterThan(image.pngData()!.count, 8 * 1024 * 1024)
+
+        let prepared = try await ImageUploadService.shared.preparePostImageForUpload(image)
+
+        XCTAssertEqual(prepared.contentType, "image/png")
+        XCTAssertTrue(prepared.preservesTransparency)
+        XCTAssertLessThanOrEqual(prepared.data.count, 8 * 1024 * 1024)
+        XCTAssertLessThanOrEqual(max(prepared.pixelSize.width, prepared.pixelSize.height), 1_280)
+    }
+
     func testPostInteractionStoreIsSharedAcrossListAndDetailFallbacks() {
         let accountID = UUID()
         let postID = UUID()
@@ -457,28 +498,6 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertEqual(SearchCategory(searchPostsRPCValue: "market"), .secondhand)
     }
 
-    func testCourseRadarLinkUsesProductionURL() {
-        XCTAssertEqual(
-            AppExternalLinks.courseRadar.absoluteString,
-            "https://radar.cheeseapp.org"
-        )
-    }
-
-    func testCourseRadarDeepLinkNormalizesAndIncludesCourseCode() throws {
-        let url = AppExternalLinks.courseRadar(for: "  econ   1b03 ")
-        let components = try XCTUnwrap(
-            URLComponents(url: url, resolvingAgainstBaseURL: false)
-        )
-
-        XCTAssertEqual(components.scheme, "https")
-        XCTAssertEqual(components.host, "radar.cheeseapp.org")
-        XCTAssertEqual(
-            components.queryItems?.first(where: { $0.name == "course" })?.value,
-            "ECON 1B03"
-        )
-        XCTAssertEqual(components.fragment, "courses")
-    }
-
     func testPostKindCodableRoundTrip() throws {
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
@@ -793,6 +812,103 @@ final class PostCorrectnessTests: XCTestCase {
                 descriptionAtRequestStart: ""
             )
         )
+    }
+
+    func testLaunchReleaseBlocksOptionalAIDescriptionBeforeAnyStagingWork() async {
+        XCTAssertFalse(ReleaseCapabilities.optionalGemini)
+
+        do {
+            _ = try await SecondhandAIDescriptionService.shared.generate(
+                input: makeAIDescriptionInput()
+            )
+            XCTFail("The launch release must not invoke an optional AI path")
+        } catch let error as SecondhandAIDescriptionError {
+            guard case .serviceUnavailable = error else {
+                return XCTFail("Expected the release gate, got \(error)")
+            }
+        } catch {
+            XCTFail("Expected a local release-gate failure, got \(error)")
+        }
+    }
+
+    func testWithdrawingImageReviewAcknowledgementClearsOnlyCurrentAccountFlag() {
+        let firstUserID = UUID(uuidString: "67000000-0000-4000-8000-000000000001")!
+        let secondUserID = UUID(uuidString: "67000000-0000-4000-8000-000000000002")!
+        let firstKey = MediaSafetyConsent.localConsentKey(for: firstUserID)
+        let secondKey = MediaSafetyConsent.localConsentKey(for: secondUserID)
+        let defaults = UserDefaults.standard
+        let originalFirst = defaults.object(forKey: firstKey)
+        let originalSecond = defaults.object(forKey: secondKey)
+        defer {
+            if let originalFirst {
+                defaults.set(originalFirst, forKey: firstKey)
+            } else {
+                defaults.removeObject(forKey: firstKey)
+            }
+            if let originalSecond {
+                defaults.set(originalSecond, forKey: secondKey)
+            } else {
+                defaults.removeObject(forKey: secondKey)
+            }
+        }
+
+        defaults.set(true, forKey: firstKey)
+        defaults.set(true, forKey: secondKey)
+
+        MediaSafetyConsent.withdrawLocalConsent(for: firstUserID)
+
+        XCTAssertFalse(defaults.bool(forKey: firstKey))
+        XCTAssertTrue(defaults.bool(forKey: secondKey))
+    }
+
+    func testAccountDeletionClearsAllComposerDraftTextAndSessionImages() {
+        CreateDraftStore.clearAll()
+        CreateComposerSessionStore.clearAll()
+        defer {
+            CreateDraftStore.clearAll()
+            CreateComposerSessionStore.clearAll()
+        }
+
+        CreateDraftStore.save(
+            kind: .forum,
+            title: "Private forum draft",
+            payload: "Private forum draft text"
+        )
+        CreateDraftStore.save(
+            kind: .secondhand,
+            title: "Private marketplace draft",
+            payload: "Private marketplace draft text"
+        )
+        CreateComposerSessionStore.save(images: [UIImage()], for: .forum)
+        CreateComposerSessionStore.save(images: [UIImage()], for: .secondhand)
+
+        CreateDraftStore.clearAll()
+        CreateComposerSessionStore.clearAll()
+
+        XCTAssertFalse(CreateDraftStore.hasDraft(.forum))
+        XCTAssertFalse(CreateDraftStore.hasDraft(.secondhand))
+        XCTAssertTrue(CreateComposerSessionStore.images(for: .forum).isEmpty)
+        XCTAssertTrue(CreateComposerSessionStore.images(for: .secondhand).isEmpty)
+        XCTAssertNil(CreateComposerSessionStore.resumableKind)
+    }
+
+    func testAccountDeletionClearsOnlyDeletedAccountNotificationCounters() {
+        let deletedUserID = UUID()
+        let retainedUserID = UUID()
+        let defaults = UserDefaults.standard
+        let deletedKeys = EngagementNotificationService.accountScopedCounterKeys(for: deletedUserID)
+        let retainedKeys = EngagementNotificationService.accountScopedCounterKeys(for: retainedUserID)
+        defer {
+            (deletedKeys + retainedKeys).forEach { defaults.removeObject(forKey: $0) }
+        }
+
+        deletedKeys.forEach { defaults.set(7, forKey: $0) }
+        retainedKeys.forEach { defaults.set(3, forKey: $0) }
+
+        EngagementNotificationService.shared.clearLocalAccountData(for: deletedUserID)
+
+        deletedKeys.forEach { XCTAssertNil(defaults.object(forKey: $0)) }
+        retainedKeys.forEach { XCTAssertEqual(defaults.integer(forKey: $0), 3) }
     }
 
     func testSecondhandAIDescriptionViewModelTracksLoadingAndSuccess() async {

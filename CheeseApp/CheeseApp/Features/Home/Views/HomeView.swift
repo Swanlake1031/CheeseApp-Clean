@@ -48,7 +48,6 @@ struct HomeView: View {
     /// discard loaded feed data or in-flight request de-duplication state.
     @ObservedObject var viewModel: HomeViewModel
     @EnvironmentObject private var authService: AuthService
-    @Environment(\.openURL) private var openURL
     @ObservedObject private var forumService = ForumService.shared
     @ObservedObject private var interactionStore = PostInteractionStore.shared
 
@@ -168,9 +167,6 @@ struct HomeView: View {
                 },
                 onSupportTap: {
                     showCustomerSupport = true
-                },
-                onCourseRadarTap: {
-                    openURL(AppExternalLinks.courseRadar)
                 }
             )
             .zIndex(100)
@@ -189,7 +185,7 @@ struct HomeView: View {
             )
         }
         .navigationDestination(isPresented: $showCustomerSupport) {
-            CheeseCustomerSupportView()
+            SupportCenterView()
         }
         .navigationDestination(isPresented: $showSettings) {
             SettingsView()
@@ -1022,11 +1018,6 @@ struct HomeView: View {
 
     private func openFeaturedCard(_ card: HomeCardItem) {
         guard let postId = card.postId else {
-            if card.isSeatRadar {
-                openURL(AppExternalLinks.courseRadar)
-                return
-            }
-
             switch card.category {
             case .secondhand:
                 postOpenErrorMessage = L10n.tr(

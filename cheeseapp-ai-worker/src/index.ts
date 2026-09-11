@@ -1,12 +1,9 @@
 import { handleModeratedUpload } from "./moderation";
 import {
   ConfigurationError,
+  isGeminiProviderEnabled,
   loadConfig,
   loadRecommendationConfig,
-  RECOMMENDATION_ALGORITHM_VERSION,
-  RECOMMENDATION_EMBEDDING_DIMENSION,
-  RECOMMENDATION_EMBEDDING_MODEL,
-  RECOMMENDATION_EMBEDDING_VERSION,
   SECONDHAND_DESCRIPTION_PROMPT_VERSION,
 } from "./config";
 import {
@@ -32,6 +29,10 @@ import { RecommendationProcessor } from "./recommendation/processor";
 
 const COMMENT_EVENT_PATH = "/v1/comment-events";
 const SECONDHAND_DESCRIPTION_PATH = "/v1/secondhand/generate-description";
+const OPTIONAL_GEMINI_PATHS = new Set([
+  COMMENT_EVENT_PATH,
+  SECONDHAND_DESCRIPTION_PATH,
+]);
 const MAX_REQUEST_BYTES = 1_024;
 const MAX_SECONDHAND_REQUEST_BYTES = 8_192;
 const UUID_PATTERN =
@@ -248,7 +249,7 @@ async function processScheduledWork(env: Env): Promise<void> {
 
 async function processScheduledRecommendationWork(env: Env): Promise<void> {
   const config = loadRecommendationConfig(env);
-  if (!config.enabled) return;
+  if (!config.maintenanceEnabled) return;
   await new RecommendationProcessor(config).runScheduledBatch();
 }
 
@@ -301,21 +302,28 @@ export async function handleWorkerRequest(
   const url = new URL(request.url);
   try {
     if (request.method === "POST" && url.pathname === "/v1/media/upload") return handleModeratedUpload(request, env);
+    // Do not advertise disabled optional routes to installed or stale clients.
+    // This check runs before authentication, parsing, repository creation, or
+    // provider construction, so it cannot trigger a Gemini call.
+    if (
+      request.method === "POST" &&
+      OPTIONAL_GEMINI_PATHS.has(url.pathname) &&
+      !isGeminiProviderEnabled(env)
+    ) {
+      return json({ error: "not_found" }, 404);
+    }
     if (request.method === "GET" && url.pathname === "/health") {
-      const config = loadConfig(env);
+      const recommendationConfig = loadRecommendationConfig(env);
       return json({
         ok: true,
-        enabled: config.enabled,
-        geminiConfigured: config.geminiApiKey.length > 0,
-        model: config.model,
-        promptVersion: config.promptVersion,
-        secondhandPromptVersion: SECONDHAND_DESCRIPTION_PROMPT_VERSION,
-        recommendationJobsEnabled:
-          loadRecommendationConfig(env).enabled,
-        recommendationAlgorithmVersion: RECOMMENDATION_ALGORITHM_VERSION,
-        recommendationEmbeddingVersion: RECOMMENDATION_EMBEDDING_VERSION,
-        recommendationEmbeddingModel: RECOMMENDATION_EMBEDDING_MODEL,
-        recommendationEmbeddingDimension: RECOMMENDATION_EMBEDDING_DIMENSION,
+        optionalAIAvailable: isGeminiProviderEnabled(env),
+        mediaSafetyEnabled:
+          Boolean(env.AI) && env.CHEESE_MEDIA_MODERATION_ENABLED === "true",
+        recommendationMaintenanceEnabled:
+          recommendationConfig.maintenanceEnabled,
+        recommendationProviderEnabled:
+          recommendationConfig.embeddingProviderEnabled,
+        recommendationShadowEnabled: recommendationConfig.shadowEnabled,
       });
     }
     if (request.method === "POST" && url.pathname === COMMENT_EVENT_PATH) {

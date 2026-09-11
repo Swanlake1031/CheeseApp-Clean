@@ -9,30 +9,6 @@ import Foundation
 import SwiftUI
 import UIKit
 
-enum AppExternalLinks {
-    static let courseRadar = URL(string: "https://radar.cheeseapp.org")!
-
-    static func courseRadar(for courseCode: String) -> URL {
-        let normalizedCode = courseCode
-            .split(whereSeparator: \Character.isWhitespace)
-            .joined(separator: " ")
-            .uppercased()
-        guard !normalizedCode.isEmpty,
-              var components = URLComponents(
-                url: courseRadar,
-                resolvingAgainstBaseURL: false
-              ) else {
-            return courseRadar
-        }
-
-        components.queryItems = [
-            URLQueryItem(name: "course", value: normalizedCode)
-        ]
-        components.fragment = "courses"
-        return components.url ?? courseRadar
-    }
-}
-
 enum CollectionLoadState: Equatable {
     case unresolved
     case initialLoading
@@ -206,6 +182,14 @@ enum CreateDraftStore {
         defaults.removeObject(forKey: storageKey(for: kind))
     }
 
+    /// Drafts are not account-scoped. Account deletion must therefore remove
+    /// every persisted composer draft before another account can open it.
+    static func clearAll() {
+        for kind in PostKind.allCases {
+            clear(kind)
+        }
+    }
+
     static func listMetas() -> [CreateDraftMeta] {
         PostKind.allCases.compactMap { kind in
             guard let envelope = loadEnvelope(kind) else { return nil }
@@ -262,6 +246,11 @@ enum CreateComposerSessionStore {
             resumableKind = nil
         }
     }
+
+    static func clearAll() {
+        imagesByKind.removeAll()
+        resumableKind = nil
+    }
 }
 
 /// UI copy never includes SQL, RPC, hostnames, tokens, or raw server messages.
@@ -282,4 +271,13 @@ enum AppErrorMessage {
         if detail.contains("account_restricted") { return L10n.tr("This account is restricted. Contact support to request a review.", "此帐号已受限制，请联络客服申请复核。") }
         return L10n.tr("Unable to complete this action. Please try again. If it continues, contact support.", "暂时无法完成操作，请重试；若问题持续，请联络客服。")
     }
+}
+
+/// The launch build intentionally contains no user-invocable Gemini path.
+///
+/// Keep this compile-time release gate closed until a provider suitable for the
+/// 13+ product has completed its own audited release.  Client-side checks are
+/// defense in depth; the Worker gate is still authoritative for network calls.
+enum ReleaseCapabilities {
+    static let optionalGemini = false
 }

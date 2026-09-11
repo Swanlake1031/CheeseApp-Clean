@@ -302,7 +302,9 @@ struct ForumDetailView: View {
                     .foregroundStyle(AppColors.textMuted)
             }
 
-            if let authorId = post.authorId, !post.isAnonymous {
+            if let authorId = post.authorId,
+               !post.isAnonymous,
+               CheeseAIIdentity.isVisibleOnUserFacingSurface(authorId) {
                 NavigationLink {
                     UserPostsView(
                         userId: authorId,
@@ -486,7 +488,13 @@ struct ForumDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
             case .loaded:
-                if initialCommentID == nil {
+                if visibleComments.isEmpty {
+                    Text(L10n.tr("No comments yet. Be the first to reply.", "还没有评论，来当第一位留言者吧。"))
+                        .font(.system(size: 14))
+                        .foregroundStyle(AppColors.textMuted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 14)
+                } else if initialCommentID == nil {
                     LazyVStack(spacing: 0) {
                         commentThreadRows
                     }
@@ -545,16 +553,26 @@ struct ForumDetailView: View {
         var id: UUID { root.id }
     }
 
+    /// Preserve old automated-account records locally for deletion, audit, and
+    /// future provider migration, but do not surface them to 13+ launch users.
+    private var visibleComments: [ForumCommentItem] {
+        comments.filter(\.isVisibleOnUserFacingSurface)
+    }
+
+    private func visibleCommentCount(_ source: [ForumCommentItem]) -> Int {
+        source.lazy.filter(\.isVisibleOnUserFacingSurface).count
+    }
+
     private var commentLookup: [UUID: ForumCommentItem] {
-        Dictionary(uniqueKeysWithValues: comments.map { ($0.id, $0) })
+        Dictionary(uniqueKeysWithValues: visibleComments.map { ($0.id, $0) })
     }
 
     private var rootCommentIdMap: [UUID: UUID] {
-        buildRootCommentIdMap(from: comments)
+        buildRootCommentIdMap(from: visibleComments)
     }
 
     private var commentThreads: [CommentThread] {
-        let ordered = comments.sorted { $0.createdAt < $1.createdAt }
+        let ordered = visibleComments.sorted { $0.createdAt < $1.createdAt }
         guard !ordered.isEmpty else { return [] }
 
         let rootMap = buildRootCommentIdMap(from: ordered)
@@ -776,7 +794,8 @@ struct ForumDetailView: View {
 
     @ViewBuilder
     private func commentAuthorAvatar(_ comment: ForumCommentItem, size: CGFloat) -> some View {
-        if comment.isAnonymous || comment.isAuthorDeactivated {
+        if comment.isAnonymous || comment.isAuthorDeactivated
+            || !CheeseAIIdentity.isVisibleOnUserFacingSurface(comment.userId) {
             commentAvatarView(comment, size: size)
         } else {
             NavigationLink {
@@ -799,7 +818,8 @@ struct ForumDetailView: View {
 
     @ViewBuilder
     private func commentAuthorName(_ comment: ForumCommentItem) -> some View {
-        if comment.isAnonymous || comment.isAuthorDeactivated {
+        if comment.isAnonymous || comment.isAuthorDeactivated
+            || !CheeseAIIdentity.isVisibleOnUserFacingSurface(comment.userId) {
             commentAuthorNameLabel(comment)
         } else {
             NavigationLink {
@@ -839,7 +859,8 @@ struct ForumDetailView: View {
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.white)
                     }
-            } else if comment.userId == CheeseAIIdentity.userID {
+            } else if ReleaseCapabilities.optionalGemini,
+                      comment.userId == CheeseAIIdentity.userID {
                 CheeseAIAvatarView(
                     remoteURLString: comment.authorAvatar,
                     size: size
@@ -1273,13 +1294,13 @@ struct ForumDetailView: View {
             )
             post = mergedDetailPost(
                 from: latestPost,
-                resolvedCommentCount: latestComments.count
+                resolvedCommentCount: visibleCommentCount(latestComments)
             )
             comments = latestComments
             likedCommentIds = latestLikedCommentIds
             commentLikeCountOverrides.removeAll()
             commentLoadState = comments.isEmpty ? .empty : .loaded
-            let validRootIds = Set(buildRootCommentIdMap(from: comments).values)
+            let validRootIds = Set(buildRootCommentIdMap(from: visibleComments).values)
             collapsedRootCommentIds = collapsedRootCommentIds.intersection(validRootIds)
             expandedRootCommentIds = expandedRootCommentIds.intersection(validRootIds)
             if let replyingToComment, !comments.contains(where: { $0.id == replyingToComment.id }) {
@@ -1330,9 +1351,9 @@ struct ForumDetailView: View {
                 }
                 pendingCommentLikeIds = pendingCommentLikeIds.intersection(validCommentIds)
                 commentLoadState = latestComments.isEmpty ? .empty : .loaded
-                post.comments = latestComments.count
+                post.comments = visibleCommentCount(latestComments)
 
-                let validRootIds = Set(buildRootCommentIdMap(from: latestComments).values)
+                let validRootIds = Set(buildRootCommentIdMap(from: visibleComments).values)
                 collapsedRootCommentIds = collapsedRootCommentIds.intersection(validRootIds)
                 expandedRootCommentIds = expandedRootCommentIds.intersection(validRootIds)
                 if let replyingToComment,
@@ -1350,7 +1371,7 @@ struct ForumDetailView: View {
     private var renderedCommentCount: Int? {
         switch commentLoadState {
         case .empty, .loaded:
-            return comments.count
+            return visibleComments.count
         case .unresolved, .initialLoading, .error:
             return nil
         }
@@ -1512,8 +1533,8 @@ struct ForumDetailView: View {
             }
             comments = try await service.fetchComments(postId: post.id)
             commentLoadState = comments.isEmpty ? .empty : .loaded
-            post.comments = comments.count
-            let validRootIds = Set(buildRootCommentIdMap(from: comments).values)
+            post.comments = visibleComments.count
+            let validRootIds = Set(buildRootCommentIdMap(from: visibleComments).values)
             collapsedRootCommentIds = collapsedRootCommentIds.intersection(validRootIds)
             expandedRootCommentIds = expandedRootCommentIds.intersection(validRootIds)
             errorMessage = nil

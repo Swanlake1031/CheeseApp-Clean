@@ -1,6 +1,13 @@
 const config = window.CHEESE_CONTENT_STUDIO_CONFIG || {};
 const SESSION_KEY = "cheese-content-studio-session-v1";
 const OAUTH_PKCE_VERIFIER_KEY = "cheese-content-studio-google-pkce-verifier-v1";
+const MEDIA_SAFETY_CONSENT_VERSION = "2026-09-11-media-v1";
+// Keep browser-produced JPEGs below the media Worker's 10 MiB raw limit. The
+// Worker forwards them as base64 data URIs to Workers AI, so this leaves room
+// for transport expansion and headers.
+const MAX_MEDIA_SAFETY_IMAGE_BYTES = 8 * 1024 * 1024;
+const MEDIA_SAFETY_IMAGE_DIMENSIONS = [2048, 1792, 1536, 1280];
+const MEDIA_SAFETY_JPEG_QUALITIES = [.82, .76, .70];
 const state = {
   session: readSession(),
   bootstrap: null,
@@ -189,7 +196,6 @@ function base64URL(bytes) {
 
 async function enterStudio() {
   state.bootstrap = await api("/v1/bootstrap");
-  $("#ai-consent").checked = (await api("/v1/ai-consent")).allowed;
   $("#login-screen").classList.add("hidden");
   $("#studio").classList.remove("hidden");
   $("#viewer-email").textContent = state.bootstrap.viewer.email || state.bootstrap.viewer.id;
@@ -300,8 +306,8 @@ async function chooseImages(event) {
     try {
       const jpg = await compressToJpeg(file);
       state.selectedMedia.push({ file: jpg, previewURL: URL.createObjectURL(jpg) });
-    } catch {
-      showToast("有一张图片无法处理，请更换后重试。", true);
+    } catch (error) {
+      showToast(error.message || "有一张图片无法处理，请更换后重试。", true);
     }
   }
   event.target.value = "";
@@ -342,9 +348,15 @@ async function saveDraft(silent = false) {
 async function publish(event) {
   event.preventDefault();
   try {
+    if (!hasMediaSafetyConsentForNewImages()) {
+      showToast("发布图片前，请先确认内容安全审核说明。", true);
+      $("#media-safety-consent").focus();
+      return;
+    }
     if (!confirm(state.editing ? "确认保存这次修改？" : "确认按当前预览正式发布？")) return;
     const draft = await saveDraft(true);
     const editing = state.editing;
+    const mediaSafetyConsentVersion = mediaSafetyConsentVersionForPublication();
     setEditorBusy(true, "正在通过正式发布链路发布…");
     const target = editing
       ? `/v1/posts/${editing.kind}/${editing.id}`
@@ -352,8 +364,8 @@ async function publish(event) {
     const result = await api(target, {
       method: editing ? "PATCH" : "POST",
       body: editing
-        ? { payload: payloadFromEditor(), isPrivate: state.editing.isPrivate, keepImageIds: state.editing.keepImageIds }
-        : { draftId: draft.id }
+        ? { payload: payloadFromEditor(), isPrivate: state.editing.isPrivate, keepImageIds: state.editing.keepImageIds, mediaSafetyConsentVersion }
+        : { draftId: draft.id, mediaSafetyConsentVersion }
     });
     if (editing && draft?.id) await api(`/v1/drafts/${draft.id}`, { method: "DELETE" });
     showToast(editing ? "内容已更新。" : "内容已发布。", false);
@@ -557,6 +569,7 @@ async function renderMedia() {
     tile.append(remove); grid.append(tile);
   }
   $("#media-count").textContent = `${mediaCount()} / 6`;
+  syncMediaSafetyConsent();
   renderPreview();
 }
 
@@ -588,6 +601,17 @@ async function draftMediaURL(path) {
 }
 
 function mediaCount() { return state.existingMedia.length + state.remoteMedia.length + state.selectedMedia.length; }
+function hasNewMedia() { return state.remoteMedia.length > 0 || state.selectedMedia.length > 0; }
+function hasMediaSafetyConsentForNewImages() { return !hasNewMedia() || $("#media-safety-consent").checked; }
+function mediaSafetyConsentVersionForPublication() {
+  return hasNewMedia() && $("#media-safety-consent").checked ? MEDIA_SAFETY_CONSENT_VERSION : undefined;
+}
+function syncMediaSafetyConsent() {
+  const row = $("#media-safety-consent-row");
+  const required = hasNewMedia();
+  row.classList.toggle("hidden", !required);
+  if (!required) $("#media-safety-consent").checked = false;
+}
 function clearSelectedMedia() { state.selectedMedia.forEach((item) => URL.revokeObjectURL(item.previewURL)); state.selectedMedia = []; }
 function renderEmpty(container) { container.append($("#empty-template").content.cloneNode(true)); }
 function setEditorBusy(busy, message = "") { $("#publish-button").disabled = busy; $("#save-draft").disabled = busy; $("#editor-status").textContent = message; }
@@ -621,14 +645,26 @@ async function apiRaw(path, { method = "GET", body } = {}) {
 async function compressToJpeg(file) {
   if (!file.type.startsWith("image/")) throw new Error("请选择图片文件");
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", .82));
-  if (!blob) throw new Error("图片转换失败");
-  return new File([blob], "image.jpg", { type: "image/jpeg" });
+  try {
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("图片转换失败");
+    for (const maximumDimension of MEDIA_SAFETY_IMAGE_DIMENSIONS) {
+      const scale = Math.min(1, maximumDimension / Math.max(bitmap.width, bitmap.height));
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      for (const quality of MEDIA_SAFETY_JPEG_QUALITIES) {
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+        if (blob && blob.size <= MAX_MEDIA_SAFETY_IMAGE_BYTES) {
+          return new File([blob], "image.jpg", { type: "image/jpeg" });
+        }
+      }
+    }
+  } finally {
+    bitmap.close();
+  }
+  throw new Error("图片压缩后仍超过 8 MB，请选择较小的图片。");
 }
 
 function persistSession(value) { localStorage.setItem(SESSION_KEY, JSON.stringify(value)); }
@@ -695,17 +731,6 @@ async function loadModeration() {
   } catch { container.textContent = "无法载入举报；请确认使用管理员帐号并检查网络。"; }
 }
 $("#refresh-moderation").addEventListener("click", loadModeration);
-$("#ai-consent").addEventListener("change", async (event) => {
-  const input = event.target;
-  const requested = input.checked;
-  input.disabled = true;
-  try { await api("/v1/ai-consent", { method: "POST", body: { allowed: requested } }); }
-  catch {
-    input.checked = !requested;
-    $("#editor-status").textContent = "权限更改未确认；请刷新页面核对服务器状态后重试。";
-  } finally { input.disabled = false; }
-});
-
 $("#restore-moderated-user").addEventListener("click", async () => {
   const userId = prompt("请输入申诉帐号 UUID（仅恢复本审核系统的暂停）");
   if (!userId) return;

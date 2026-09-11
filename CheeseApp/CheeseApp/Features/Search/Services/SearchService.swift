@@ -87,10 +87,11 @@ final class SearchService {
         query: String,
         limit: Int
     ) async throws -> [SearchProfileResult] {
-        try await supabase.client
+        let rows: [SearchProfileResult] = try await supabase.client
             .rpc("search_profiles", params: SearchProfilesParams(pQuery: query, pLimit: limit))
             .execute()
             .value
+        return rows.filter(\.isVisibleOnUserFacingSurface)
     }
 
     func followUser(targetUserId: UUID) async throws {

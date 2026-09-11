@@ -27,6 +27,15 @@ Pages origin in production.
 This preserves post ownership, current RLS/RPC validation, media staging,
 notifications, and cleanup behavior already used by the iOS app.
 
+## Image safety acknowledgement
+
+Content Studio keeps optional Gemini features out of its release UI. Images use
+a separate content-safety path: a publish or edit request that includes new
+draft media must explicitly send `mediaSafetyConsentVersion:
+"2026-09-11-media-v1"`. The API checks that acknowledgement before creating a
+media operation, then sends only `X-Cheese-Media-Safety-Consent` to the media
+Worker. It never treats the legacy Gemini consent as approval for image review.
+
 ## Validation
 
 ```sh

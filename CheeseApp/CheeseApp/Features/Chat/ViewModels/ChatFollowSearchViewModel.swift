@@ -86,7 +86,9 @@ final class ChatFollowSearchViewModel: ObservableObject {
             guard !Task.isCancelled, normalized == normalizedQuery else { return }
 
             let currentUserID = AuthService.shared.currentUser?.id
-            results = rows.filter { $0.id != currentUserID }
+            results = rows.filter {
+                $0.id != currentUserID && $0.isVisibleOnUserFacingSurface
+            }
             errorMessage = nil
             isLoading = false
         } catch {

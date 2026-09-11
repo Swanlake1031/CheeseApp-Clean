@@ -93,7 +93,6 @@ struct HomeNavigationDrawerContainer: View {
     let onSecondhandCategoryTap: (SecondhandPost.Category) -> Void
     let onSettingsTap: () -> Void
     let onSupportTap: () -> Void
-    let onCourseRadarTap: () -> Void
 
     @State private var isOpen = false
     @State private var reveal: CGFloat = 0
@@ -149,10 +148,6 @@ struct HomeNavigationDrawerContainer: View {
                     onSupportTap: {
                         closeDrawer()
                         onSupportTap()
-                    },
-                    onCourseRadarTap: {
-                        closeDrawer()
-                        onCourseRadarTap()
                     }
                 )
                 .frame(width: drawerWidth)
@@ -247,7 +242,6 @@ struct HomeNavigationDrawerView: View {
     let onSecondhandCategoryTap: (SecondhandPost.Category) -> Void
     let onSettingsTap: () -> Void
     let onSupportTap: () -> Void
-    let onCourseRadarTap: () -> Void
 
     @State private var isSecondhandExpanded = true
 
@@ -309,17 +303,11 @@ struct HomeNavigationDrawerView: View {
 
                     navigationRow(
                         title: L10n.tr("Cheese Support", "奶酪小客服"),
-                        subtitle: L10n.tr("WeChat support and app help", "微信客服与使用帮助"),
+                        subtitle: L10n.tr("Get help and send feedback", "取得帮助并提交回馈"),
                         icon: "headphones",
                         action: onSupportTap
                     )
 
-                    navigationRow(
-                        title: L10n.tr("Cheese Radar Registration", "奶酪雷达抢课"),
-                        subtitle: L10n.tr("Track course seats in real time", "实时监控课程空位"),
-                        icon: "bolt.fill",
-                        action: onCourseRadarTap
-                    )
                 }
                 .padding(.vertical, 18)
             }

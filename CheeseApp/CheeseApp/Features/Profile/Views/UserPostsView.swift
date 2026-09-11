@@ -90,6 +90,10 @@ struct UserPostsView: View {
         authService.currentUser?.id == userId
     }
 
+    private var isHiddenLegacyAutomatedProfile: Bool {
+        !CheeseAIIdentity.isVisibleOnUserFacingSurface(userId)
+    }
+
     private var viewerScopedTaskID: String {
         "\(authService.currentUser?.id.uuidString ?? "signed-out"):\(userId.uuidString)"
     }
@@ -164,12 +168,42 @@ struct UserPostsView: View {
 
     var body: some View {
         Group {
-            if isCurrentUser && redirectsCurrentUserToProfileTab {
+            if isHiddenLegacyAutomatedProfile {
+                unavailableLegacyProfileScene
+            } else if isCurrentUser && redirectsCurrentUserToProfileTab {
                 currentUserProfileRedirect
             } else {
                 presentedScene
             }
         }
+    }
+
+    private var unavailableLegacyProfileScene: some View {
+        ZStack {
+            AppColors.pageBackground
+                .ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                Image(systemName: "person.slash.fill")
+                    .font(.system(size: 30))
+                    .foregroundStyle(.secondary)
+                Text(L10n.tr("This profile is unavailable", "该用户主页暂不可访问"))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                Text(
+                    L10n.tr(
+                        "This account is not available in the current release.",
+                        "此帐号在当前版本中不可使用。"
+                    )
+                )
+                .font(.system(size: 13))
+                .foregroundStyle(AppColors.textMuted)
+                .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 24)
+        }
+        .navigationTitle(L10n.tr("Profile", "主页"))
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var currentUserProfileRedirect: some View {
@@ -753,7 +787,8 @@ struct UserPostsView: View {
         isOfficial: Bool
     ) -> some View {
         Group {
-            if userId == CheeseAIIdentity.userID {
+            if ReleaseCapabilities.optionalGemini,
+               userId == CheeseAIIdentity.userID {
                 CheeseAIAvatarView(
                     remoteURLString: urlString,
                     size: 56

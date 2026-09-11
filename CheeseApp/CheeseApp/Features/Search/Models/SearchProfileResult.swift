@@ -33,4 +33,8 @@ struct SearchProfileResult: Codable, Identifiable, Hashable {
             isMutualFollow: isFollowing ? isMutualFollow : false
         )
     }
+
+    var isVisibleOnUserFacingSurface: Bool {
+        CheeseAIIdentity.isVisibleOnUserFacingSurface(id)
+    }
 }

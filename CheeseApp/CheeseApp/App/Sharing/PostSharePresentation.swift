@@ -615,15 +615,6 @@ struct CheesePostShareBottomSheet: View {
     private var quickActionsSection: some View {
         HStack(alignment: .top, spacing: 10) {
             PostShareQuickActionButton(
-                icon: "message.fill",
-                title: L10n.tr("WeChat", "微信"),
-                tint: AppColors.accent,
-                iconColor: .black
-            ) {
-                showSystemShareSheet = true
-            }
-
-            PostShareQuickActionButton(
                 icon: "paperplane.fill",
                 title: L10n.tr("System Share", "系统分享"),
                 tint: AppColors.accent,

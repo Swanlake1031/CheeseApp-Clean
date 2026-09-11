@@ -1,6 +1,22 @@
 # Cheese AI Worker
 
-`cheeseapp-ai-worker` 是 Cheese 共用的服务端 AI 执行器。它处理论坛内 `@奶酪AI`、二手发布页的可编辑商品简介，以及论坛推荐所需的异步文本 embedding。各功能复用既有 Gemini secret 和调度入口，但使用彼此隔离的 endpoint、prompt、队列与开关。
+`cheeseapp-ai-worker` currently serves the separately disclosed image-safety
+endpoint and database-only recommendation maintenance. The Gemini provider
+abstractions remain in the repository for a future audited release, but are not
+available to the current 13+ App Store build.
+
+## Current release boundary
+
+`GEMINI_PROVIDER_RELEASED` is `false` in source and
+`CHEESE_GEMINI_RELEASE_ENABLED` is `false` in Worker configuration. The source
+latch means a dashboard variable cannot accidentally re-enable Gemini. The
+legacy comment and secondhand-generation routes are absent from static asset
+routing and return `404` before authentication, database work, retries, or
+provider construction. The public health response does not disclose Gemini
+models or secret-configuration state.
+
+The historical provider contracts below are retained as implementation context,
+not as a statement that the feature is enabled.
 
 ## Secondhand description endpoint
 
@@ -65,7 +81,10 @@ Non-secret bindings:
 - `CHEESE_AI_USER_ID`
 - `CHEESE_AI_MODEL`，固定为 `gemini-3.5-flash-lite`
 - `CHEESE_AI_PROMPT_VERSION`，当前 `cheese-community-v3`
-- `CHEESE_AI_ENABLED`
+- `CHEESE_AI_ENABLED`：legacy operational flag; it cannot enable the current
+  source-disabled Gemini release.
+- `CHEESE_GEMINI_RELEASE_ENABLED`：must remain `false`; it is an additional
+  deployment guard, not a substitute for an audited source change.
 - `CHEESE_RECOMMENDATION_JOBS_ENABLED`：推荐 embedding/指标/画像任务总开关，默认 `false`。
 - `CHEESE_RECOMMENDATION_SHADOW_ENABLED`：无用户可见流量的 shadow session 开关，默认 `false`。
 - `SECONDHAND_AI_RATE_LIMITER`：Cloudflare Rate Limiting binding，二手简介按 `user + feature` 每分钟 5 次；不占用论坛 interaction 限额。
@@ -73,7 +92,8 @@ Non-secret bindings:
 Secrets:
 
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `GEMINI_API_KEY`
+- `GEMINI_API_KEY`：legacy provider secret. It remains server-only if retained,
+  but the current release does not use it.
 
 ## Local verification
 

@@ -20,7 +20,6 @@ struct ProfileScrollOffsetPreferenceKey: PreferenceKey {
 
 struct ProfileView: View {
     @EnvironmentObject var authService: AuthService
-    @Environment(\.openURL) private var openURL
     let isActive: Bool
     let onOpenForum: () -> Void
     let onOpenSecondhand: (SecondhandPost.Category?) -> Void
@@ -148,8 +147,7 @@ struct ProfileView: View {
                 onSecondhandTap: { onOpenSecondhand(nil) },
                 onSecondhandCategoryTap: { onOpenSecondhand($0) },
                 onSettingsTap: { showSettings = true },
-                onSupportTap: { showCustomerSupport = true },
-                onCourseRadarTap: { openURL(AppExternalLinks.courseRadar) }
+                onSupportTap: { showCustomerSupport = true }
             )
         }
         .sheet(isPresented: $showingEditProfile) {
@@ -165,7 +163,7 @@ struct ProfileView: View {
             }
         }
         .navigationDestination(isPresented: $showCustomerSupport) {
-            CheeseCustomerSupportView()
+            SupportCenterView()
         }
         .navigationDestination(isPresented: $showSettings) {
             SettingsView()
@@ -318,7 +316,8 @@ struct ProfileView: View {
 
     @ViewBuilder
     private var ownProfileAvatar: some View {
-        if user?.id == CheeseAIIdentity.userID {
+        if ReleaseCapabilities.optionalGemini,
+           user?.id == CheeseAIIdentity.userID {
             CheeseAIAvatarView(
                 remoteURLString: user?.avatarUrl,
                 size: 56

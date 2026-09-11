@@ -165,6 +165,7 @@ struct CreateSecondhandView: View {
                                         bottomContentInset: 44
                                     )
 
+                                    if ReleaseCapabilities.optionalGemini {
                                     Button(action: requestAIDescription) {
                                         HStack(spacing: 6) {
                                             if aiDescriptionModel.isGenerating {
@@ -213,9 +214,10 @@ struct CreateSecondhandView: View {
                                             "使用 AI 生成简介"
                                         )
                                     )
+                                    }
                                 }
 
-                                if !canGenerateAIDescription,
+                                if ReleaseCapabilities.optionalGemini, !canGenerateAIDescription,
                                    !aiDescriptionModel.isGenerating,
                                    !isLoading {
                                     Text(L10n.tr(

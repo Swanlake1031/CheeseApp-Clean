@@ -529,7 +529,7 @@ struct CustomTabBar: View {
                 }
             }
             
-            // Secondhand occupies the former Courses slot.
+            // Secondhand marketplace.
             TabBarButton(
                 icon: TabItem.secondhand.icon,
                 selectedIcon: TabItem.secondhand.selectedIcon,

@@ -67,9 +67,13 @@ for suite in \
   102_critical_security_boundaries.test.sql \
   141_release_school_binding_on_deactivation.test.sql \
   20260910052718_required_school.test.sql \
+  190_recommendation_v1.test.sql \
   20260911165358_no_manual_tags.test.sql \
   20260911164610_session_ttl.test.sql \
-  20260911184137_app_store_safety.test.sql; do
+  20260911184137_app_store_safety.test.sql \
+  20260911194713_media_safety_release_gate.test.sql \
+  20260911202000_account_deletion_media_cleanup.test.sql \
+  20260911204500_ai_consent_vector_cleanup.test.sql; do
   { echo 'SET search_path=public,extensions,pg_temp;'; cat "$repo_root/Supabase/tests/database/$suite"; } | local_sql >"$fixture_root/test.tap" 2>>"$log_file"
   cat "$fixture_root/test.tap" >>"$log_file"
   python3 - "$fixture_root/test.tap" "$suite" <<'PYTHON'

@@ -39,4 +39,36 @@ final class SearchProfileResultTests: XCTestCase {
         XCTAssertTrue(profile.isFollowing)
         XCTAssertFalse(profile.isMutualFollow)
     }
+
+    func testLaunchReleaseHidesRetainedAutomatedProfileFromUserFacingSearch() {
+        let retainedAutomatedProfile = SearchProfileResult(
+            id: CheeseAIIdentity.userID,
+            publicID: "legacy-ai",
+            fullName: "Cheese AI",
+            avatarURL: nil,
+            university: nil,
+            bio: nil,
+            isFollowing: false,
+            isMutualFollow: false
+        )
+        let memberProfile = SearchProfileResult(
+            id: UUID(),
+            publicID: "member",
+            fullName: "Member",
+            avatarURL: nil,
+            university: nil,
+            bio: nil,
+            isFollowing: false,
+            isMutualFollow: false
+        )
+
+        XCTAssertFalse(retainedAutomatedProfile.isVisibleOnUserFacingSurface)
+        XCTAssertTrue(memberProfile.isVisibleOnUserFacingSurface)
+        XCTAssertEqual(
+            [retainedAutomatedProfile, memberProfile]
+                .filter(\.isVisibleOnUserFacingSurface)
+                .map(\.id),
+            [memberProfile.id]
+        )
+    }
 }

@@ -193,6 +193,23 @@ final class SearchPaginationViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.recentSearches, ["ECON 1B03"])
     }
 
+    func testAccountDeletionClearsOnlyDeletedAccountRecentSearches() {
+        let suiteName = "SearchPaginationViewModelTests.deletion.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let deletedAccount = UUID()
+        let retainedAccount = UUID()
+        let deletedKey = SearchViewModel.recentSearchesStorageKey(for: deletedAccount)
+        let retainedKey = SearchViewModel.recentSearchesStorageKey(for: retainedAccount)
+        defaults.set(["private deleted-account search"], forKey: deletedKey)
+        defaults.set(["retained account search"], forKey: retainedKey)
+
+        SearchViewModel.clearStoredRecentSearches(for: deletedAccount, defaults: defaults)
+
+        XCTAssertNil(defaults.stringArray(forKey: deletedKey))
+        XCTAssertEqual(defaults.stringArray(forKey: retainedKey), ["retained account search"])
+    }
+
     func testPopularFeedMergesCategoriesByHotScore() async {
         let secondhand = makeResult(
             title: "secondhand",

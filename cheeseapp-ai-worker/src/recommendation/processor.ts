@@ -4,29 +4,75 @@ import type { PostEmbeddingJob } from "../types";
 import {
   EmbeddingProviderError,
   GeminiEmbeddingProvider,
+  type NormalizedEmbedding,
 } from "./embeddingProvider";
 
-export class RecommendationProcessor {
-  private readonly repository: SupabaseRepository;
-  private readonly provider: GeminiEmbeddingProvider;
+export interface RecommendationProcessorRepository {
+  backfillForumEmbeddingJobs(limit?: number): Promise<number>;
+  backfillRecommendationSignalState(limit?: number): Promise<number>;
+  refreshRecommendationMetrics(force?: boolean): Promise<boolean>;
+  claimPostEmbeddingJobs(limit?: number): Promise<readonly PostEmbeddingJob[]>;
+  listRecommendationShadowUsers(limit?: number): Promise<readonly string[]>;
+  createRecommendationShadowSession(userId: string): Promise<string | null>;
+  getPost(postId: string): ReturnType<SupabaseRepository["getPost"]>;
+  hasAIConsent(userId: string): Promise<boolean>;
+  completePostEmbeddingJob(
+    jobId: string,
+    inputHash: string,
+    embedding: readonly number[],
+    norm: number,
+  ): Promise<boolean>;
+  failPostEmbeddingJob(
+    jobId: string,
+    category: string,
+    retryable: boolean,
+  ): Promise<void>;
+}
 
-  constructor(private readonly config: RecommendationConfig) {
-    this.repository = new SupabaseRepository(
-      config.supabaseUrl,
-      config.supabaseServiceRoleKey,
-    );
-    this.provider = new GeminiEmbeddingProvider(config.geminiApiKey);
+export interface RecommendationEmbeddingProvider {
+  embed(input: string): Promise<NormalizedEmbedding>;
+}
+
+export interface RecommendationProcessorDependencies {
+  readonly repository?: RecommendationProcessorRepository;
+  readonly provider?: RecommendationEmbeddingProvider;
+}
+
+export class RecommendationProcessor {
+  private readonly repository: RecommendationProcessorRepository;
+  private readonly provider: RecommendationEmbeddingProvider | null;
+
+  constructor(
+    private readonly config: RecommendationConfig,
+    dependencies: RecommendationProcessorDependencies = {},
+  ) {
+    this.repository =
+      dependencies.repository ??
+      new SupabaseRepository(
+        config.supabaseUrl,
+        config.supabaseServiceRoleKey,
+      );
+    this.provider = config.embeddingProviderEnabled
+      ? (dependencies.provider ?? new GeminiEmbeddingProvider(config.geminiApiKey))
+      : null;
   }
 
   async runScheduledBatch(): Promise<void> {
+    if (!this.config.maintenanceEnabled) return;
+
     const [backfilled, signalsBackfilled, metricsRefreshed] = await Promise.all([
       this.repository.backfillForumEmbeddingJobs(100),
       this.repository.backfillRecommendationSignalState(250),
       this.repository.refreshRecommendationMetrics(false),
     ]);
-    const jobs = await this.repository.claimPostEmbeddingJobs(8);
-    for (let offset = 0; offset < jobs.length; offset += 2) {
-      await Promise.all(jobs.slice(offset, offset + 2).map((job) => this.process(job)));
+    let jobs: readonly PostEmbeddingJob[] = [];
+    if (this.config.embeddingProviderEnabled) {
+      jobs = await this.repository.claimPostEmbeddingJobs(8);
+      for (let offset = 0; offset < jobs.length; offset += 2) {
+        await Promise.all(
+          jobs.slice(offset, offset + 2).map((job) => this.process(job)),
+        );
+      }
     }
 
     let shadowSessions = 0;
@@ -44,12 +90,17 @@ export class RecommendationProcessor {
       backfilled,
       signals_backfilled: signalsBackfilled,
       metrics_refreshed: metricsRefreshed,
+      embedding_provider_enabled: this.config.embeddingProviderEnabled,
       jobs_claimed: jobs.length,
       shadow_sessions: shadowSessions,
     }));
   }
 
   private async process(job: PostEmbeddingJob): Promise<void> {
+    // This duplicates the scheduler guard so a future caller cannot send post
+    // content to Gemini while the release gate is disabled.
+    if (!this.config.embeddingProviderEnabled || !this.provider) return;
+
     const startedAt = Date.now();
     try {
       if (

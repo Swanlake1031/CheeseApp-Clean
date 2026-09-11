@@ -35,3 +35,8 @@ test('client cannot request a media path outside the report',async()=>{
 test('moderation requires an explanatory note before calling a write RPC',async()=>{
  const {response,calls}=await run('admin','/v1/moderation/resolve',{method:'POST',body:JSON.stringify({kind:'user',id:'11111111-1111-4111-8111-111111111111',action:'suspend',note:''})});assert.equal(response.status,400);assert.equal(calls.length,2);
 });
+test('Content Studio no longer exposes the optional Gemini consent API',async()=>{
+ const {response,calls}=await run('editor','/v1/ai-consent');
+ assert.equal(response.status,404);
+ assert.equal(calls.some(call=>call.url.includes('ai_processing_consents')||call.url.includes('set_my_ai_consent')),false);
+});

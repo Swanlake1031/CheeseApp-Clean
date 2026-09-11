@@ -95,8 +95,6 @@ Do not commit values. The iOS app reads environment values first and the built I
 | `APPLE_TEAM_ID` | Push worker | worker variable/secret | Apple developer team identifier |
 | `APP_BUNDLE_ID` | Optional | worker | Explicit APNs topic override |
 | `APP_DOWNLOAD_URL` | Optional | worker | Share-page download target |
-| `WECHAT_OPEN_APP_ID` | Optional | worker | WeChat open-app integration |
-| `WECHAT_JS_SDK_CONFIG_URL` | Optional | worker | WeChat signature endpoint |
 
 Tests use a non-production placeholder only when loaded under XCTest; production/development launches fail fast when required iOS configuration is missing.
 

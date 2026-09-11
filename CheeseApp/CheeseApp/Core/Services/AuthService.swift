@@ -352,7 +352,6 @@ class AuthService: ObservableObject {
                 phoneNumber: nil,
                 gradYear: nil,
                 bio: nil,
-                wechatId: nil,
                 profileCompleted: savedAccount?.profileCompleted ?? true,
                 createdAt: nil,
                 updatedAt: nil,
@@ -1252,6 +1251,9 @@ class AuthService: ObservableObject {
     func deactivateCurrentAccount() async throws {
         guard !isLoading else { return }
         let userId = try await requireAuthUserId()
+        let linkedGoogleSubject = supabase.auth.currentSession?.user.identities?
+            .first(where: { $0.provider.lowercased() == "google" })?
+            .identityData?["sub"]?.stringValue
 
         isLoading = true
         errorMessage = nil
@@ -1263,8 +1265,16 @@ class AuthService: ObservableObject {
                 .execute()
                 .value
 
+            // The database deletion is authoritative. A matching Google SDK
+            // session can then revoke its own OAuth grant without risking a
+            // different locally-signed-in Google account on shared devices.
+            await disconnectMatchingGoogleAccount(subject: linkedGoogleSubject)
+            await EngagementNotificationService.shared.unregisterCurrentDeviceTokenIfNeeded()
+            UIApplication.shared.unregisterForRemoteNotifications()
+
             beginAccountStateTransition()
             try? await supabase.auth.signOut()
+            clearLocalDataAfterAccountDeletion(userId: userId)
             clearSavedAccountsFromStorage()
             removeRecentLoginAccountFromStorage(userId: userId)
             currentUser = nil
@@ -1272,12 +1282,49 @@ class AuthService: ObservableObject {
             requiresProfileCompletion = false
             bootstrapState = .ready
             hasCheckedSession = false
+            profileCompletionReturnSnapshot = nil
+            accountIdentityStatusesCache = nil
+            accountIdentityStatusesCacheUserId = nil
+            accountIdentityStatusesRefreshedAt = nil
             activateAccountState(nil)
         } catch {
             let message = "注销账号失败：\(AppErrorMessage.userMessage(for: error))"
             errorMessage = message
             throw NSError(domain: "AuthService", code: 500, userInfo: [NSLocalizedDescriptionKey: message])
         }
+    }
+
+    /// GoogleSignIn keeps one SDK session for the device. Only disconnect when
+    /// its immutable subject matches the Supabase identity being deleted; doing
+    /// otherwise could revoke another saved account's Google authorization.
+    private func disconnectMatchingGoogleAccount(subject: String?) async {
+        guard let subject,
+              let localSubject = GIDSignIn.sharedInstance.currentUser?.userID,
+              localSubject == subject
+        else { return }
+
+        do {
+            try await GIDSignIn.sharedInstance.disconnect()
+        } catch {
+            // The Cheese account is already deleted. Remove the local Google
+            // credential even if the provider is temporarily unreachable.
+            GIDSignIn.sharedInstance.signOut()
+        }
+    }
+
+    private func clearLocalDataAfterAccountDeletion(userId: UUID) {
+        UserDefaults.standard.removeObject(forKey: AIProcessingConsent.key(for: userId))
+        UserDefaults.standard.removeObject(
+            forKey: "media_safety_consent.2026-09-11.\(userId.uuidString)"
+        )
+        CreateDraftStore.clearAll()
+        CreateComposerSessionStore.clearAll()
+        SearchViewModel.clearStoredRecentSearches(for: userId)
+        ChatService.shared.clearLocalAccountData(for: userId)
+        ProfileSocialService.shared.clearLocalAccountData(for: userId)
+        EngagementNotificationService.shared.clearLocalAccountData(for: userId)
+        RemoteImageCache.shared.removeAll()
+        URLCache.shared.removeAllCachedResponses()
     }
     
     // MARK: - 重置密码

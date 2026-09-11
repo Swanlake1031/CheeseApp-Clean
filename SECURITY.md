@@ -1,6 +1,6 @@
 # Reporting a vulnerability
 
-Contact support@cheeseapp.dev privately with the affected feature, reproducible
+Contact support.cheeseteam@gmail.com privately with the affected feature, reproducible
 steps using test accounts, expected and observed behavior, and a safe way to reply.
 Do not include passwords, bearer tokens, production database dumps or private keys.
 Do not post exploit details or other users' content in a public issue.

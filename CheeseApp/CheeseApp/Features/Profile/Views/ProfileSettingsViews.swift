@@ -157,7 +157,7 @@ struct SettingsView: View {
                             settingsRow(
                                 icon: "trash.fill",
                                 title: isDeletingAccount ? "注销中..." : "注销账号",
-                                subtitle: "清空账号数据，聊天内将显示“已注销”",
+                                subtitle: "清除帐号内容与媒体，聊天保留不含内容的“已注销”提示",
                                 tint: .red,
                                 showChevron: false
                             )
@@ -193,6 +193,7 @@ struct SettingsView: View {
 
                     settingsHeader(title: L10n.tr("Privacy", "隐私"))
                     settingsCard {
+                        if ReleaseCapabilities.optionalGemini {
                         Button {
                             Task {
                                 do { try await AIProcessingConsent.requireConsent() }
@@ -203,6 +204,7 @@ struct SettingsView: View {
                             settingsRow(icon: "sparkles", title: L10n.tr("AI Processing Permission", "AI 处理权限"), subtitle: L10n.tr("Review and allow Google Gemini processing", "查看并允许 Google Gemini 处理"))
                         }
                         Divider().overlay(AppColors.divider)
+                        }
                         Button {
                             Task {
                                 do {
@@ -211,7 +213,23 @@ struct SettingsView: View {
                                 } catch { settingsError = AppErrorMessage.userMessage(for: error) }
                             }
                         } label: {
-                            settingsRow(icon: "hand.raised", title: L10n.tr("Withdraw AI Permission", "撤回 AI 处理权限"), subtitle: L10n.tr("Stop new AI transfers and remove recommendation vectors", "停止新的 AI 传输并移除推荐向量"))
+                            settingsRow(
+                                icon: "hand.raised",
+                                title: L10n.tr("Remove optional AI data", "移除可选 AI 资料"),
+                                subtitle: L10n.tr("Optional AI is unavailable in this release; remove any earlier consent and recommendation vectors", "本版本未提供可选 AI；移除先前同意与推荐向量")
+                            )
+                        }
+                        Divider().overlay(AppColors.divider)
+
+                        Button {
+                            guard let userID = authService.currentUser?.id else { return }
+                            MediaSafetyConsent.withdrawLocalConsent(for: userID)
+                        } label: {
+                            settingsRow(
+                                icon: "photo.badge.exclamationmark",
+                                title: L10n.tr("Withdraw image review acknowledgement", "撤回图片审核确认"),
+                                subtitle: L10n.tr("Image uploads will ask again; text-only use remains available", "再次上传图片前会重新询问；纯文字功能仍可使用")
+                            )
                         }
                         Divider().overlay(AppColors.divider)
 
@@ -355,7 +373,10 @@ struct SettingsView: View {
                 Task { await deactivateAccount() }
             }
         } message: {
-            Text("该操作不可恢复：将删除你的帖子和公开内容，聊天里会显示“已注销”。")
+            Text(L10n.tr(
+                "This cannot be undone. Your posts, listings, comments, message content and media will be removed. Chats may keep a content-free “Deactivated” placeholder. If you used Sign in with Apple, remove Cheese in your Apple Account’s Sign in with Apple settings after deletion.",
+                "该操作不可恢复：将删除你的贴文、刊登、评论、讯息内容与媒体；聊天可能保留不含内容的“已注销”提示。若使用 Apple 登录，注销后请在 Apple 帐号的「使用 Apple 登录」中移除 Cheese 授权。"
+            ))
         }
         .onAppear {
             defaultAnonymousPosting = authService.currentUser?.isAnonymousDefault ?? false
@@ -679,6 +700,17 @@ struct SettingsView: View {
         } catch {
             settingsError = AppErrorMessage.userMessage(for: error)
         }
+    }
+}
+
+@MainActor
+extension MediaSafetyConsent {
+    static func localConsentKey(for userID: UUID) -> String {
+        "media_safety_consent.2026-09-11.\(userID.uuidString)"
+    }
+
+    static func withdrawLocalConsent(for userID: UUID) {
+        UserDefaults.standard.removeObject(forKey: localConsentKey(for: userID))
     }
 }
 

@@ -499,7 +499,7 @@ export const pageStyles = `
       .download-card {
         padding: 22px 18px;
       }
-      .wechat-intercept-alert {
+      .open-guidance {
         margin: 0 0 12px;
         padding: 18px;
         border-radius: 22px;
@@ -507,12 +507,12 @@ export const pageStyles = `
         background: linear-gradient(145deg, #ffd86b 0%, #ffedb4 100%);
         box-shadow: 0 12px 28px rgba(122, 57, 0, 0.18);
       }
-      .wechat-alert-heading {
+      .open-guidance-heading {
         display: flex;
         align-items: center;
         gap: 12px;
       }
-      .wechat-alert-icon {
+      .open-guidance-icon {
         width: 42px;
         height: 42px;
         flex: 0 0 42px;
@@ -525,52 +525,26 @@ export const pageStyles = `
         font-size: 26px;
         font-weight: 900;
       }
-      .wechat-alert-kicker {
+      .open-guidance-kicker {
         margin-bottom: 2px;
         color: #8a4b00;
         font-size: 12px;
         font-weight: 900;
         letter-spacing: 0.06em;
       }
-      .wechat-alert-title {
+      .open-guidance-title {
         color: #2f1b00;
         font-size: 21px;
         font-weight: 900;
         line-height: 1.2;
       }
-      .wechat-intercept-alert p {
+      .open-guidance p {
         margin: 14px 0 12px;
         font-size: 15px;
         font-weight: 650;
         line-height: 1.55;
       }
-      .wechat-browser-instruction {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 12px;
-        border-radius: 15px;
-        color: #ffffff;
-        background: #111827;
-        font-size: 14px;
-        font-weight: 800;
-        text-align: center;
-      }
-      .wechat-browser-instruction strong {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 42px;
-        padding: 2px 9px 5px;
-        border-radius: 999px;
-        color: #111827;
-        background: #ffffff;
-        font-size: 20px;
-        line-height: 1;
-      }
-      .wechat-open-actions {
+      .open-guidance-actions {
         margin-top: 14px;
       }
       .is-hidden {

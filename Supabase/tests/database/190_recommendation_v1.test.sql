@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(28);
+SELECT plan(33);
 
 SELECT is(
   (SELECT embedding_model FROM public.recommendation_configuration WHERE singleton),
@@ -85,6 +85,83 @@ SELECT is(
   1::BIGINT,
   'same input hash never duplicates work'
 );
+
+-- The provider may be unavailable or deliberately disabled. A pending vector
+-- record must not remove an otherwise eligible forum post from ranking or a
+-- signed-in user's feed session.
+SELECT set_config('request.jwt.claim.role', 'service_role', TRUE);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-000000000002","role":"service_role"}',
+  TRUE
+);
+SET LOCAL ROLE service_role;
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1
+    FROM public.post_embeddings
+    WHERE post_id = '19000000-0000-4000-8000-000000000001'
+      AND (status = 'ready' OR embedding IS NOT NULL)
+  ),
+  'eligible forum post has no materialized embedding while its job is pending'
+);
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.rank_forum_recommendations_v1(
+      '00000000-0000-0000-0000-000000000002', NULL, 80
+    )
+    WHERE post_id = '19000000-0000-4000-8000-000000000001'
+  ),
+  'exact ranking retains an eligible forum post with no materialized embedding'
+);
+SELECT is(
+  (
+    SELECT semantic_score
+    FROM public.rank_forum_recommendations_v1(
+      '00000000-0000-0000-0000-000000000002', NULL, 80
+    )
+    WHERE post_id = '19000000-0000-4000-8000-000000000001'
+  ),
+  0.5::DOUBLE PRECISION,
+  'unembedded eligible post uses the neutral semantic fallback'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.role', 'authenticated', TRUE);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}',
+  TRUE
+);
+SET LOCAL ROLE authenticated;
+SELECT ok(
+  set_config(
+    'test.no_embedding_session_id',
+    public.create_recommendation_feed_session(TRUE, FALSE, NULL)::TEXT,
+    TRUE
+  ) IS NOT NULL,
+  'signed-in user can create a recommendation session with no materialized vector'
+);
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.get_recommendation_feed_page(
+      current_setting('test.no_embedding_session_id')::UUID, 0, 20
+    )
+    WHERE post_id = '19000000-0000-4000-8000-000000000001'
+  ),
+  'session page remains non-empty and includes the unembedded eligible forum post'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.role', 'service_role', TRUE);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-000000000002","role":"service_role"}',
+  TRUE
+);
+SET LOCAL ROLE service_role;
 
 DO $$
 DECLARE v_values REAL[] := array_fill(0::REAL, ARRAY[768]);

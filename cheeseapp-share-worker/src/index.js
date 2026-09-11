@@ -240,9 +240,7 @@ async function readConfig(env) {
     apnsPrivateKey,
     apnsKeyID: normalizeText(env.APNS_KEY_ID),
     appleTeamID: normalizeText(env.APPLE_TEAM_ID),
-    apnsTopic: bundleID,
-    wechatOpenAppID: normalizeText(env.WECHAT_OPEN_APP_ID),
-    wechatJSSDKConfigURL: normalizeText(env.WECHAT_JS_SDK_CONFIG_URL)
+    apnsTopic: bundleID
   };
 }
 

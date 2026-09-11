@@ -25,13 +25,13 @@ SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002'
 SET LOCAL ROLE authenticated;
 SELECT throws_ok($$SELECT * FROM public.moderation_report_media('user','91100000-0000-4000-8000-000000000002')$$,'42501','moderation_access_denied','ordinary user cannot discover reported media');
 SELECT throws_ok($$SELECT * FROM public.moderation_queue(10)$$,'42501','moderation_access_denied','ordinary user cannot read confidential reports');
-SELECT is(public.can_upload_moderated_media('avatars','00000000-0000-0000-0000-000000000002/new.jpg'),false,'missing AI consent denies upload');
+SELECT is(public.can_upload_moderated_media('avatars','00000000-0000-0000-0000-000000000002/new.jpg'),true,'owned avatar upload is independent of optional AI consent');
 SELECT is(public.set_my_ai_consent(true),true,'explicit AI permission stored');
-SELECT is(public.can_upload_moderated_media('avatars','00000000-0000-0000-0000-000000000002/new.jpg'),true,'owned avatar permitted after consent');
+SELECT is(public.can_upload_moderated_media('avatars','00000000-0000-0000-0000-000000000002/new.jpg'),true,'optional AI permission does not change owned avatar eligibility');
 SELECT is(public.can_upload_moderated_media('avatars','00000000-0000-0000-0000-000000000001/new.jpg'),false,'other account media denied');
 SELECT throws_like($$INSERT INTO storage.objects(bucket_id,name) VALUES('avatars','00000000-0000-0000-0000-000000000002/new.jpg')$$,'%row-level security%','raw Storage upload denied even with consent');
 SELECT is(public.set_my_ai_consent(false),true,'AI permission can be withdrawn');
-SELECT is(public.can_upload_moderated_media('avatars','00000000-0000-0000-0000-000000000002/new.jpg'),false,'withdrawal immediately blocks new transfers');
+SELECT is(public.can_upload_moderated_media('avatars','00000000-0000-0000-0000-000000000002/new.jpg'),true,'withdrawing optional AI permission preserves normal image uploads');
 RESET ROLE;
 SELECT set_config('request.jwt.claim.sub','',true);
 SELECT set_config('request.jwt.claims','{}',true);

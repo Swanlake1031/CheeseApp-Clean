@@ -48,9 +48,7 @@ struct ContentCardView: View {
 
     var body: some View {
         Group {
-            if item.isSeatRadar {
-                seatRadarCard
-            } else if item.category == .secondhand {
+            if item.category == .secondhand {
                 secondhandCard
             } else {
                 discussionCard
@@ -292,39 +290,6 @@ struct ContentCardView: View {
         .font(.system(size: 11, weight: .medium))
         .foregroundStyle(AppColors.textMuted)
         .lineLimit(1)
-    }
-
-    private var seatRadarCard: some View {
-        HStack(spacing: 15) {
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .fill(AppColors.accent)
-                .frame(width: 54, height: 54)
-                .overlay {
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(.black)
-                }
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(item.title)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
-                Text(item.subtitle)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.68))
-                    .lineLimit(2)
-            }
-
-            Spacer()
-
-            Image(systemName: "arrow.up.right")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(AppColors.accent)
-        }
-        .padding(17)
-        .background(Color.black.opacity(0.94))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.13), radius: 13, y: 6)
     }
 
     private var metadataRow: some View {
