@@ -28,7 +28,23 @@ CONFIG
 # A separate local project: no production link, secrets, dumps or Storage files.
 # Supabase startup output may include development keys, so keep it private.
 log_file="$fixture_root/verification.log"
-trap 'supabase stop --workdir "$fixture_root" --no-backup >/dev/null 2>&1 || true' EXIT
+cleanup() {
+  local status=$?
+  trap - EXIT
+  if [[ "$status" -ne 0 && -f "$log_file" ]]; then
+    echo "Database verification failed (exit $status). Sanitized diagnostics:" >&2
+    # Keep the complete log private, but expose enough stable context to
+    # identify a migration or pgtap failure in CI. Long tokens/keys/UUIDs are
+    # redacted before the summary reaches the public Actions log.
+    grep -Ei 'error|fatal|fail|not ok|assert|syntax|migration|exception|permission|violat|could not' "$log_file" \
+      | tail -n 120 \
+      | sed -E 's/[A-Za-z0-9+\/_=-]{24,}/REDACTED/g' \
+      | cut -c1-500 >&2 || true
+  fi
+  supabase stop --workdir "$fixture_root" --no-backup >/dev/null 2>&1 || true
+  exit "$status"
+}
+trap cleanup EXIT
 if ! supabase start --workdir "$fixture_root" -x realtime,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor >"$log_file" 2>&1; then
   echo "Local database startup failed; inspect $log_file privately." >&2; exit 1
 fi
