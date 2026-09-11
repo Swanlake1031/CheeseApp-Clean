@@ -116,7 +116,7 @@ struct CheeseUniversityOption: Identifiable, Hashable {
 }
 
 enum ProfileCompletionPolicy {
-    static func needsCompletion(profileCompleted: Bool?, school _: String?) -> Bool {
-        profileCompleted != true
+    static func needsCompletion(profileCompleted: Bool?, school: String?) -> Bool {
+        profileCompleted != true || CheeseUniversityOption.option(matching: school) == nil
     }
 }

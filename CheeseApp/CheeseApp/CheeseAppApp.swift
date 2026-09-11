@@ -9,6 +9,7 @@
 import SwiftUI
 import UserNotifications
 import Supabase
+import GoogleSignIn
 import UIKit
 
 @main
@@ -159,6 +160,10 @@ struct CheeseAppApp: App {
     }
 
     private func handleIncomingURL(_ url: URL) {
+        if GIDSignIn.sharedInstance.handle(url) {
+            return
+        }
+
         if isAuthCallback(url) {
             SupabaseManager.shared.auth.handle(url)
             return

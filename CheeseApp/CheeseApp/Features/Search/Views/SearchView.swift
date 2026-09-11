@@ -88,7 +88,7 @@ struct SearchView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { _ in
             guard hasSearchQuery else { return }
-            viewModel.updateSearch(text: searchText, category: selectedTab.searchCategory)
+            viewModel.updateSearch(text: searchText, category: selectedTab.searchCategory, forceRefresh: true)
         }
         .onReceive(NotificationCenter.default.publisher(for: ProfileSocialEvents.followingDidChange)) { notification in
             guard let (targetUserID, isFollowing) = ProfileSocialEvents.change(
@@ -279,6 +279,14 @@ struct SearchView: View {
                     icon: showsProfiles ? "person.crop.circle.badge.questionmark" : "tray",
                     text: L10n.tr("No matching result", "没有符合的结果")
                 )
+                if !showsProfiles, tab == selectedTab,
+                   let error = viewModel.searchPageErrorMessage {
+                    Button("\(error) · \(L10n.tr("Retry", "重试"))") {
+                        Task { await viewModel.retrySearchPage() }
+                    }
+                    .font(.system(size: 12))
+                    .foregroundStyle(.red)
+                }
             } else {
                 if showsProfiles {
                     if viewModel.isSearching {
@@ -361,17 +369,18 @@ struct SearchView: View {
     }
 
     private func visibleSearchPosts(for tab: SearchTab) -> [UnifiedSearchResult] {
+        let results = viewModel.cachedSearchResults(for: tab.searchCategory)
         switch tab {
         case .hot:
-            return viewModel.filteredResults.sorted(by: SearchViewModel.isHigherPriorityForFeed)
+            return results.sorted(by: SearchViewModel.isHigherPriorityForFeed)
         case .latest:
-            return viewModel.filteredResults.sorted(by: SearchViewModel.isNewerForFeed)
+            return results.sorted(by: SearchViewModel.isNewerForFeed)
         case .profiles:
             return []
         case .secondhand:
-            return viewModel.filteredResults.filter { $0.category == .secondhand }
+            return results.filter { $0.category == .secondhand }
         case .forum:
-            return viewModel.filteredResults.filter { $0.category == .forum }
+            return results.filter { $0.category == .forum }
         }
     }
 
@@ -580,6 +589,8 @@ final class SearchViewModel: ObservableObject {
     private var profileSearchTask: Task<Void, Never>?
     private var lastProfileQuery: String = ""
     private var searchCursor: SearchPostCursor?
+    @Published private var searchPages: [SearchCategory: SearchPostPage] = [:]
+    private var searchErrors: [SearchCategory: String] = [:]
     private var searchPageRequestID: UUID?
     private let recentSearchesKeyPrefix = "search_recent_queries."
     private let searchPageSize = 24
@@ -629,6 +640,8 @@ final class SearchViewModel: ObservableObject {
         currentPostSearchCategory = .all
         lastProfileQuery = ""
         searchCursor = nil
+        searchPages = [:]
+        searchErrors = [:]
         searchPageRequestID = nil
         trendingItems = []
         landingPostsByCategory = [:]
@@ -679,8 +692,17 @@ final class SearchViewModel: ObservableObject {
         )
     }
 
-    func updateSearch(text: String, category: SearchCategory) {
+    func updateSearch(text: String, category: SearchCategory, forceRefresh: Bool = false) {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !forceRefresh, !query.isEmpty, query == currentPostSearchQuery {
+            guard currentPostSearchCategory != category else { return }
+            currentPostSearchCategory = category
+            // Switching pages never cancels/restarts the query or clears caches.
+            applySelectedSearchPage()
+            return
+        }
+        searchPages = [:]
+        searchErrors = [:]
         guard !query.isEmpty else {
             postSearchTask?.cancel()
             currentPostSearchQuery = ""
@@ -705,8 +727,31 @@ final class SearchViewModel: ObservableObject {
         hasMoreSearchResults = false
         isLoadingMoreSearchResults = false
         searchPageErrorMessage = nil
-        searchProfiles(with: query)
+        profileSearchTask?.cancel()
+        lastProfileQuery = query
+        profileResults = []
         scheduleRemotePostSearch(query: query, category: category)
+    }
+
+    func cachedSearchResults(for category: SearchCategory) -> [UnifiedSearchResult] {
+        searchPages[category]?.results ?? []
+    }
+
+    private func applySelectedSearchPage() {
+        let page = searchPages[currentPostSearchCategory]
+        filteredResults = page?.results ?? []
+        searchCursor = page?.nextCursor
+        hasMoreSearchResults = page?.nextCursor != nil
+        searchPageErrorMessage = searchErrors[currentPostSearchCategory]
+    }
+
+    private func initialPage(query: String, category: SearchCategory) async -> Result<SearchPostPage, Error> {
+        do { return .success(try await loadPostPage(query, category, nil, searchPageSize)) }
+        catch { return .failure(error) }
+    }
+
+    private func initialProfiles(query: String) async -> [SearchProfileResult] {
+        (try? await loadProfiles(query, 20)) ?? []
     }
 
     private func scheduleRemotePostSearch(
@@ -738,41 +783,31 @@ final class SearchViewModel: ObservableObject {
         category: SearchCategory,
         generation: UInt64
     ) async {
-        guard accountGeneration == generation,
-              currentPostSearchQuery == query,
-              currentPostSearchCategory == category
-        else { return }
-
+        guard accountGeneration == generation, currentPostSearchQuery == query else { return }
         isSearching = true
-        searchPageErrorMessage = nil
-        defer {
-            if accountGeneration == generation,
-               currentPostSearchQuery == query,
-               currentPostSearchCategory == category {
-                isSearching = false
+        // One debounce, concurrent first-page loads, one completed query snapshot.
+        // Hot/latest share the all-post page; forum/market keep their own cursors.
+        async let all = initialPage(query: query, category: .all)
+        async let forum = initialPage(query: query, category: .forum)
+        async let secondhand = initialPage(query: query, category: .secondhand)
+        async let profiles = initialProfiles(query: query)
+        let (allPage, forumPage, marketPage, people) = await (all, forum, secondhand, profiles)
+        guard !Task.isCancelled, accountGeneration == generation,
+              currentPostSearchQuery == query else { return }
+        var pages: [SearchCategory: SearchPostPage] = [:]
+        var errors: [SearchCategory: String] = [:]
+        for (key, result) in [(SearchCategory.all, allPage), (.forum, forumPage), (.secondhand, marketPage)] {
+            switch result {
+            case .success(let page): pages[key] = page
+            case .failure(let error):
+                if !error.isCancellationLike { errors[key] = error.localizedDescription }
             }
         }
-
-        do {
-            let page = try await loadPostPage(query, category, nil, searchPageSize)
-            if Task.isCancelled { return }
-            guard accountGeneration == generation,
-                  currentPostSearchQuery == query,
-                  currentPostSearchCategory == category
-            else { return }
-
-            filteredResults = page.results
-            searchCursor = page.nextCursor
-            hasMoreSearchResults = page.nextCursor != nil
-        } catch {
-            if Task.isCancelled || error.isCancellationLike { return }
-            guard accountGeneration == generation,
-                  currentPostSearchQuery == query,
-                  currentPostSearchCategory == category
-            else { return }
-            filteredResults = []
-            searchPageErrorMessage = error.localizedDescription
-        }
+        searchPages = pages
+        searchErrors = errors
+        profileResults = people
+        applySelectedSearchPage()
+        isSearching = false
     }
 
     func loadMoreSearchResults() async {
@@ -794,24 +829,25 @@ final class SearchViewModel: ObservableObject {
             let page = try await loadPostPage(query, category, cursor, searchPageSize)
             guard accountGeneration == requestGeneration,
                   searchPageRequestID == requestID,
-                  currentPostSearchQuery == query,
-                  currentPostSearchCategory == category
+                  currentPostSearchQuery == query
             else { return }
 
-            let existingIDs = Set(filteredResults.map(\.id))
-            filteredResults.append(
-                contentsOf: page.results.filter { !existingIDs.contains($0.id) }
+            let existing = searchPages[category]?.results ?? []
+            let existingIDs = Set(existing.map(\.id))
+            searchPages[category] = SearchPostPage(
+                results: existing + page.results.filter { !existingIDs.contains($0.id) },
+                nextCursor: page.nextCursor
             )
-            searchCursor = page.nextCursor
-            hasMoreSearchResults = page.nextCursor != nil
+            searchErrors[category] = nil
+            applySelectedSearchPage()
         } catch {
             guard accountGeneration == requestGeneration,
                   searchPageRequestID == requestID,
-                  currentPostSearchQuery == query,
-                  currentPostSearchCategory == category
+                  currentPostSearchQuery == query
             else { return }
             if !error.isCancellationLike {
-                searchPageErrorMessage = error.localizedDescription
+                searchErrors[category] = error.localizedDescription
+                applySelectedSearchPage()
             }
         }
 
@@ -975,11 +1011,11 @@ final class SearchViewModel: ObservableObject {
             let rows = try await loadProfiles(normalized, 20)
 
             if Task.isCancelled { return }
-            guard requestGeneration == accountGeneration else { return }
+            guard requestGeneration == accountGeneration, lastProfileQuery == normalized else { return }
             profileResults = rows
         } catch {
             if Task.isCancelled { return }
-            guard requestGeneration == accountGeneration else { return }
+            guard requestGeneration == accountGeneration, lastProfileQuery == normalized else { return }
             profileResults = []
         }
     }

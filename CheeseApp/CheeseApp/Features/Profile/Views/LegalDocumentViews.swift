@@ -149,8 +149,8 @@ enum LegalDocument: String, Identifiable {
             title: .init("1. Scope and operator", "1. 适用范围与营运者"),
             paragraphs: [
                 .init(
-                    "This policy describes how Cheese handles personal information when you use the iOS app, community, marketplace, housing, course, profile, notification and chat features. Cheese is the service operator for this policy. Contact: support@cheeseapp.dev.",
-                    "本政策说明你使用 Cheese iOS App、社群、二手、租屋、课程、个人档案、通知与聊天功能时，我们如何处理个人资料。本政策中的服务营运者为 Cheese；联络信箱：support@cheeseapp.dev。"
+                    "This policy describes how Cheese handles personal information when you use the iOS app, community, marketplace, profile, notification and chat features. Cheese is the service operator for this policy. Contact: support@cheeseapp.dev.",
+                    "本政策说明你使用 Cheese iOS App、社群、二手、个人档案、通知与聊天功能时，我们如何处理个人资料。本政策中的服务营运者为 Cheese；联络信箱：support@cheeseapp.dev。"
                 )
             ]
         ),
@@ -159,7 +159,7 @@ enum LegalDocument: String, Identifiable {
             bullets: [
                 .init("Account data: email address, account identifier, sign-in provider and authentication records from Apple, Google or our authentication provider.", "帐号资料：Email、帐号识别码，以及 Apple、Google 或验证服务提供者产生的登入与验证纪录。"),
                 .init("Profile data: display name, avatar, school, bio, occupation and preferences you choose to provide.", "个人档案：显示名称、头像、学校、简介、职业及你选择提供的偏好。"),
-                .init("Community activity: posts, listings, course reviews, comments, reactions, favourites, follows, blocks, searches, reports and feedback.", "社群活动：贴文、刊登、课程评价、留言、反应、收藏、追踪、封锁、搜寻、举报与回馈。"),
+                .init("Community activity: posts, listings, comments, reactions, favourites, follows, blocks, searches, reports and feedback.", "社群活动：贴文、刊登、留言、反应、收藏、追踪、封锁、搜寻、举报与回馈。"),
                 .init("Messages: direct and group messages, shared media, membership, read state and conversation settings.", "通讯资料：私讯与群聊内容、分享的媒体、群组成员关系、已读状态与对话设定。"),
                 .init("Technical data: IP address and request logs processed by our hosting provider, device or app version, push token, timestamps, security events, cache and basic diagnostic information.", "技术资料：由托管服务处理的 IP 位址与请求纪录、装置或 App 版本、推播权杖、时间戳记、安全事件、快取与基本诊断资讯。"),
                 .init("Optional media: only photos you select through the system photo picker for an avatar, post, listing or message.", "选用媒体：仅包含你透过系统照片选择器主动选取并用于头像、贴文、刊登或讯息的照片。")
@@ -315,11 +315,11 @@ enum LegalDocument: String, Identifiable {
             ]
         ),
         .init(
-            title: .init("8. Courses and community information", "8. 课程与社群资讯"),
+            title: .init("8. Community information", "8. 社群资讯"),
             paragraphs: [
                 .init(
-                    "Course information, professor ratings, posts and comments are informational and may be incomplete, subjective or outdated. They are not official academic, legal, financial, housing or safety advice. Confirm important decisions with the school or another qualified source.",
-                    "课程资讯、教授评价、贴文与留言仅供参考，可能不完整、主观或已过时，并非官方学业、法律、财务、租屋或安全建议。重要决定请向学校或其他合格来源确认。"
+                    "Posts and comments are informational and may be incomplete, subjective or outdated. They are not official academic, legal, financial, housing or safety advice. Confirm important decisions with the school or another qualified source.",
+                    "贴文与留言仅供参考，可能不完整、主观或已过时，并非官方学业、法律、财务、租屋或安全建议。重要决定请向学校或其他合格来源确认。"
                 )
             ]
         ),

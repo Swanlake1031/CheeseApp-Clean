@@ -1,9 +1,65 @@
 import XCTest
 import UIKit
+import Supabase
 @testable import CheeseApp
 
 @MainActor
 final class PostCorrectnessTests: XCTestCase {
+    func testForumComposerRequiresOnlyValidTitleNotManualTags() {
+        XCTAssertTrue(ForumComposerRules.canSubmit(title: "A post without tags"))
+        XCTAssertTrue(ForumComposerRules.canSubmit(title: String(repeating: "文", count: 80)))
+        XCTAssertFalse(ForumComposerRules.canSubmit(title: " \n "))
+        XCTAssertFalse(ForumComposerRules.canSubmit(title: String(repeating: "文", count: 81)))
+    }
+
+    func testPostMutationRetriesOnlyRolledBackDatabaseFailures() async throws {
+        var attempts = 0
+        let value = try await PostMutationRetry.perform(sleep: { _ in }) {
+            attempts += 1
+            if attempts < 3 {
+                throw PostgrestError(code: "57014", message: "canceling statement due to statement timeout")
+            }
+            return 42
+        }
+        XCTAssertEqual(value, 42)
+        XCTAssertEqual(attempts, 3)
+    }
+
+    func testPostMutationDoesNotRetryUnknownTransportOutcome() async {
+        var attempts = 0
+        do {
+            try await PostMutationRetry.perform(sleep: { _ in }) {
+                attempts += 1
+                throw URLError(.timedOut)
+            }
+            XCTFail("Expected transport failure")
+        } catch {
+            XCTAssertTrue(error is URLError)
+        }
+        XCTAssertEqual(attempts, 1)
+        XCTAssertFalse(PostMutationRetry.isRetryable(
+            PostgrestError(code: "42501", message: "Permission denied")
+        ))
+        XCTAssertFalse(PostMutationRetry.isRetryable(
+            PostgrestError(code: "57014", message: "canceling statement due to user request")
+        ))
+    }
+
+    func testPostMutationStopsAfterThreeFailuresWithFriendlyError() async {
+        var attempts = 0
+        do {
+            try await PostMutationRetry.perform(sleep: { _ in }) {
+                attempts += 1
+                throw PostgrestError(code: "55P03", message: "canceling statement due to lock timeout")
+            }
+            XCTFail("Expected busy error")
+        } catch {
+            XCTAssertTrue(error is PostMutationFailure)
+            XCTAssertFalse(error.localizedDescription.contains("canceling statement"))
+        }
+        XCTAssertEqual(attempts, 3)
+    }
+
     func testSecondhandImagesUseStableNilLastOrdering() {
         let firstID = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
         let images = [
@@ -268,6 +324,13 @@ final class PostCorrectnessTests: XCTestCase {
                 school: "McMaster University"
             )
         )
+    }
+
+    func testProfileOnboardingRejectsMissingOrUnsupportedSchoolEvenIfCompleted() {
+        let schools: [String?] = [nil, "", "  ", "Unknown School"]
+        for school in schools {
+            XCTAssertTrue(ProfileCompletionPolicy.needsCompletion(profileCompleted: true, school: school))
+        }
     }
 
     func testSystemShareMetadataAlwaysUsesTheOfficialCheeseLogo() throws {

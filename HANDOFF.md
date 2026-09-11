@@ -2,7 +2,7 @@
 
 ## Current State
 
-This repository is the clean engineering baseline created from the recovery working tree on 2026-08-08. The iOS app is a SwiftUI/Supabase application with Courses, Forum, Secondhand, Search, Profile, direct/group Chat, System Messages, moderation, sharing, and push infrastructure.
+This repository is the clean engineering baseline created from the recovery working tree on 2026-08-08. The iOS app is a SwiftUI/Supabase application with Forum, Secondhand, Search, Profile, direct/group Chat, System Messages, moderation, sharing, and push infrastructure. Course ratings and their data were retired on 2026-09-06 by migration 20260906203031.
 
 Rentals/Housing is not present in the current client or database contract. Ride-Sharing, Carpooling, Team-Up, and Group-Finding are retired. Generic group chat is supported. Secondhand currently supports bookmarks but not likes because migration 140 rejects Marketplace likes; it has no comment system.
 
@@ -111,7 +111,6 @@ For Cloudflare, configure `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` as deplo
 - Migrations 152–155 are required for the private-content UI, 30-day auto-hide contract, Search schema, and optional activity parameters. Migration 156 adds the contact-card-triggered Secondhand transaction contract and must be deployed before shipping its pinned chat card.
 - Cloudflare Worker routes for `cheeseapp.org`, cron lifecycle jobs, and universal-link/AASA delivery.
 - APNs credentials and queued push database contracts.
-- Course import files and manifests under `docs` / `scripts` where applicable.
 
 Before using a new database, follow the Supabase reset/bootstrap documentation; do not point a development build at production casually.
 

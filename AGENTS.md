@@ -4,18 +4,22 @@
 
 The active product surface is:
 
-- Course discovery, course reviews, and professor ratings.
 - Second-hand marketplace.
 - Community forum.
 - Shared auth, profiles, moderation, notifications, search, chat, and infrastructure.
 
 Do not reintroduce retired Ride-Sharing, Carpooling, Team-Up, or Group-Finding flows. Generic group chat is still a supported shared capability.
 
+Course discovery, ratings, professor directories, course reviews, and outlines
+were retired by migration 20260906203031. Do not reintroduce them or their data.
+
 Rentals/Housing is not present in the current app or schema contract. Migration 127 removed that module. Do not reintroduce it or infer it from historical migrations or documentation.
 
 Secondhand supports bookmarks, but not likes or comments. Migration 140 rejects Marketplace likes. Do not restore Secondhand likes or comments.
 
 ## Important Paths
+
+- Current recommendation flow and version/deployment contract: `docs/CURRENT_RECOMMENDATION_SYSTEM.md`. Read this before changing recommendations; update it alongside changes to ranking, eligibility, refresh, pagination, or release status. Historical V1/V2 reports are dated evidence, not the current specification.
 
 - iOS app: `CheeseApp/CheeseApp`
 - iOS tests: `CheeseApp/CheeseAppTests`

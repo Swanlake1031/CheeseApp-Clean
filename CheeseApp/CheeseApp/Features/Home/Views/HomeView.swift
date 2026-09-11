@@ -43,6 +43,7 @@ enum HomeFeedNavigationEvents {
 
 // MARK: - 首页视图
 struct HomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
     /// Owned by MainTabView so tab changes and root view reconstruction do not
     /// discard loaded feed data or in-flight request de-duplication state.
     @ObservedObject var viewModel: HomeViewModel
@@ -58,7 +59,6 @@ struct HomeView: View {
     @State private var showCustomerSupport = false
     @State private var showSettings = false
     @State private var selectedForumBoardID: UUID?
-    @State private var showCourseDiscovery = false
     @State private var showNavigationDrawer = false
     @State private var navigationDrawerOpenRequest: UInt = 0
     @State private var selectedForumPost: ForumPostItem?
@@ -68,6 +68,7 @@ struct HomeView: View {
     @State private var shareActionToastMessage: String?
     @State private var postOpenErrorMessage: String?
     @State private var selectedFeaturedCategory: HomeFeedTab = .forum
+    @State private var forumFooterNearViewport = false
     // Start without a pager position so the initial forum selection is applied
     // after the horizontal scroll view has finished creating its targets.
     // Otherwise SwiftUI can keep the first target (`following`) visible while
@@ -139,7 +140,7 @@ struct HomeView: View {
                             }
                         }
                         .refreshable {
-                            await viewModel.refresh(userID: authService.currentUser?.id)
+                            await viewModel.refresh(userID: authService.currentUser?.id, intent: .explicitPull)
                             clearCreatedPostPromotion()
                         }
                     }
@@ -168,9 +169,6 @@ struct HomeView: View {
                 onSupportTap: {
                     showCustomerSupport = true
                 },
-                onCourseTap: {
-                    showCourseDiscovery = true
-                },
                 onCourseRadarTap: {
                     openURL(AppExternalLinks.courseRadar)
                 }
@@ -189,9 +187,6 @@ struct HomeView: View {
                 shouldAutoFocus: $shouldAutoFocusSearch,
                 showsBackButton: true
             )
-        }
-        .navigationDestination(isPresented: $showCourseDiscovery) {
-            CourseDiscoveryView(universityName: resolvedHomeUniversityName)
         }
         .navigationDestination(isPresented: $showCustomerSupport) {
             CheeseCustomerSupportView()
@@ -222,7 +217,11 @@ struct HomeView: View {
             await boards
         }
         .onChange(of: authService.accountTransitionGeneration) { _, _ in
-            viewModel.cancelPendingRefreshes()
+            viewModel.resetAccountScopedState()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await viewModel.loadIfNeeded(userID: authService.currentUser?.id) }
         }
         .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { notification in
             handlePostChange(notification)
@@ -296,17 +295,6 @@ struct HomeView: View {
     private func loadForumBoardsIfNeeded() async {
         guard forumService.boards.isEmpty else { return }
         await forumService.fetchBoards()
-    }
-
-    private var resolvedHomeUniversityName: String {
-        guard let rawSchool = authService.currentUser?.school else {
-            return CheeseUniversityOption.defaultSchoolName
-        }
-        if let option = CheeseUniversityOption.option(matching: rawSchool) {
-            return option.displayText
-        }
-        let trimmed = rawSchool.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? CheeseUniversityOption.defaultSchoolName : trimmed
     }
 
     // MARK: - 内容分页
@@ -436,28 +424,8 @@ struct HomeView: View {
         }
     }
 
-    private var algorithmicForumCards: [HomeCardItem] {
-        viewModel.forumCards
-    }
-
-    private var officialForumCards: [HomeCardItem] {
-        viewModel.homeFeaturedForumCards
-    }
-
     private var forumTabCards: [HomeCardItem] {
-        let selectedOfficialCards = officialForumCards.filter {
-            selectedForumBoardID == nil || $0.boardID == selectedForumBoardID
-        }
-        let selectedAlgorithmicCards = algorithmicForumCards.filter {
-            selectedForumBoardID == nil || $0.boardID == selectedForumBoardID
-        }
-        var seenPostIDs = Set<UUID>()
-        let uniqueCards = (selectedOfficialCards + selectedAlgorithmicCards).filter { card in
-            seenPostIDs.insert(card.postId ?? card.id).inserted
-        }
-        let systemPinnedCards = uniqueCards.filter(\.isSystemPinned)
-        let organicCards = uniqueCards.filter { !$0.isSystemPinned }
-        return Array((systemPinnedCards + organicCards).prefix(12))
+        viewModel.forumTabCards(selectedBoardID: selectedForumBoardID)
     }
 
     private func featuredLoadState(
@@ -620,11 +588,51 @@ struct HomeView: View {
                 }
             }
             .padding(.top, category == .forum ? 8 : 0)
+
+            if category == .forum, viewModel.hasResolvedInitialForumLoad {
+                if let error = viewModel.forumRefreshError {
+                    Text(error).font(.footnote).foregroundStyle(.secondary)
+                }
+                forumPaginationFooter
+            }
         }
         .padding(.top, category == .forum ? 2 : 6)
         .padding(.bottom, 12)
         .padding(.horizontal, horizontalInset)
         .contentShape(Rectangle())
+    }
+
+    private var forumPaginationFooter: some View {
+        Group {
+            if viewModel.isLoadingMoreForum {
+                ProgressView()
+            } else if viewModel.hasMoreForum {
+                Button(viewModel.forumPaginationError ?? L10n.tr("Load more", "加载更多")) {
+                    Task { await viewModel.loadMoreForum(userID: authService.currentUser?.id) }
+                }
+            } else {
+                Text(L10n.tr("You’re all caught up", "已看完当前可见帖子"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .onGeometryChange(for: Bool.self) { proxy in
+            // The horizontal pages are eagerly laid out: onAppear would load
+            // offscreen pages too. Only prefetch near the actual viewport.
+            proxy.frame(in: .global).intersects(UIScreen.main.bounds.insetBy(dx: 0, dy: -200))
+        } action: { forumFooterNearViewport = $0 }
+        .onChange(of: "\(forumFooterNearViewport)-\(selectedFeaturedCategory)-\(viewModel.forumPageNumber)-\(viewModel.isRefreshingForum)", initial: true) { _, _ in
+            guard forumFooterNearViewport, selectedFeaturedCategory == .forum,
+                  HomeForumContinuationPosition.allowsAutomaticLoad(
+                    refreshError: viewModel.forumRefreshError,
+                    paginationError: viewModel.forumPaginationError) else { return }
+            // An expired-session refresh failure must not start a footer retry
+            // loop. Explicit pull/load-more remains available to retry.
+            // Scrolling away must not cancel an already requested page. The
+            // model rejects stale responses after refresh/account transitions.
+            Task { await viewModel.loadMoreForum(userID: authService.currentUser?.id) }
+        }
     }
 
     private func compactSecondhandGrid(
@@ -827,8 +835,6 @@ struct HomeView: View {
             kind = .forum
         case .secondhand:
             kind = .secondhand
-        case .course:
-            return nil
         }
 
         let imageURL: URL?
@@ -853,7 +859,7 @@ struct HomeView: View {
         do {
             try await viewModel.toggleLike(for: card)
         } catch {
-            postOpenErrorMessage = error.localizedDescription
+            postOpenErrorMessage = error.postActionMessage
         }
     }
 
@@ -862,7 +868,7 @@ struct HomeView: View {
         do {
             try await viewModel.toggleFavorite(for: card)
         } catch {
-            postOpenErrorMessage = error.localizedDescription
+            postOpenErrorMessage = error.postActionMessage
         }
     }
 
@@ -899,12 +905,12 @@ struct HomeView: View {
     }
 
     private func handleHomeReselect() {
+        Task { await viewModel.loadIfNeeded(userID: authService.currentUser?.id) }
         showForumList = false
         showSearch = false
         shouldAutoFocusSearch = false
         showCustomerSupport = false
         showSettings = false
-        showCourseDiscovery = false
         selectedForumBoardID = nil
         selectedForumPost = nil
         selectedFeaturedSecondhandItem = nil
@@ -934,6 +940,9 @@ struct HomeView: View {
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             selectedFeaturedCategory = category
+        }
+        if category == .forum {
+            Task { await viewModel.loadIfNeeded(userID: authService.currentUser?.id) }
         }
     }
 
@@ -1034,8 +1043,6 @@ struct HomeView: View {
                         "该帖子暂时无法打开，请刷新后重试。"
                     )
                 }
-            case .course:
-                showCourseDiscovery = true
             }
             return
         }
@@ -1062,8 +1069,6 @@ struct HomeView: View {
                     "该帖子暂时无法打开，请刷新后重试。"
                 )
             }
-        case .course:
-            showCourseDiscovery = true
         }
     }
 

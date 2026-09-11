@@ -7,7 +7,9 @@ restore it.
 ## Preferred Local Reset
 
 ```sh
-supabase db reset
+supabase db reset --local --version 195
+supabase storage rm --local --experimental --recursive --yes ss:///course-outlines
+supabase migration up --local
 ```
 
 This replays the full migration directory and the configured seed against the
@@ -33,4 +35,3 @@ omit security/privacy contracts.
 Never use the reset script in production. Deploy reviewed forward migrations
 only, after following each destructive migration's backup, rollback-limit, and
 ordering notes.
-

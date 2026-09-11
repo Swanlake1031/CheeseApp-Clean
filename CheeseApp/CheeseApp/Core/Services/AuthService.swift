@@ -10,6 +10,9 @@ import Foundation
 import SwiftUI
 import Supabase
 import UIKit
+import AuthenticationServices
+import CryptoKit
+import GoogleSignIn
 
 enum AuthBootstrapState: Equatable {
     case restoringSession
@@ -165,6 +168,7 @@ class AuthService: ObservableObject {
     private var accountIdentityStatusesCacheUserId: UUID?
     private var accountIdentityStatusesRefreshedAt: Date?
     private let accountIdentityStatusesCacheLifetime: TimeInterval = 5 * 60
+    private var appleSignInCoordinator: AppleSignInCoordinator?
     
     private init() {
         // 不在 init 中自动检查，避免重复请求
@@ -512,8 +516,6 @@ class AuthService: ObservableObject {
     func signInWithGoogle() async throws {
         guard !isLoading else { return }
         profileCompletionReturnSnapshot = nil
-        let previousSessionUserId = localSessionUserId()
-
         isLoading = true
         errorMessage = nil
 
@@ -522,12 +524,26 @@ class AuthService: ObservableObject {
         await clearResidualLoggedOutSessionIfNeeded()
 
         do {
-            let redirectURL = URL(string: "cheeseapp://auth/callback")
-            let session = try await supabase.auth.signInWithOAuth(
-                provider: .google,
-                redirectTo: redirectURL,
-                scopes: "openid email profile",
-                queryParams: Self.googleOAuthQueryParams
+            guard let presenter = UIApplication.shared.cheeseTopViewController else {
+                throw NativeSocialSignInError.presentationUnavailable
+            }
+
+            let rawNonce = Self.makeSecureNonce()
+            let result = try await nativeGoogleSignIn(
+                with: presenter,
+                nonce: rawNonce
+            )
+            guard let idToken = result.user.idToken?.tokenString else {
+                throw NativeSocialSignInError.missingIdentityToken
+            }
+
+            let session = try await supabase.auth.signInWithIdToken(
+                credentials: OpenIDConnectCredentials(
+                    provider: .google,
+                    idToken: idToken,
+                    accessToken: result.user.accessToken.tokenString,
+                    nonce: rawNonce
+                )
             )
 
             isAuthenticated = true
@@ -538,21 +554,9 @@ class AuthService: ObservableObject {
                 recentSignInMethod: .google
             )
         } catch {
-            // 某些设备/网络下 OAuth 回跳后 SDK 可能先抛错，但会话已建立；这里做一次兜底确认。
-            if let currentSession = supabase.auth.currentSession,
-               previousSessionUserId == nil || currentSession.user.id != previousSessionUserId,
-               let userId = try? await requireAuthUserId(),
-               userId == currentSession.user.id {
-                await fetchUserProfile(userId: userId)
-                if let profile = currentUser {
-                    isAuthenticated = true
-                    requiresProfileCompletion = needsProfileCompletion(profile)
-                    _ = await persistCurrentSessionForAccountSwitching(
-                        recordAsRecent: true,
-                        recentSignInMethod: .google
-                    )
-                    return
-                }
+            if Self.isUserCancelledSocialSignIn(error) {
+                errorMessage = nil
+                throw error
             }
             let message = socialSignInMessage(for: error, provider: "谷歌")
             errorMessage = message
@@ -568,8 +572,6 @@ class AuthService: ObservableObject {
     func signInWithApple() async throws {
         guard !isLoading else { return }
         profileCompletionReturnSnapshot = nil
-        let previousSessionUserId = localSessionUserId()
-
         isLoading = true
         errorMessage = nil
 
@@ -578,36 +580,32 @@ class AuthService: ObservableObject {
         await clearResidualLoggedOutSessionIfNeeded()
 
         do {
-            let redirectURL = URL(string: "cheeseapp://auth/callback")
-            let session = try await supabase.auth.signInWithOAuth(
-                provider: .apple,
-                redirectTo: redirectURL,
-                scopes: "name email"
+            let rawNonce = Self.makeSecureNonce()
+            let coordinator = AppleSignInCoordinator(rawNonce: rawNonce)
+            appleSignInCoordinator = coordinator
+            defer { appleSignInCoordinator = nil }
+
+            let credential = try await coordinator.authorize()
+            let session = try await supabase.auth.signInWithIdToken(
+                credentials: OpenIDConnectCredentials(
+                    provider: .apple,
+                    idToken: credential.identityToken,
+                    nonce: rawNonce
+                )
             )
 
             isAuthenticated = true
             await fetchUserProfile(userId: session.user.id)
+            await persistAppleNameIfNeeded(credential.fullName, userId: session.user.id)
             requiresProfileCompletion = needsProfileCompletion(currentUser)
             _ = await persistCurrentSessionForAccountSwitching(
                 recordAsRecent: true,
                 recentSignInMethod: .apple
             )
         } catch {
-            // 某些设备/网络下 OAuth 回跳后 SDK 可能先抛错，但会话已建立；这里做一次兜底确认。
-            if let currentSession = supabase.auth.currentSession,
-               previousSessionUserId == nil || currentSession.user.id != previousSessionUserId,
-               let userId = try? await requireAuthUserId(),
-               userId == currentSession.user.id {
-                await fetchUserProfile(userId: userId)
-                if let profile = currentUser {
-                    isAuthenticated = true
-                    requiresProfileCompletion = needsProfileCompletion(profile)
-                    _ = await persistCurrentSessionForAccountSwitching(
-                        recordAsRecent: true,
-                        recentSignInMethod: .apple
-                    )
-                    return
-                }
+            if Self.isUserCancelledSocialSignIn(error) {
+                errorMessage = nil
+                throw error
             }
             let message = socialSignInMessage(for: error, provider: "Apple")
             errorMessage = message
@@ -616,6 +614,68 @@ class AuthService: ObservableObject {
                 code: (error as NSError).code,
                 userInfo: [NSLocalizedDescriptionKey: message]
             )
+        }
+    }
+
+    private func persistAppleNameIfNeeded(_ fullName: String?, userId: UUID) async {
+        guard let fullName = fullName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !fullName.isEmpty
+        else { return }
+
+        do {
+            let profile = currentUser?.id == userId
+                ? currentUser
+                : try? await fetchProfileWithRetry(userId: userId, attempts: 2)
+            guard profile?.fullName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false else {
+                return
+            }
+            try await supabase.client
+                .from("profiles")
+                .update(AppleProfileNameUpdate(fullName: fullName))
+                .eq("id", value: userId.uuidString)
+                .execute()
+            await fetchUserProfile(userId: userId)
+        } catch {
+            // Name capture is best-effort; a valid native session must not be discarded.
+        }
+    }
+
+    private static func makeSecureNonce(length: Int = 32) -> String {
+        precondition(length > 0)
+        let characters = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        var result = ""
+        var remainingLength = length
+
+        while remainingLength > 0 {
+            var random: UInt8 = 0
+            guard SecRandomCopyBytes(kSecRandomDefault, 1, &random) == errSecSuccess else {
+                fatalError("Unable to generate a secure Apple sign-in nonce")
+            }
+            if random < characters.count {
+                result.append(characters[Int(random)])
+                remainingLength -= 1
+            }
+        }
+        return result
+    }
+
+    private func nativeGoogleSignIn(
+        with presenter: UIViewController,
+        nonce: String
+    ) async throws -> GIDSignInResult {
+        try await withCheckedThrowingContinuation { continuation in
+            GIDSignIn.sharedInstance.signIn(
+                withPresenting: presenter,
+                hint: nil,
+                additionalScopes: nil,
+                nonce: nonce
+            ) { result, error in
+                if let result {
+                    continuation.resume(returning: result)
+                } else {
+                    continuation.resume(throwing: error ?? NativeSocialSignInError.missingIdentityToken)
+                }
+            }
         }
     }
 
@@ -678,25 +738,46 @@ class AuthService: ObservableObject {
     }
 
     func linkAccountIdentity(_ provider: AccountIdentityProvider) async throws {
-        let redirectURL = URL(string: "cheeseapp://auth/callback")
-
         do {
             switch provider {
             case .google:
-                try await supabase.auth.linkIdentity(
-                    provider: .google,
-                    scopes: "openid email profile",
-                    redirectTo: redirectURL,
-                    queryParams: Self.googleOAuthQueryParams
+                guard let presenter = UIApplication.shared.cheeseTopViewController else {
+                    throw NativeSocialSignInError.presentationUnavailable
+                }
+                let rawNonce = Self.makeSecureNonce()
+                let result = try await nativeGoogleSignIn(
+                    with: presenter,
+                    nonce: rawNonce
+                )
+                guard let idToken = result.user.idToken?.tokenString else {
+                    throw NativeSocialSignInError.missingIdentityToken
+                }
+                try await supabase.auth.linkIdentityWithIdToken(
+                    credentials: OpenIDConnectCredentials(
+                        provider: .google,
+                        idToken: idToken,
+                        accessToken: result.user.accessToken.tokenString,
+                        nonce: rawNonce
+                    )
                 )
             case .apple:
-                try await supabase.auth.linkIdentity(
-                    provider: .apple,
-                    scopes: "name email",
-                    redirectTo: redirectURL
+                let rawNonce = Self.makeSecureNonce()
+                let coordinator = AppleSignInCoordinator(rawNonce: rawNonce)
+                appleSignInCoordinator = coordinator
+                defer { appleSignInCoordinator = nil }
+                let credential = try await coordinator.authorize()
+                try await supabase.auth.linkIdentityWithIdToken(
+                    credentials: OpenIDConnectCredentials(
+                        provider: .apple,
+                        idToken: credential.identityToken,
+                        nonce: rawNonce
+                    )
                 )
             }
         } catch {
+            if Self.isUserCancelledSocialSignIn(error) {
+                throw error
+            }
             throw accountIdentityLinkError(for: error, provider: provider)
         }
     }
@@ -1078,37 +1159,44 @@ class AuthService: ObservableObject {
     }
 
     func addAccountWithGoogle() async throws -> UUID {
-        let previousUserId = currentUser?.id
         return try await addAccountBySigningIn(signInMethod: .google) {
-            do {
-                let redirectURL = URL(string: "cheeseapp://auth/callback")
-                return try await supabase.auth.signInWithOAuth(
-                    provider: .google,
-                    redirectTo: redirectURL,
-                    scopes: "openid email profile",
-                    queryParams: Self.googleOAuthQueryParams
-                )
-            } catch {
-                // 某些设备回跳后会先抛错，这里做一次会话兜底。
-                guard let session = try? await supabase.auth.session else {
-                    throw error
-                }
-                if session.user.id == previousUserId {
-                    throw error
-                }
-                return session
+            guard let presenter = UIApplication.shared.cheeseTopViewController else {
+                throw NativeSocialSignInError.presentationUnavailable
             }
+            let rawNonce = Self.makeSecureNonce()
+            let result = try await nativeGoogleSignIn(
+                with: presenter,
+                nonce: rawNonce
+            )
+            guard let idToken = result.user.idToken?.tokenString else {
+                throw NativeSocialSignInError.missingIdentityToken
+            }
+            return try await supabase.auth.signInWithIdToken(
+                credentials: OpenIDConnectCredentials(
+                    provider: .google,
+                    idToken: idToken,
+                    accessToken: result.user.accessToken.tokenString,
+                    nonce: rawNonce
+                )
+            )
         }
     }
 
     func addAccountWithApple() async throws -> UUID {
         try await addAccountBySigningIn(signInMethod: .apple) {
-            let redirectURL = URL(string: "cheeseapp://auth/callback")
-            let session = try await supabase.auth.signInWithOAuth(
-                provider: .apple,
-                redirectTo: redirectURL,
-                scopes: "name email"
+            let rawNonce = Self.makeSecureNonce()
+            let coordinator = AppleSignInCoordinator(rawNonce: rawNonce)
+            appleSignInCoordinator = coordinator
+            defer { appleSignInCoordinator = nil }
+            let credential = try await coordinator.authorize()
+            let session = try await supabase.auth.signInWithIdToken(
+                credentials: OpenIDConnectCredentials(
+                    provider: .apple,
+                    idToken: credential.identityToken,
+                    nonce: rawNonce
+                )
             )
+            await persistAppleNameIfNeeded(credential.fullName, userId: session.user.id)
             return session
         }
     }
@@ -1176,12 +1264,11 @@ class AuthService: ObservableObject {
     ) async throws {
         let normalizedFullName = fullName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         let normalizedSchool = school.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-        let selectedSchoolOption = CheeseUniversityOption.option(matching: normalizedSchool)
-        if normalizedSchool != nil, selectedSchoolOption == nil {
+        guard let selectedSchoolOption = CheeseUniversityOption.option(matching: normalizedSchool) else {
             throw NSError(
                 domain: "AuthService",
                 code: 400,
-                userInfo: [NSLocalizedDescriptionKey: "请选择下拉列表中的正确学校"]
+                userInfo: [NSLocalizedDescriptionKey: "学校为必填，请选择下拉列表中的学校"]
             )
         }
         let normalizedGender = gender.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1196,31 +1283,24 @@ class AuthService: ObservableObject {
 
         // Google / OAuth 场景下，极少数账号会出现 profiles 行缺失，先兜底确保存在。
         let userId = try await ensureOwnProfileRowIfNeeded(
-            schoolName: selectedSchoolOption?.name ?? CheeseUniversityOption.defaultSchoolName,
+            schoolName: selectedSchoolOption.name,
             fullName: normalizedFullName
         )
 
         let params = CompleteProfileParams(
             pFullName: normalizedFullName,
-            pUniversity: selectedSchoolOption?.name,
+            pUniversity: selectedSchoolOption.name,
             pGender: normalizedGender,
             pOccupation: normalizedOccupation
         )
-        _ = try await supabase.client
+        let completedProfile: Profile = try await supabase.client
             .rpc("complete_profile", params: params)
             .execute()
+            .value
 
-        // 先乐观更新本地状态，避免因短暂读取失败把用户卡在“完善资料”页。
-        if var profile = currentUser {
-            if let normalizedFullName {
-                profile.fullName = normalizedFullName
-            }
-            profile.school = selectedSchoolOption?.name
-            profile.gender = normalizedGender
-            profile.occupation = normalizedOccupation
-            profile.profileCompleted = true
-            currentUser = profile
-        }
+        // Use the returned school_id/campus_id as well as the display name.
+        // Never leave a newly selected school paired with the old routing ID.
+        currentUser = completedProfile
         requiresProfileCompletion = false
         profileCompletionReturnSnapshot = nil
 
@@ -1442,6 +1522,11 @@ class AuthService: ObservableObject {
                 currentUser = previousProfile
                 isAuthenticated = true
                 requiresProfileCompletion = needsProfileCompletion(previousProfile)
+            }
+
+            if Self.isUserCancelledSocialSignIn(error) {
+                errorMessage = nil
+                throw error
             }
 
             let nsError = error as NSError
@@ -1748,6 +1833,12 @@ class AuthService: ObservableObject {
         return normalized.hasSuffix("@gmail.com") || normalized.hasSuffix("@googlemail.com")
     }
 
+    nonisolated static func isUserCancelledSocialSignIn(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return (nsError.domain == "com.apple.AuthenticationServices.AuthorizationError" && nsError.code == 1001)
+            || nsError.code == NSUserCancelledError
+    }
+
     private func socialSignInMessage(for error: Error, provider: String) -> String {
         let text = error.localizedDescription.lowercased()
         if text.contains("canceled") || text.contains("cancelled") {
@@ -1828,11 +1919,7 @@ struct SavedAuthAccount: Codable, Identifiable, Hashable {
     let lastUsedAt: Date
 
     var displayLabel: String {
-        if let displayName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines), !displayName.isEmpty {
-            return displayName
-        }
-        let prefix = email.split(separator: "@").first.map(String.init) ?? ""
-        return prefix.isEmpty ? "用户" : prefix
+        accountDisplayLabel(displayName: displayName, email: email)
     }
 }
 
@@ -1855,11 +1942,130 @@ struct RecentLoginAccount: Codable, Identifiable, Hashable {
     }
 
     var displayLabel: String {
-        if let displayName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines), !displayName.isEmpty {
-            return displayName
+        accountDisplayLabel(displayName: displayName, email: email)
+    }
+}
+
+private func accountDisplayLabel(displayName: String?, email: String) -> String {
+    if let displayName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines),
+       !displayName.isEmpty {
+        return displayName
+    }
+
+    let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    if normalizedEmail.hasSuffix("@privaterelay.appleid.com") {
+        return "Apple 用户"
+    }
+
+    let prefix = email.split(separator: "@").first.map(String.init) ?? ""
+    return prefix.isEmpty ? "用户" : prefix
+}
+
+private enum NativeSocialSignInError: LocalizedError {
+    case presentationUnavailable
+    case missingIdentityToken
+
+    var errorDescription: String? {
+        switch self {
+        case .presentationUnavailable:
+            return "无法显示登录页面，请稍后重试。"
+        case .missingIdentityToken:
+            return "登录服务没有返回有效身份凭证，请重试。"
         }
-        let prefix = email.split(separator: "@").first.map(String.init) ?? ""
-        return prefix.isEmpty ? "用户" : prefix
+    }
+}
+
+private struct AppleNativeCredential {
+    let identityToken: String
+    let fullName: String?
+}
+
+@MainActor
+private final class AppleSignInCoordinator: NSObject,
+    ASAuthorizationControllerDelegate,
+    ASAuthorizationControllerPresentationContextProviding {
+    private let rawNonce: String
+    private var continuation: CheckedContinuation<AppleNativeCredential, Error>?
+
+    init(rawNonce: String) {
+        self.rawNonce = rawNonce
+    }
+
+    func authorize() async throws -> AppleNativeCredential {
+        try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+
+            let request = ASAuthorizationAppleIDProvider().createRequest()
+            request.requestedScopes = [.fullName, .email]
+            request.nonce = SHA256.hash(data: Data(rawNonce.utf8))
+                .map { String(format: "%02x", $0) }
+                .joined()
+
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            controller.delegate = self
+            controller.presentationContextProvider = self
+            controller.performRequests()
+        }
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        UIApplication.shared.cheeseKeyWindow ?? ASPresentationAnchor()
+    }
+
+    func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithAuthorization authorization: ASAuthorization
+    ) {
+        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let tokenData = credential.identityToken,
+              let token = String(data: tokenData, encoding: .utf8)
+        else {
+            finish(.failure(NativeSocialSignInError.missingIdentityToken))
+            return
+        }
+
+        let formattedName = credential.fullName
+            .map { PersonNameComponentsFormatter().string(from: $0) }
+            .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty }
+        finish(.success(AppleNativeCredential(identityToken: token, fullName: formattedName)))
+    }
+
+    func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithError error: Error
+    ) {
+        finish(.failure(error))
+    }
+
+    private func finish(_ result: Result<AppleNativeCredential, Error>) {
+        guard let continuation else { return }
+        self.continuation = nil
+        continuation.resume(with: result)
+    }
+}
+
+private extension UIApplication {
+    var cheeseKeyWindow: UIWindow? {
+        connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }
+    }
+
+    var cheeseTopViewController: UIViewController? {
+        var current = cheeseKeyWindow?.rootViewController
+        while let presented = current?.presentedViewController {
+            current = presented
+        }
+        return current
+    }
+}
+
+private struct AppleProfileNameUpdate: Encodable {
+    let fullName: String
+
+    enum CodingKeys: String, CodingKey {
+        case fullName = "full_name"
     }
 }
 

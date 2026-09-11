@@ -4,7 +4,6 @@ Cheese is a SwiftUI campus community application backed by Supabase. This reposi
 
 ## Active Product Surface
 
-- Course discovery, reviews, and professor ratings
 - Community Forum with boards, anonymous posting rules, moderation, comments, and Forum likes
 - Secondhand Marketplace with bookmarks, seller identity, recoverable 30-day auto-hide, contact-card-triggered chat transactions, and owner deletion
 - Search across active domains and profiles
@@ -33,6 +32,8 @@ SwiftUI View → feature state/ViewModel → service/repository → Supabase
 Home content is committed as one coherent snapshot, and `PostInteractionStore` owns cross-screen Forum-like/bookmark state. See [ARCHITECTURE.md](ARCHITECTURE.md) for state ownership and data flow.
 
 ## Setup
+
+Recommendation behavior and version identity: [Current recommendation system — source of truth](docs/CURRENT_RECOMMENDATION_SYSTEM.md). Read this before historical V1/V2 reports.
 
 Requirements:
 

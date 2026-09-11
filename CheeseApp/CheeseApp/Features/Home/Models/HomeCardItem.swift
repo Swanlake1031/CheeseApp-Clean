@@ -3,7 +3,7 @@
 //  CheeseApp
 //
 //  🏠 首页卡片数据模型
-//  用于展示二手、论坛与课程内容卡片的轻量级 DTO
+//  用于展示二手与论坛内容卡片的轻量级 DTO
 //
 
 import SwiftUI
@@ -87,11 +87,6 @@ struct HomeCardItem: Identifiable {
     let saveCount: Int
     let isSystemPinned: Bool
     let initiallyLiked: Bool
-    let courseID: UUID?
-    let courseCode: String?
-    let rating: Double?
-    let reviewCount: Int
-    let professorText: String?
     let isSeatRadar: Bool
     
     /// 便捷初始化方法
@@ -122,11 +117,6 @@ struct HomeCardItem: Identifiable {
         saveCount: Int = 0,
         isSystemPinned: Bool = false,
         initiallyLiked: Bool = false,
-        courseID: UUID? = nil,
-        courseCode: String? = nil,
-        rating: Double? = nil,
-        reviewCount: Int = 0,
-        professorText: String? = nil,
         isSeatRadar: Bool = false
     ) {
         self.id = id ?? postId ?? UUID()
@@ -157,11 +147,6 @@ struct HomeCardItem: Identifiable {
         self.saveCount = max(saveCount, 0)
         self.isSystemPinned = isSystemPinned
         self.initiallyLiked = initiallyLiked
-        self.courseID = courseID
-        self.courseCode = courseCode
-        self.rating = rating
-        self.reviewCount = max(reviewCount, 0)
-        self.professorText = professorText
         self.isSeatRadar = isSeatRadar
     }
 }
@@ -213,9 +198,6 @@ enum HomeRecommendationRanker {
                 score = normalized(card.viewCount, scale: viewScale) * 0.25
                     + normalized(card.saveCount, scale: saveScale) * 0.25
                     + randomScore * 0.50
-            case .course:
-                score = normalized(card.viewCount, scale: viewScale) * 0.30
-                    + randomScore * 0.70
             }
             return Candidate(card: card, originalIndex: index, score: score)
         }
@@ -315,7 +297,6 @@ enum HomeViewRanker {
 enum HomeCardCategory: String, CaseIterable {
     case secondhand = "Secondhand"  // 二手
     case forum = "Forum"            // 论坛
-    case course = "Course"          // 课程评分
 
     var localizedTitle: String {
         switch self {
@@ -323,8 +304,6 @@ enum HomeCardCategory: String, CaseIterable {
             return L10n.tr("Secondhand", "二手")
         case .forum:
             return L10n.tr("Forum", "论坛")
-        case .course:
-            return L10n.tr("Course Ratings", "课程评分")
         }
     }
 }

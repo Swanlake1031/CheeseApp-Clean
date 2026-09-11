@@ -13,8 +13,9 @@ This directory is the source of truth for the Cheese backend contract.
 
 ## Current Product Contract
 
-The shared post types are `secondhand` and `forum`. Courses/reviews use their
-own tables and RPCs. Migration 085 removes Ride/Team/Carpool contracts,
+The shared post types are `secondhand` and `forum`. Migration 20260906203031
+removes courses, reviews, professors, outlines, and their dedicated PDF bucket.
+Migration 085 removes Ride/Team/Carpool contracts,
 migration 127 removes Rent, and migration 128 removes geolocation contracts.
 Migration 140 rejects Secondhand likes; bookmarks remain supported.
 
@@ -27,12 +28,16 @@ Use Supabase CLI against a local/throwaway project:
 
 ```sh
 supabase start
-supabase db reset
+supabase db reset --local --version 195
+supabase storage rm --local --experimental --recursive --yes ss:///course-outlines
+supabase migration up --local
 supabase test db
 ```
 
-`supabase db reset` replays every migration and then the configured seed. Never
-run a reset against production.
+The two-phase reset is required because immutable historical migrations create
+the retired course bucket. Remove it through the Storage API before applying
+the retirement migration; direct SQL deletion of Storage objects is forbidden.
+Never run a reset against production.
 
 If a throwaway remote schema must be rebuilt manually, follow
 `RESET_INSTRUCTIONS.md`. Apply every migration in filename order through the
@@ -58,4 +63,3 @@ against the intended project. Confirm the target project before any command.
 The share/push/lifecycle worker also depends on reviewed database RPCs and
 privileged deployment secrets. See `../cheeseapp-share-worker/README.md` and
 `../HANDOFF.md`.
-

@@ -6,14 +6,17 @@ enum ForumComposerRules {
     static func limitedTitle(_ value: String) -> String {
         String(value.prefix(maximumTitleLength))
     }
+
+    static func canSubmit(title: String) -> Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && title.count <= maximumTitleLength
+    }
 }
 
 struct ForumPostEditorSurface: View {
     @State private var titleEditorHeight: CGFloat = 44
 
     let isEditing: Bool
-    let boards: [ForumBoard]
-    @Binding var selectedBoardID: UUID?
     @Binding var isAnonymous: Bool
     @Binding var title: String
     @Binding var content: String
@@ -31,16 +34,9 @@ struct ForumPostEditorSurface: View {
     let onSaveDraft: () -> Void
     let onRestoreDraft: () -> Void
     let onClearDraft: () -> Void
-    let onBoardSelected: (ForumBoard) -> Void
-
-    private var selectedBoard: ForumBoard? {
-        boards.first { $0.id == selectedBoardID && $0.status == .active }
-    }
 
     private var isValid: Bool {
-        selectedBoard != nil
-            && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && title.count <= ForumComposerRules.maximumTitleLength
+        ForumComposerRules.canSubmit(title: title)
     }
 
     private var isSubmitEnabled: Bool {
@@ -106,34 +102,6 @@ struct ForumPostEditorSurface: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(AppColors.textPrimary)
                     .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.plain)
-
-            Menu {
-                ForEach(boards.filter { $0.status == .active }) { board in
-                    Button {
-                        onBoardSelected(board)
-                    } label: {
-                        Text("# \(board.name)")
-                    }
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Text(
-                        selectedBoard.map { "# \($0.name)" }
-                            ?? L10n.tr("Choose Tag", "选择标签")
-                    )
-                        .font(.system(size: 15, weight: .semibold))
-                        .lineLimit(1)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
-                }
-                .foregroundStyle(AppColors.textPrimary)
-                .padding(.horizontal, 13)
-                .frame(height: 40)
-                .background(AppColors.cardBackground)
-                .clipShape(Capsule())
-                .overlay { Capsule().stroke(Color.black.opacity(0.16)) }
             }
             .buttonStyle(.plain)
 

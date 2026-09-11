@@ -12,8 +12,9 @@ The shared `posts` table now supports these user-facing post types:
 | `secondhand` | Second-hand marketplace |
 | `forum` | Community forum |
 
-Courses and professor ratings use their own course, professor, outline, term,
-review, and aggregate contracts; they are not represented as post types.
+Course ratings and all course, professor, outline, term, offering, and review
+tables were removed by migration 20260906203031. The course-outlines storage
+bucket and its PDF objects were also removed.
 
 ## Core Tables
 
@@ -77,5 +78,5 @@ For a messy throwaway database, `Supabase/rebuild_public_and_bootstrap.sql` can 
 
 ## Seed Data
 
-`Supabase/seed.sql` only seeds current modules: profiles, courses, second-hand,
+`Supabase/seed.sql` only seeds current modules: profiles, second-hand,
 forum, comments, and direct chat.

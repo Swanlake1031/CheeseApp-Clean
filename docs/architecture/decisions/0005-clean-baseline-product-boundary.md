@@ -2,6 +2,9 @@
 
 Status: Accepted
 
+Updated 2026-09-06: course ratings were retired; see
+[course module retirement](../../course-module-retirement.md).
+
 Date: 2026-08-08
 
 ## Context
@@ -18,7 +21,6 @@ destructively removed those likes and rejects new ones.
 
 Active product areas are:
 
-- Course discovery, reviews, and professor ratings
 - Secondhand Marketplace with bookmarks, availability, and owner deletion
 - Forum/community with comments and Forum likes
 - Search and profiles/social privacy
@@ -38,7 +40,7 @@ Bookmarks are supported.
   not decode them.
 - Rent and Secondhand likes are outside the accepted product boundary. Do not
   restore them from historical code or migrations.
-- Course records remain independent of the shared post hierarchy.
+- Course ratings and their data were removed by migration 20260906203031.
 
 ## Validation
 

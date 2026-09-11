@@ -28,6 +28,24 @@ final class AuthCredentialStoreTests: XCTestCase {
         super.tearDown()
     }
 
+    func testAppleAuthorizationCancellationIsRecognized() {
+        let cancellation = NSError(
+            domain: "com.apple.AuthenticationServices.AuthorizationError",
+            code: 1001
+        )
+
+        XCTAssertTrue(AuthService.isUserCancelledSocialSignIn(cancellation))
+    }
+
+    func testNonCancellationAuthorizationErrorIsNotSuppressed() {
+        let failure = NSError(
+            domain: "com.apple.AuthenticationServices.AuthorizationError",
+            code: 1000
+        )
+
+        XCTAssertFalse(AuthService.isUserCancelledSocialSignIn(failure))
+    }
+
     func testSavedAccountEncodingContainsMetadataOnly() throws {
         let data = try JSONEncoder().encode(makeMetadata())
         let object = try XCTUnwrap(
@@ -151,6 +169,32 @@ final class AuthCredentialStoreTests: XCTestCase {
         XCTAssertFalse(message.contains("test-access-token"))
         XCTAssertFalse(message.contains("test-refresh-token"))
         XCTAssertFalse(message.contains(String(errSecAuthFailed)))
+    }
+
+    func testApplePrivateRelayEmailDoesNotBecomeDisplayName() {
+        let account = SavedAuthAccount(
+            id: UUID(),
+            email: "y7whpptbj4@privaterelay.appleid.com",
+            displayName: nil,
+            avatarURL: nil,
+            profileCompleted: true,
+            lastUsedAt: Date()
+        )
+
+        XCTAssertEqual(account.displayLabel, "Apple 用户")
+    }
+
+    func testProfileNameStillOverridesApplePrivateRelayFallback() {
+        let account = SavedAuthAccount(
+            id: UUID(),
+            email: "y7whpptbj4@privaterelay.appleid.com",
+            displayName: "Timon",
+            avatarURL: nil,
+            profileCompleted: true,
+            lastUsedAt: Date()
+        )
+
+        XCTAssertEqual(account.displayLabel, "Timon")
     }
 
     private func makeMetadata() -> SavedAuthAccount {

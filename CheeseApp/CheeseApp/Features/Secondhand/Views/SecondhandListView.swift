@@ -13,6 +13,7 @@ private struct SecondhandSellerRoute: Identifiable, Hashable {
 }
 
 struct SecondhandListView: View {
+    var isTabRoot = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
     @StateObject private var service = SecondhandService.shared
@@ -147,17 +148,19 @@ struct SecondhandListView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    guard !isSearchPresented else {
-                        dismissSearchKeyboard()
-                        return
+            if !isTabRoot {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        guard !isSearchPresented else {
+                            dismissSearchKeyboard()
+                            return
+                        }
+                        dismiss()
+                    } label: {
+                        PostToolbarIconCircle(icon: "chevron.left")
                     }
-                    dismiss()
-                } label: {
-                    PostToolbarIconCircle(icon: "chevron.left")
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
         .navigationDestination(item: $editingPost) { post in
@@ -871,6 +874,8 @@ struct SecondhandDetailView: View {
             try await secondhandService.deletePost(postId: item.id, authorId: item.sellerId)
             dismiss()
         } catch {
+            if error.isCancellationLike { return }
+            interactionErrorMessage = error.postActionMessage
         }
     }
 

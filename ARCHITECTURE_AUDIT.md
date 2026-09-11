@@ -1,5 +1,8 @@
 # Cheese App Architecture Audit
 
+Historical audit: course-module descriptions below were superseded by the
+2026-09-06 [course retirement](docs/course-module-retirement.md).
+
 Date: 2026-08-08  
 Audit source: `/Users/timonayf/Desktop/GF` on `recovery/2026-07-28-reconstructed`  
 Clean-baseline workspace: `/Users/timonayf/Desktop/CheeseApp-Clean`

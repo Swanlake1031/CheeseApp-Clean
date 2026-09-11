@@ -3,7 +3,7 @@
 //  CheeseApp
 //
 //  🎯 主标签导航视图
-//  自定义底部导航栏：Home - Courses - Create(+) - Chat - Profile
+//  自定义底部导航栏：Home - Secondhand - Create(+) - Chat - Profile
 //
 
 import SwiftUI
@@ -14,7 +14,7 @@ enum CheeseTabBarLayout {
 }
 
 enum CheeseCreateSheetLayout {
-    static let compactDetent: PresentationDetent = .fraction(0.50)
+    static let compactDetent: PresentationDetent = .height(260)
 }
 
 private struct CreateComposerRoute: Identifiable {
@@ -50,7 +50,7 @@ struct MainTabView: View {
     @State private var activeCreateComposer: CreateComposerRoute?
     @State private var showProfileOnboarding = false
     @State private var homeRootResetID = UUID()
-    @State private var courseRootResetID = UUID()
+    @State private var secondhandRootResetID = UUID()
     @State private var chatRootResetID = UUID()
     @State private var profileRootResetID = UUID()
     @State private var isKeyboardVisible = false
@@ -95,19 +95,15 @@ struct MainTabView: View {
                     .accessibilityHidden(selectedTab != .home)
                 }
 
-                if shouldMount(.courses) {
+                if shouldMount(.secondhand) {
                     NavigationStack {
-                        CourseDiscoveryView(
-                            universityName: resolvedUniversityName,
-                            showsBackButton: false,
-                            hidesTabBar: false
-                        )
+                        SecondhandListView(isTabRoot: true)
                     }
                     .enableSwipeBackGesture()
-                    .id(courseRootResetID)
-                    .opacity(selectedTab == .courses ? 1 : 0)
-                    .allowsHitTesting(selectedTab == .courses)
-                    .accessibilityHidden(selectedTab != .courses)
+                    .id(secondhandRootResetID)
+                    .opacity(selectedTab == .secondhand ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .secondhand)
+                    .accessibilityHidden(selectedTab != .secondhand)
                 }
 
                 if shouldMount(.chat) {
@@ -134,10 +130,6 @@ struct MainTabView: View {
                                 HomeFeedNavigationEvents.post(.secondhand(category))
                                 activatedTabs.insert(.home)
                                 selectedTab = .home
-                            },
-                            onOpenCourses: {
-                                activatedTabs.insert(.courses)
-                                selectedTab = .courses
                             }
                         )
                     }
@@ -162,9 +154,6 @@ struct MainTabView: View {
                         onHomeReselect: {
                             postDeepLinkCoordinator.dismissActiveRoute()
                             HomeFeedNavigationEvents.postHomeReselect()
-                        },
-                        onCourseReselect: {
-                            courseRootResetID = UUID()
                         },
                         onChatReselect: {
                             chatRootResetID = UUID()
@@ -344,7 +333,7 @@ struct MainTabView: View {
         }
         .onChange(of: authService.currentUser?.id) { _, _ in
             homeRootResetID = UUID()
-            courseRootResetID = UUID()
+            secondhandRootResetID = UUID()
             chatRootResetID = UUID()
             profileRootResetID = UUID()
             syncProfileOnboardingState()
@@ -461,32 +450,19 @@ struct MainTabView: View {
         activatedTabs.contains(tab) || selectedTab == tab
     }
 
-    private var resolvedUniversityName: String {
-        guard let rawSchool = authService.currentUser?.school else {
-            return CheeseUniversityOption.defaultSchoolName
-        }
-        if let option = CheeseUniversityOption.option(matching: rawSchool) {
-            return option.displayText
-        }
-        let trimmed = rawSchool.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty
-            ? CheeseUniversityOption.defaultSchoolName
-            : trimmed
-    }
-
 }
 
 // MARK: - Tab 枚举
 enum TabItem: String, CaseIterable {
     case home
-    case courses
+    case secondhand
     case chat
     case profile
     
     var icon: String {
         switch self {
         case .home: return "house"
-        case .courses: return "graduationcap"
+        case .secondhand: return "bag"
         case .chat: return "bubble.left.and.bubble.right"
         case .profile: return "person"
         }
@@ -495,7 +471,7 @@ enum TabItem: String, CaseIterable {
     var selectedIcon: String {
         switch self {
         case .home: return "house.fill"
-        case .courses: return "graduationcap.fill"
+        case .secondhand: return "bag.fill"
         case .chat: return "bubble.left.and.bubble.right.fill"
         case .profile: return "person.fill"
         }
@@ -504,7 +480,7 @@ enum TabItem: String, CaseIterable {
     var title: String {
         switch self {
         case .home: return L10n.tr("Home", "首页")
-        case .courses: return L10n.tr("Course ratings", "课程评分")
+        case .secondhand: return L10n.tr("Secondhand", "二手")
         case .chat: return L10n.tr("Messages", "消息")
         case .profile: return L10n.tr("Profile", "个人档案")
         }
@@ -532,7 +508,6 @@ struct CustomTabBar: View {
     let chatUnreadBadgeCount: Int
     let showProfileRedDot: Bool
     var onHomeReselect: () -> Void
-    var onCourseReselect: () -> Void
     var onChatReselect: () -> Void
     var onProfileReselect: () -> Void
     var onCreateTap: () -> Void
@@ -554,21 +529,17 @@ struct CustomTabBar: View {
                 }
             }
             
-            // Course ratings
+            // Secondhand occupies the former Courses slot.
             TabBarButton(
-                icon: TabItem.courses.icon,
-                selectedIcon: TabItem.courses.selectedIcon,
-                accessibilityLabel: TabItem.courses.title,
-                isSelected: selectedTab == .courses,
+                icon: TabItem.secondhand.icon,
+                selectedIcon: TabItem.secondhand.selectedIcon,
+                accessibilityLabel: TabItem.secondhand.title,
+                isSelected: selectedTab == .secondhand,
                 showIndicator: true
             ) {
-                if selectedTab == .courses {
-                    onCourseReselect()
-                } else {
-                    selectedTab = .courses
-                }
+                selectedTab = .secondhand
             }
-            
+
             // Center Create Button (+)
             CreateButton(action: onCreateTap)
             
@@ -729,6 +700,7 @@ struct CompleteProfileOnboardingView: View {
     @EnvironmentObject private var authService: AuthService
 
     @State private var fullName: String = ""
+    @State private var school: String = ""
     @State private var gender: String = ""
     @State private var occupation: String = ""
     @State private var hasHydratedProfileDraft = false
@@ -747,6 +719,7 @@ struct CompleteProfileOnboardingView: View {
     private var canSave: Bool {
         !fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !gender.isEmpty
+            && CheeseUniversityOption.option(matching: school) != nil
     }
 
     private var shouldShowNameValidationError: Bool {
@@ -791,7 +764,7 @@ struct CompleteProfileOnboardingView: View {
                             }
                         }
 
-                        Text("首次进入需要补充信息。昵称和性别为必填，职业可选。")
+                        Text("首次进入需要补充信息。昵称、学校和性别为必填，职业可选。")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(AppColors.textMuted)
 
@@ -814,6 +787,20 @@ struct CompleteProfileOnboardingView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 2)
                         }
+
+                        fieldTitle("学校（必填）")
+                        Picker("请选择学校", selection: $school) {
+                            Text("请选择学校").tag("")
+                            ForEach(CheeseUniversityOption.all, id: \.name) { option in
+                                Text(option.name).tag(option.name)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .profileOnboardingOutline(cornerRadius: 12)
 
                         studentVerificationInfo
 
@@ -982,7 +969,7 @@ struct CompleteProfileOnboardingView: View {
         do {
             try await authService.completeProfile(
                 fullName: fullName,
-                school: authService.currentUser?.school ?? CheeseUniversityOption.defaultSchoolName,
+                school: school,
                 gender: gender,
                 occupation: occupation
             )

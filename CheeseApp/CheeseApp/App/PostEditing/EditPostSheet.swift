@@ -7,7 +7,6 @@ struct EditPostSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var userPostsService = UserPostsService()
-    @StateObject private var forumService = ForumService.shared
 
     @State private var title: String
     @State private var description: String
@@ -159,8 +158,6 @@ struct EditPostSheet: View {
     private var forumEditor: some View {
         ForumPostEditorSurface(
             isEditing: true,
-            boards: forumService.boards,
-            selectedBoardID: $forumBoardID,
             isAnonymous: $forumIsAnonymous,
             title: $title,
             content: $description,
@@ -177,10 +174,7 @@ struct EditPostSheet: View {
             onSubmit: { Task { await save() } },
             onSaveDraft: {},
             onRestoreDraft: {},
-            onClearDraft: {},
-            onBoardSelected: { board in
-                forumBoardID = board.id
-            }
+            onClearDraft: {}
         )
     }
 
@@ -238,9 +232,7 @@ struct EditPostSheet: View {
         case .secondhand:
             return !trimmedTitle.isEmpty && !priceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .forum:
-            return !trimmedTitle.isEmpty
-                && title.count <= ForumComposerRules.maximumTitleLength
-                && forumBoardID != nil
+            return ForumComposerRules.canSubmit(title: title)
         }
     }
 
@@ -437,7 +429,6 @@ struct EditPostSheet: View {
                 existingImages = details.images
 
             case .forum:
-                await forumService.fetchBoards()
                 let details = try await userPostsService.fetchForumEditFields(postId: post.id)
                 forumBoardID = details.boardID
                 forumAllowComments = details.allowComments

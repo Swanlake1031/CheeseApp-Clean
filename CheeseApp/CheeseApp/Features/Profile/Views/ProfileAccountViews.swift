@@ -318,6 +318,9 @@ struct AddAccountView: View {
                     : "Google 账号已注册并添加成功。"
             )
         } catch {
+            if AuthService.isUserCancelledSocialSignIn(error) {
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }
@@ -343,6 +346,9 @@ struct AddAccountView: View {
                     : "Apple 账号已注册并添加成功。"
             )
         } catch {
+            if AuthService.isUserCancelledSocialSignIn(error) {
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import OSLog
 
 enum HomeFeedAuthFailurePolicy {
     static func shouldRetry(_ error: Error) -> Bool {
@@ -71,6 +72,7 @@ class HomeViewModel: ObservableObject {
         let postsByID: [UUID: ForumPostItem]
         let recommendationSessionID: UUID?
         let recommendationPositions: [UUID: Int]
+        let resolution: HomeForumSessionResolution?
     }
 
     private struct HomeFeaturedSnapshot {
@@ -98,6 +100,9 @@ class HomeViewModel: ObservableObject {
         var secondhandItemsByID: [UUID: SecondhandItem] = [:]
         var recommendationSessionID: UUID?
         var recommendationPositions: [UUID: Int] = [:]
+        var forumPresentation = HomeForumPresentation()
+        var forumContinuationCards: [HomeCardItem] = []
+        var forumSessionExpiresAt: Date?
         var hasResolvedInitialFeaturedBundleLoad = false
         var hasResolvedInitialForumLoad = false
         var hasResolvedInitialHomeFeaturedLoad = false
@@ -117,6 +122,16 @@ class HomeViewModel: ObservableObject {
 
     @Published private var contentSnapshot = HomeContentSnapshot()
     @Published private var loadingSnapshot = HomeLoadingSnapshot()
+    @Published private(set) var isLoadingMoreForum = false
+    @Published private(set) var hasMoreForum = true
+    @Published private(set) var forumPaginationError: String?
+    @Published private(set) var forumPageNumber = 0
+    @Published private(set) var isRefreshingForum = false
+    @Published private(set) var forumRefreshError: String?
+    @Published private(set) var forumSessionDiagnostics: HomeForumSessionResolution?
+    private let lifecycleLogger = Logger(subsystem: "com.timonayf.cheeseapp", category: "ForumLifecycle")
+    private var forumContinuationPosition = HomeForumContinuationPosition()
+    private var forumPaginationGeneration: UInt64 = 0
 
     var isHomeFeaturedLoading: Bool {
         loadingSnapshot.isHomeFeaturedLoading
@@ -140,6 +155,37 @@ class HomeViewModel: ObservableObject {
 
     var forumCards: [HomeCardItem] {
         contentSnapshot.forumCards
+    }
+
+    /// The Home Forum tab consumes server-ordered V2 cards, not recommendedCards
+    /// (which is the older mixed-content preview). Featured rows are already
+    /// checked by the same server eligibility gate in HomeFeedService.
+    func forumTabCards(selectedBoardID: UUID?) -> [HomeCardItem] {
+        Self.composeForumTabCards(
+            featured: homeFeaturedForumCards,
+            ranked: forumCards,
+            selectedBoardID: selectedBoardID
+        )
+    }
+
+    static func composeForumTabCards(
+        featured: [HomeCardItem], ranked: [HomeCardItem], selectedBoardID: UUID?
+    ) -> [HomeCardItem] {
+        var seen = Set<UUID>()
+        let unique = (featured + ranked).filter { card in
+            (selectedBoardID == nil || card.boardID == selectedBoardID)
+                && seen.insert(card.postId ?? card.id).inserted
+        }
+        // Preserve the existing system-pinned placement, then exact RPC order.
+        return unique.filter(\.isSystemPinned)
+            + unique.filter { !$0.isSystemPinned }
+    }
+
+    static func orderForumCards(
+        _ cards: [HomeCardItem], sessionID: UUID?, seed: UInt64
+    ) -> [HomeCardItem] {
+        guard sessionID == nil else { return cards }
+        return HomeRecommendationRanker.ranked(cards, seed: seed, limit: cards.count)
     }
 
     var followingCards: [HomeCardItem] {
@@ -182,8 +228,7 @@ class HomeViewModel: ObservableObject {
     private let reactionService = PostReactionService.shared
     private let favoriteService = PostFavoriteService.shared
     private let interactionStore = PostInteractionStore.shared
-    private var activeRefreshTask: Task<Bool, Never>?
-    private var activeRefreshID: UUID?
+    private let refreshCoordinator = HomeRefreshCoordinator()
     private var accountScopeKey: String?
     private var lastSuccessfulRefreshAt: Date?
     private var pendingLikePostIDs = Set<UUID>()
@@ -198,58 +243,49 @@ class HomeViewModel: ObservableObject {
         now: Date = Date()
     ) async {
         establishAccountScope(for: userID)
+        let loadTransition = AuthService.shared.accountTransitionGeneration
         guard let userID,
               await AuthService.shared.prepareAuthenticatedRequest(
                 expectedUserID: userID
               ),
-              Self.shouldReload(
+              (contentSnapshot.forumSessionExpiresAt.map { $0 <= now } == true || Self.shouldReload(
             hasResolvedData: hasResolvedInitialData,
             lastSuccessfulRefreshAt: lastSuccessfulRefreshAt,
             now: now,
             cacheLifetime: Self.cacheLifetime
-        ) else { return }
+        )) else { return }
 
+        guard loadTransition == AuthService.shared.accountTransitionGeneration,
+              accountScopeKey == userID.uuidString else { return }
         await refresh(userID: userID, now: now)
     }
 
     func refresh(
         userID: UUID? = nil,
-        now: Date = Date()
+        now: Date = Date(),
+        intent: HomeRefreshIntent = .normal
     ) async {
         establishAccountScope(for: userID)
+        let transition = AuthService.shared.accountTransitionGeneration
         guard let userID,
               await AuthService.shared.prepareAuthenticatedRequest(
                 expectedUserID: userID
               )
         else { return }
-
-        if let activeRefreshTask {
-            _ = await activeRefreshTask.value
-            return
-        }
-
-        let refreshID = UUID()
-        let task = Task { [weak self] in
+        guard transition == AuthService.shared.accountTransitionGeneration,
+              accountScopeKey == userID.uuidString else { return }
+        let completed = await refreshCoordinator.run(intent: intent) { [weak self] in
             guard let self else { return false }
             return await self.performRefresh(userID: userID)
         }
-        activeRefreshID = refreshID
-        activeRefreshTask = task
-        let completed = await task.value
-
-        if activeRefreshID == refreshID {
-            activeRefreshTask = nil
-            activeRefreshID = nil
-            if completed {
-                lastSuccessfulRefreshAt = now
-            }
+        if completed, transition == AuthService.shared.accountTransitionGeneration,
+           accountScopeKey == userID.uuidString {
+            lastSuccessfulRefreshAt = now
         }
     }
 
     func cancelPendingRefreshes() {
-        activeRefreshTask?.cancel()
-        activeRefreshTask = nil
-        activeRefreshID = nil
+        refreshCoordinator.cancel()
     }
 
     var forumFeaturedLoadState: CollectionLoadState {
@@ -257,7 +293,7 @@ class HomeViewModel: ObservableObject {
             hasResolvedInitialLoad: hasResolvedInitialForumLoad,
             isLoading: isLoading,
             hasContent: !forumCards.isEmpty,
-            errorMessage: nil
+            errorMessage: forumRefreshError
         )
     }
 
@@ -381,6 +417,10 @@ class HomeViewModel: ObservableObject {
     }
 
     func resetAccountScopedState() {
+        resetForumPagination()
+        isRefreshingForum = false
+        forumRefreshError = nil
+        forumSessionDiagnostics = nil
         cancelPendingRefreshes()
         accountScopeKey = nil
         lastSuccessfulRefreshAt = nil
@@ -561,6 +601,69 @@ class HomeViewModel: ObservableObject {
 
     // MARK: - 私有方法
 
+    private func resetForumPagination(sessionID: UUID? = nil) {
+        forumPaginationGeneration &+= 1
+        forumContinuationPosition = HomeForumContinuationPosition(sessionID: sessionID)
+        forumPageNumber = 0
+        hasMoreForum = true
+        isLoadingMoreForum = false
+        forumPaginationError = nil
+    }
+
+    func loadMoreForum(userID: UUID?) async {
+        guard let userID, hasResolvedInitialForumLoad, hasMoreForum,
+              !isLoadingMoreForum, !isRefreshingForum,
+              accountScopeKey == userID.uuidString else { return }
+        if contentSnapshot.forumSessionExpiresAt.map({ $0 <= Date() }) == true {
+            await refresh(userID: userID)
+            return
+        }
+        let generation = forumPaginationGeneration
+        let transition = AuthService.shared.accountTransitionGeneration
+        isLoadingMoreForum = true
+        forumPaginationError = nil
+        defer {
+            if generation == forumPaginationGeneration { isLoadingMoreForum = false }
+        }
+        // Fixed exclusion set: all initial recommendations were fetched (up to
+        // the session's 60 rows). Continuation uses a keyset, never a growing offset.
+        if forumContinuationPosition.exclusions == nil {
+            forumContinuationPosition.exclusions = Array(Set((forumCards + homeFeaturedForumCards).compactMap(\.postId)))
+        }
+        do {
+            let references = try await feedService.fetchForumContinuation(
+                excluding: forumContinuationPosition.exclusions ?? [], before: forumContinuationPosition.cursor)
+            let posts = try await ForumService.shared.fetchPosts(postIDs: references.map(\.post_id))
+            let postsByID = Dictionary(posts.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            let cards = references.compactMap { postsByID[$0.post_id].map { makeForumCard($0) } }
+            let interactions = await fetchPostInteractionUpdates(for: cards)
+            guard !Task.isCancelled, generation == forumPaginationGeneration,
+                  transition == AuthService.shared.accountTransitionGeneration,
+                  accountScopeKey == userID.uuidString,
+                  AuthService.shared.isAuthenticatedRequestReady(for: userID) else { return }
+            var next = contentSnapshot
+            let unseen = HomeForumContinuationPosition.unseen(
+                cards.compactMap(\.postId),
+                after: (next.forumCards + homeFeaturedForumCards).compactMap(\.postId))
+            let cardsByID = Dictionary(cards.map { ($0.postId ?? $0.id, $0) },
+                                       uniquingKeysWith: { first, _ in first })
+            let appended = unseen.compactMap { cardsByID[$0] }
+            next.forumCards += appended
+            next.forumContinuationCards += appended
+            next.forumPostsByID.merge(postsByID, uniquingKeysWith: { _, new in new })
+            contentSnapshot = next
+            interactionStore.mergeServerSnapshots(interactions)
+            // Advance from raw RPC rows, including rows removed during hydration.
+            forumContinuationPosition.cursor = references.last ?? forumContinuationPosition.cursor
+            hasMoreForum = references.count == 20
+            forumPageNumber += 1
+        } catch {
+            guard generation == forumPaginationGeneration,
+                  accountScopeKey == userID.uuidString else { return }
+            forumPaginationError = L10n.tr("Couldn’t load more posts. Tap to retry.", "加载失败，点击重试")
+        }
+    }
+
     private var hasResolvedInitialData: Bool {
         hasResolvedInitialFeaturedBundleLoad
             && hasResolvedInitialForumLoad
@@ -590,11 +693,22 @@ class HomeViewModel: ObservableObject {
     }
 
     private func performRefresh(userID: UUID) async -> Bool {
+        let accountTransitionGeneration = AuthService.shared.accountTransitionGeneration
+        // Invalidate in-flight append requests before replacing a feed snapshot.
+        forumPaginationGeneration &+= 1
+        isLoadingMoreForum = false
+        isRefreshingForum = true
+        defer {
+            if accountScopeKey == userID.uuidString,
+               accountTransitionGeneration == AuthService.shared.accountTransitionGeneration,
+               !Task.isCancelled { isRefreshingForum = false }
+        }
         guard await AuthService.shared.prepareAuthenticatedRequest(
             expectedUserID: userID
-        ) else { return false }
+        ), !Task.isCancelled,
+           accountTransitionGeneration == AuthService.shared.accountTransitionGeneration,
+           accountScopeKey == userID.uuidString else { return false }
 
-        let accountTransitionGeneration = AuthService.shared.accountTransitionGeneration
         followingRequestGeneration &+= 1
         let requestGeneration = followingRequestGeneration
         let requestScopeKey = accountScopeKey
@@ -636,18 +750,20 @@ class HomeViewModel: ObservableObject {
               AuthService.shared.isAuthenticatedRequestReady(for: userID)
         else { return false }
         guard featured != nil || forum != nil || homeFeatured != nil || following != nil else {
+            forumRefreshError = L10n.tr("Couldn’t refresh Forum. Pull to retry.", "论坛刷新失败，请下拉重试")
             return false
         }
 
         let nextSeed = recommendationSeed &+ 0x9E37_79B9_7F4A_7C15
         let forumSourceCards = forum?.cards ?? forumCards
-        let nextForumCards = forum?.recommendationSessionID == nil
-            ? HomeRecommendationRanker.ranked(
-                forumSourceCards,
-                seed: nextSeed ^ 0xF04D_F04D,
-                limit: forumSourceCards.count
-            )
-            : forumSourceCards
+        // A failed forum refresh retains BOTH the prior cards and their session.
+        // It must not send a cached V2 sequence through the legacy random ranker.
+        let nextForumSessionID = forum != nil
+            ? forum?.recommendationSessionID
+            : contentSnapshot.recommendationSessionID
+        var nextForumCards = Self.orderForumCards(
+            forumSourceCards, sessionID: nextForumSessionID, seed: nextSeed ^ 0xF04D_F04D
+        )
         let nextSecondhandCards = HomeRecommendationRanker.ranked(
             featured?.cards ?? featuredSecondhandCards,
             seed: nextSeed ^ 0x5EC0_0DAD,
@@ -661,6 +777,16 @@ class HomeViewModel: ObservableObject {
                 badge: $0.badgeText,
                 isSystemPinned: true
             )
+        }
+        // Validate cached browsing rows without changing their chronological order
+        // or cursor. A validation error keeps the whole prior Forum snapshot.
+        var retainedContinuation: [HomeCardItem] = []
+        var canCommitForum = forum != nil
+        if let forum, forum.recommendationSessionID == contentSnapshot.recommendationSessionID {
+            do {
+                let allowed = try await feedService.validateForumPosts(contentSnapshot.forumContinuationCards.compactMap(\.postId))
+                retainedContinuation = contentSnapshot.forumContinuationCards.filter { allowed.contains($0.postId ?? $0.id) }
+            } catch { canCommitForum = false }
         }
         let interactionUpdates = await fetchPostInteractionUpdates(
             for: nextForumCards
@@ -676,7 +802,34 @@ class HomeViewModel: ObservableObject {
         else { return false }
 
         var nextSnapshot = contentSnapshot
-        if let forum {
+        if let forum, canCommitForum {
+            let changedSession = forum.recommendationSessionID != contentSnapshot.recommendationSessionID
+            if forumContinuationPosition.resolve(session: forum.recommendationSessionID) {
+                resetForumPagination(sessionID: forum.recommendationSessionID)
+                retainedContinuation = []
+            }
+            if let sessionID = forum.recommendationSessionID {
+                let priorGeneration = nextSnapshot.forumPresentation.generation
+                nextSnapshot.forumPresentation.resolve(account: userID, session: sessionID,
+                    candidates: forum.cards.compactMap(\.postId),
+                    featured: Set(nextHomeFeaturedCards.compactMap(\.postId)),
+                    intent: refreshCoordinator.explicitPullRequested ? .explicitPull : .normal)
+                let byID = Dictionary(uniqueKeysWithValues: forum.cards.map { ($0.postId ?? $0.id, $0) })
+                let presented = nextSnapshot.forumPresentation.orderedIDs.compactMap { byID[$0] }
+                let ids = Set(presented.compactMap(\.postId))
+                retainedContinuation.removeAll { ids.contains($0.postId ?? $0.id) }
+                nextForumCards = presented + retainedContinuation
+                let generation = nextSnapshot.forumPresentation.generation
+                let tiers = nextSnapshot.forumPresentation.tierCounts.map(String.init).joined(separator: ",")
+                let rotated = !changedSession && generation > priorGeneration
+                lifecycleLogger.info("session=\(sessionID.uuidString, privacy: .public) reused=\(forum.resolution?.reused ?? false) reason=\(forum.resolution?.reason ?? "unknown", privacy: .public) refresh_generation=\(generation) rotation_applied=\(rotated) tiers=\(tiers, privacy: .public)")
+            } else {
+                nextSnapshot.forumPresentation = HomeForumPresentation()
+            }
+            nextSnapshot.forumContinuationCards = retainedContinuation
+            nextSnapshot.forumSessionExpiresAt = forum.resolution?.expires_at
+            forumSessionDiagnostics = forum.resolution
+            forumRefreshError = nil
             nextSnapshot.forumPostsByID.merge(
                 forum.postsByID,
                 uniquingKeysWith: { _, refreshed in refreshed }
@@ -687,6 +840,9 @@ class HomeViewModel: ObservableObject {
                 sessionID: forum.recommendationSessionID,
                 positions: forum.recommendationPositions
             )
+        } else {
+            nextForumCards = forumCards
+            forumRefreshError = L10n.tr("Couldn’t refresh Forum. Pull to retry.", "论坛刷新失败，请下拉重试")
         }
         if let homeFeatured {
             nextSnapshot.forumPostsByID.merge(
@@ -720,7 +876,7 @@ class HomeViewModel: ObservableObject {
             nextSnapshot.followedAuthorIDs = following.followedAuthorIDs
         }
         nextSnapshot.hasResolvedInitialFeaturedBundleLoad = true
-        nextSnapshot.hasResolvedInitialForumLoad = true
+        nextSnapshot.hasResolvedInitialForumLoad = canCommitForum || contentSnapshot.hasResolvedInitialForumLoad
         nextSnapshot.hasResolvedInitialHomeFeaturedLoad = true
         nextSnapshot.hasResolvedInitialFollowingLoad = true
         var commitTransaction = Transaction()
@@ -827,11 +983,10 @@ class HomeViewModel: ObservableObject {
     ) async -> ForumSnapshot? {
         do {
             return try await withAuthenticatedRetry(expectedUserID: expectedUserID) {
-                let recommendation = try? await self.feedService
-                    .fetchRecommendationForumPreview(
-                        limit: 36,
-                        forceRefresh: true
-                    )
+                // An RPC failure must not bypass V2 eligibility through legacy
+                // fetching. Only an explicit server-off response returns nil.
+                let recommendation = try await self.feedService
+                    .resolveRecommendationForumPreview()
                 let previews: [HomeForumPreview]
                 let sessionID: UUID?
                 let positions: [UUID: Int]
@@ -857,7 +1012,8 @@ class HomeViewModel: ObservableObject {
                     },
                     postsByID: postsByID,
                     recommendationSessionID: sessionID,
-                    recommendationPositions: positions
+                    recommendationPositions: positions,
+                    resolution: recommendation?.resolution
                 )
             }
         } catch {

@@ -2,5 +2,6 @@
 // Developer-specific Supabase values belong in Local.xcconfig, which Git ignores.
 SUPABASE_AUTH_REDIRECT_URL = cheeseapp:/$()/auth/callback
 CHEESE_AI_TRIGGER_URL = https:/$()/ai.cheeseapp.org/v1/comment-events
+GOOGLE_IOS_CLIENT_ID = 539057328070-paqq6h8nin0e0klqp9c1o4610q4if2s4.apps.googleusercontent.com
 
 #include? "Local.xcconfig"

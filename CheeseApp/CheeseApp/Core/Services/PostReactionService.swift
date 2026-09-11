@@ -2,6 +2,63 @@ import Foundation
 import Combine
 import Supabase
 
+enum PostMutationFailure: LocalizedError {
+    case busy
+    case unavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .busy:
+            return L10n.tr("The server is busy. Please try again shortly.", "服务器暂时繁忙，请稍后重试。")
+        case .unavailable:
+            return L10n.tr("This post is unavailable. Please refresh and try again.", "该帖子暂时无法操作，请刷新后重试。")
+        }
+    }
+}
+
+enum PostMutationRetry {
+    // Only retry database errors that guarantee the entire request rolled back.
+    // Transport timeouts may have committed, so they must never be retried here.
+    static func isRetryable(_ error: Error) -> Bool {
+        guard let databaseError = error as? PostgrestError else { return false }
+        return databaseError.code == "55P03"
+            || databaseError.code == "40P01"
+            || databaseError.code == "40001"
+            || (databaseError.code == "57014"
+                && databaseError.message.lowercased().contains("statement timeout"))
+    }
+
+    @MainActor
+    static func perform<T>(
+        sleep: (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) },
+        operation: () async throws -> T
+    ) async throws -> T {
+        for attempt in 0..<3 {
+            try Task.checkCancellation()
+            do {
+                return try await operation()
+            } catch {
+                guard isRetryable(error) else { throw error }
+                guard attempt < 2 else { throw PostMutationFailure.busy }
+                try await sleep(UInt64(attempt + 1) * 300_000_000)
+            }
+        }
+        throw PostMutationFailure.busy
+    }
+}
+
+extension Error {
+    var postActionMessage: String {
+        if PostMutationRetry.isRetryable(self) {
+            return PostMutationFailure.busy.localizedDescription
+        }
+        if self is PostgrestError {
+            return L10n.tr("Unable to complete this action. Please refresh and try again.", "操作未完成，请刷新后重试。")
+        }
+        return localizedDescription
+    }
+}
+
 extension Error {
     var isCancellationLike: Bool {
         if self is CancellationError { return true }
@@ -377,22 +434,26 @@ final class PostFavoriteService {
         }
 
         if currentlyFavorited {
-            try await supabase
-                .database(Tables.favorites)
-                .delete()
-                .eq("user_id", value: userId.uuidString)
-                .eq("post_id", value: postId.uuidString)
-                .execute()
+            try await PostMutationRetry.perform {
+                _ = try await supabase
+                    .database(Tables.favorites)
+                    .delete()
+                    .eq("user_id", value: userId.uuidString)
+                    .eq("post_id", value: postId.uuidString)
+                    .execute()
+            }
             PostActivityMutationCenter.shared.markFavoritedChanged()
             PostInteractionStore.shared.setFavorite(postID: postId, isFavorited: false)
             return false
         }
 
         do {
-            try await supabase
-                .database(Tables.favorites)
-                .insert(PostFavoriteInsert(userId: userId, postId: postId))
-                .execute()
+            try await PostMutationRetry.perform {
+                _ = try await supabase
+                    .database(Tables.favorites)
+                    .insert(PostFavoriteInsert(userId: userId, postId: postId))
+                    .execute()
+            }
             PostActivityMutationCenter.shared.markFavoritedChanged()
             PostInteractionStore.shared.setFavorite(postID: postId, isFavorited: true)
             return true

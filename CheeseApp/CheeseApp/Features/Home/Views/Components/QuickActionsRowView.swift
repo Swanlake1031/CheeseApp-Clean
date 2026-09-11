@@ -93,7 +93,6 @@ struct HomeNavigationDrawerContainer: View {
     let onSecondhandCategoryTap: (SecondhandPost.Category) -> Void
     let onSettingsTap: () -> Void
     let onSupportTap: () -> Void
-    let onCourseTap: () -> Void
     let onCourseRadarTap: () -> Void
 
     @State private var isOpen = false
@@ -150,10 +149,6 @@ struct HomeNavigationDrawerContainer: View {
                     onSupportTap: {
                         closeDrawer()
                         onSupportTap()
-                    },
-                    onCourseTap: {
-                        closeDrawer()
-                        onCourseTap()
                     },
                     onCourseRadarTap: {
                         closeDrawer()
@@ -252,7 +247,6 @@ struct HomeNavigationDrawerView: View {
     let onSecondhandCategoryTap: (SecondhandPost.Category) -> Void
     let onSettingsTap: () -> Void
     let onSupportTap: () -> Void
-    let onCourseTap: () -> Void
     let onCourseRadarTap: () -> Void
 
     @State private var isSecondhandExpanded = true
@@ -318,13 +312,6 @@ struct HomeNavigationDrawerView: View {
                         subtitle: L10n.tr("WeChat support and app help", "微信客服与使用帮助"),
                         icon: "headphones",
                         action: onSupportTap
-                    )
-
-                    navigationRow(
-                        title: L10n.tr("Course ratings", "课程评分"),
-                        subtitle: L10n.tr("Courses, professors and outlines", "课程、教授与大纲"),
-                        icon: "graduationcap.fill",
-                        action: onCourseTap
                     )
 
                     navigationRow(

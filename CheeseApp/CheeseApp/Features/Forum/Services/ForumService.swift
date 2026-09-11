@@ -397,7 +397,7 @@ class ForumService: ObservableObject {
             throw NSError(
                 domain: "ForumPublishing",
                 code: 400,
-                userInfo: [NSLocalizedDescriptionKey: "请选择 Hashtag"]
+                userInfo: [NSLocalizedDescriptionKey: L10n.tr("Unable to load this post’s details. Please reopen it and retry.", "帖子资料加载失败，请重新打开后重试。")]
             )
         }
 
@@ -466,10 +466,12 @@ class ForumService: ObservableObject {
     }
 
     func deletePost(postID: UUID) async throws {
-        try await supabase.client.rpc(
-            "delete_forum_post_with_media",
-            params: ForumPostIDParams(postID: postID)
-        ).execute()
+        try await PostMutationRetry.perform {
+            _ = try await supabase.client.rpc(
+                "delete_forum_post_with_media",
+                params: ForumPostIDParams(postID: postID)
+            ).execute()
+        }
 
         posts.removeAll { $0.id == postID }
         await retryPendingMediaCleanup(postID: postID)
@@ -707,7 +709,7 @@ class ForumService: ObservableObject {
         } catch {
             if isCurrentAccountRequest(generation: requestGeneration),
                !error.isCancellationLike {
-                errorMessage = L10n.tr("Unable to load Hashtags", "Hashtag 加载失败")
+                errorMessage = L10n.tr("Unable to load forum sections", "论坛版块加载失败")
             }
         }
     }

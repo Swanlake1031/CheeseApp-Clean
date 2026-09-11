@@ -64,19 +64,6 @@
 		211A /* ProfileSocialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 211 /* ProfileSocialService.swift */; };
 		AUTHCRED02 /* AuthCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUTHCRED01 /* AuthCredentialStore.swift */; };
 		AVCRP02 /* AvatarImageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AVCRP01 /* AvatarImageViews.swift */; };
-		C01A /* CourseSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01 /* CourseSummary.swift */; };
-		C04A /* CourseDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04 /* CourseDiscoveryView.swift */; };
-		C05A /* CourseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05 /* CourseDetailView.swift */; };
-		C06A /* CourseOutline.swift in Sources */ = {isa = PBXBuildFile; fileRef = C06 /* CourseOutline.swift */; };
-		C07A /* CourseOutlineService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07 /* CourseOutlineService.swift */; };
-		C08A /* CourseOutlineViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C08 /* CourseOutlineViewerView.swift */; };
-		C09A /* CourseReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09 /* CourseReview.swift */; };
-		C10A /* CourseReviewService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10 /* CourseReviewService.swift */; };
-		C11A /* CourseReviewViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11 /* CourseReviewViewModel.swift */; };
-		C12A /* CourseReviewSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12 /* CourseReviewSection.swift */; };
-		C13A /* CourseCatalogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13 /* CourseCatalogService.swift */; };
-		C14A /* CourseDiscoveryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14 /* CourseDiscoveryViewModel.swift */; };
-		C15A /* CoursePageBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15 /* CoursePageBackground.swift */; };
 		CFOLBLD1 /* ChatFollowSearchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFOLFILE1 /* ChatFollowSearchViews.swift */; };
 		CFVMBLD1 /* ChatFollowSearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFVMFILE1 /* ChatFollowSearchViewModel.swift */; };
 		CGDTBLD1 /* ChatGroupDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CGDTFILE1 /* ChatGroupDetailsView.swift */; };
@@ -97,6 +84,7 @@
 		DBA54BA22F2D43DA0073E17A /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA12F2D43DA0073E17A /* Realtime */; };
 		DBA54BA42F2D43DA0073E17A /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA32F2D43DA0073E17A /* Storage */; };
 		DBA54BA72F2D44C30073E17A /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA62F2D44C30073E17A /* Supabase */; };
+		GIDPKGBLD1 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = GIDPKGPROD1 /* GoogleSignIn */; };
 		FBRDBLD1 /* ForumBoardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBRDFILE1 /* ForumBoardViews.swift */; };
 		FCARDBLD1 /* ForumPostCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCARDFILE1 /* ForumPostCardView.swift */; };
 		FDETBLD1 /* ForumDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDETFILE1 /* ForumDetailView.swift */; };
@@ -136,10 +124,7 @@
 		TSTBLD08 /* HomeFeedServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE08 /* HomeFeedServiceTests.swift */; };
 		TSTBLD09 /* SearchProfileResultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE09 /* SearchProfileResultTests.swift */; };
 		TSTBLD10 /* AuthCredentialStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE10 /* AuthCredentialStoreTests.swift */; };
-		TSTBLD11 /* CourseOutlineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE11 /* CourseOutlineTests.swift */; };
-		TSTBLD12 /* CourseReviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE12 /* CourseReviewTests.swift */; };
 		TSTBLD13 /* SearchPaginationViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE13 /* SearchPaginationViewModelTests.swift */; };
-		TSTBLD14 /* CourseDiscoveryFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE14 /* CourseDiscoveryFilterTests.swift */; };
 		TSTBLD15 /* ChatAccountIsolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE15 /* ChatAccountIsolationTests.swift */; };
 		TSTBLD16 /* SystemMessageViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE16 /* SystemMessageViewModelTests.swift */; };
 		TSTBLD17 /* MentionTextLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTFILE17 /* MentionTextLogicTests.swift */; };
@@ -218,19 +203,6 @@
 		AAA /* CheeseApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CheeseApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AUTHCRED01 /* AuthCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthCredentialStore.swift; sourceTree = "<group>"; };
 		AVCRP01 /* AvatarImageViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarImageViews.swift; sourceTree = "<group>"; };
-		C01 /* CourseSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseSummary.swift; sourceTree = "<group>"; };
-		C04 /* CourseDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseDiscoveryView.swift; sourceTree = "<group>"; };
-		C05 /* CourseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseDetailView.swift; sourceTree = "<group>"; };
-		C06 /* CourseOutline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseOutline.swift; sourceTree = "<group>"; };
-		C07 /* CourseOutlineService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseOutlineService.swift; sourceTree = "<group>"; };
-		C08 /* CourseOutlineViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseOutlineViewerView.swift; sourceTree = "<group>"; };
-		C09 /* CourseReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseReview.swift; sourceTree = "<group>"; };
-		C10 /* CourseReviewService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseReviewService.swift; sourceTree = "<group>"; };
-		C11 /* CourseReviewViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseReviewViewModel.swift; sourceTree = "<group>"; };
-		C12 /* CourseReviewSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseReviewSection.swift; sourceTree = "<group>"; };
-		C13 /* CourseCatalogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseCatalogService.swift; sourceTree = "<group>"; };
-		C14 /* CourseDiscoveryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseDiscoveryViewModel.swift; sourceTree = "<group>"; };
-		C15 /* CoursePageBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoursePageBackground.swift; sourceTree = "<group>"; };
 		CFGSHARED /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		CFOLFILE1 /* ChatFollowSearchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFollowSearchViews.swift; sourceTree = "<group>"; };
 		CFVMFILE1 /* ChatFollowSearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFollowSearchViewModel.swift; sourceTree = "<group>"; };
@@ -285,10 +257,7 @@
 		TSTFILE08 /* HomeFeedServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFeedServiceTests.swift; sourceTree = "<group>"; };
 		TSTFILE09 /* SearchProfileResultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchProfileResultTests.swift; sourceTree = "<group>"; };
 		TSTFILE10 /* AuthCredentialStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthCredentialStoreTests.swift; sourceTree = "<group>"; };
-		TSTFILE11 /* CourseOutlineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseOutlineTests.swift; sourceTree = "<group>"; };
-		TSTFILE12 /* CourseReviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseReviewTests.swift; sourceTree = "<group>"; };
 		TSTFILE13 /* SearchPaginationViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchPaginationViewModelTests.swift; sourceTree = "<group>"; };
-		TSTFILE14 /* CourseDiscoveryFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseDiscoveryFilterTests.swift; sourceTree = "<group>"; };
 		TSTFILE15 /* ChatAccountIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAccountIsolationTests.swift; sourceTree = "<group>"; };
 		TSTFILE16 /* SystemMessageViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMessageViewModelTests.swift; sourceTree = "<group>"; };
 		TSTFILE17 /* MentionTextLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionTextLogicTests.swift; sourceTree = "<group>"; };
@@ -303,6 +272,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				GIDPKGBLD1 /* GoogleSignIn in Frameworks */,
 				DBA54BA02F2D43DA0073E17A /* PostgREST in Frameworks */,
 				DBA54B9E2F2D43DA0073E17A /* Functions in Frameworks */,
 				DBA54BA72F2D44C30073E17A /* Supabase in Frameworks */,
@@ -477,7 +447,6 @@
 				GS0 /* Search */,
 				GCR /* Create */,
 				G32 /* Secondhand */,
-				G34 /* Courses */,
 				G35 /* Forum */,
 				G36 /* Chat */,
 				G37 /* Profile */,
@@ -519,17 +488,6 @@
 				192 /* SecondhandService.swift */,
 			);
 			path = Services;
-			sourceTree = "<group>";
-		};
-		G34 /* Courses */ = {
-			isa = PBXGroup;
-			children = (
-				GC4 /* Models */,
-				GC5 /* Services */,
-				GC6 /* ViewModels */,
-				GC7 /* Views */,
-			);
-			path = Courses;
 			sourceTree = "<group>";
 		};
 		G35 /* Forum */ = {
@@ -745,55 +703,6 @@
 			path = Sharing;
 			sourceTree = "<group>";
 		};
-		GC4 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				C01 /* CourseSummary.swift */,
-				C06 /* CourseOutline.swift */,
-				C09 /* CourseReview.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		GC5 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				C13 /* CourseCatalogService.swift */,
-				C07 /* CourseOutlineService.swift */,
-				C10 /* CourseReviewService.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		GC6 /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-				C14 /* CourseDiscoveryViewModel.swift */,
-				C11 /* CourseReviewViewModel.swift */,
-			);
-			path = ViewModels;
-			sourceTree = "<group>";
-		};
-		GC7 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				C04 /* CourseDiscoveryView.swift */,
-				C05 /* CourseDetailView.swift */,
-				C08 /* CourseOutlineViewerView.swift */,
-				C12 /* CourseReviewSection.swift */,
-				GC8 /* Components */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
-		GC8 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				C15 /* CoursePageBackground.swift */,
-			);
-			path = Components;
-			sourceTree = "<group>";
-		};
 		GCONFIG /* Configuration */ = {
 			isa = PBXGroup;
 			children = (
@@ -916,10 +825,7 @@
 				TSTFILE08 /* HomeFeedServiceTests.swift */,
 				TSTFILE09 /* SearchProfileResultTests.swift */,
 				TSTFILE10 /* AuthCredentialStoreTests.swift */,
-				TSTFILE11 /* CourseOutlineTests.swift */,
-				TSTFILE12 /* CourseReviewTests.swift */,
 				TSTFILE13 /* SearchPaginationViewModelTests.swift */,
-				TSTFILE14 /* CourseDiscoveryFilterTests.swift */,
 				TSTFILE15 /* ChatAccountIsolationTests.swift */,
 				TSTFILE16 /* SystemMessageViewModelTests.swift */,
 				TSTFILE17 /* MentionTextLogicTests.swift */,
@@ -946,6 +852,7 @@
 			);
 			name = CheeseApp;
 			packageProductDependencies = (
+				GIDPKGPROD1 /* GoogleSignIn */,
 				DBA54B9B2F2D43DA0073E17A /* Auth */,
 				DBA54B9D2F2D43DA0073E17A /* Functions */,
 				DBA54B9F2F2D43DA0073E17A /* PostgREST */,
@@ -1008,6 +915,7 @@
 			mainGroup = G00;
 			packageReferences = (
 				PKGREF1 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				GIDPKGREF1 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			productRefGroup = G02 /* Products */;
 			projectDirPath = "";
@@ -1131,19 +1039,6 @@
 				H03 /* HomeViewModel.swift in Sources */,
 				H04 /* HomeView.swift in Sources */,
 				H07 /* QuickActionsRowView.swift in Sources */,
-				C01A /* CourseSummary.swift in Sources */,
-				C04A /* CourseDiscoveryView.swift in Sources */,
-				C05A /* CourseDetailView.swift in Sources */,
-				C06A /* CourseOutline.swift in Sources */,
-				C07A /* CourseOutlineService.swift in Sources */,
-				C08A /* CourseOutlineViewerView.swift in Sources */,
-				C09A /* CourseReview.swift in Sources */,
-				C10A /* CourseReviewService.swift in Sources */,
-				C11A /* CourseReviewViewModel.swift in Sources */,
-				C12A /* CourseReviewSection.swift in Sources */,
-				C13A /* CourseCatalogService.swift in Sources */,
-				C14A /* CourseDiscoveryViewModel.swift in Sources */,
-				C15A /* CoursePageBackground.swift in Sources */,
 				H09 /* HomeFeedService.swift in Sources */,
 				S01 /* SearchView.swift in Sources */,
 				S02 /* SearchService.swift in Sources */,
@@ -1172,10 +1067,7 @@
 				TSTBLD08 /* HomeFeedServiceTests.swift in Sources */,
 				TSTBLD09 /* SearchProfileResultTests.swift in Sources */,
 				TSTBLD10 /* AuthCredentialStoreTests.swift in Sources */,
-				TSTBLD11 /* CourseOutlineTests.swift in Sources */,
-				TSTBLD12 /* CourseReviewTests.swift in Sources */,
 				TSTBLD13 /* SearchPaginationViewModelTests.swift in Sources */,
-				TSTBLD14 /* CourseDiscoveryFilterTests.swift in Sources */,
 				TSTBLD15 /* ChatAccountIsolationTests.swift in Sources */,
 				TSTBLD16 /* SystemMessageViewModelTests.swift in Sources */,
 				TSTBLD17 /* MentionTextLogicTests.swift in Sources */,
@@ -1469,6 +1361,14 @@
 				minimumVersion = 2.0.0;
 			};
 		};
+		GIDPKGREF1 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.2.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1501,6 +1401,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = PKGREF1 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		GIDPKGPROD1 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = GIDPKGREF1 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

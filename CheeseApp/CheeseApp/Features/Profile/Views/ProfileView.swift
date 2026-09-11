@@ -24,7 +24,6 @@ struct ProfileView: View {
     let isActive: Bool
     let onOpenForum: () -> Void
     let onOpenSecondhand: (SecondhandPost.Category?) -> Void
-    let onOpenCourses: () -> Void
     @State private var showingEditProfile = false
     @State private var showingAvatarEditor = false
     @State private var isLoadingSocialSummary = false
@@ -66,13 +65,11 @@ struct ProfileView: View {
     init(
         isActive: Bool = true,
         onOpenForum: @escaping () -> Void = {},
-        onOpenSecondhand: @escaping (SecondhandPost.Category?) -> Void = { _ in },
-        onOpenCourses: @escaping () -> Void = {}
+        onOpenSecondhand: @escaping (SecondhandPost.Category?) -> Void = { _ in }
     ) {
         self.isActive = isActive
         self.onOpenForum = onOpenForum
         self.onOpenSecondhand = onOpenSecondhand
-        self.onOpenCourses = onOpenCourses
     }
 
     var body: some View {
@@ -152,7 +149,6 @@ struct ProfileView: View {
                 onSecondhandCategoryTap: { onOpenSecondhand($0) },
                 onSettingsTap: { showSettings = true },
                 onSupportTap: { showCustomerSupport = true },
-                onCourseTap: onOpenCourses,
                 onCourseRadarTap: { openURL(AppExternalLinks.courseRadar) }
             )
         }

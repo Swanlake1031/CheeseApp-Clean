@@ -420,8 +420,18 @@ final class UserPostsService: ObservableObject {
         }
     }
 
-    func delete(postId: UUID) async throws {
-        let deletionEvent = try? await deletionEventPayload(for: postId)
+    func delete(postId: UUID, kind knownKind: PostKind? = nil) async throws {
+        let deletionEvent: DeletionEventPayload?
+        if let knownKind {
+            deletionEvent = DeletionEventPayload(
+                kind: knownKind,
+                authorId: try await AuthService.shared.requireAuthUserId()
+            )
+        } else {
+            deletionEvent = try await PostMutationRetry.perform {
+                try await deletionEventPayload(for: postId)
+            }
+        }
         if let deletionEvent {
             switch deletionEvent.kind {
             case .secondhand:
@@ -433,7 +443,7 @@ final class UserPostsService: ObservableObject {
                 try await ForumService.shared.deletePost(postID: postId)
             }
         } else {
-            try await deleteBasePost(postId: postId)
+            throw PostMutationFailure.unavailable
         }
 
         posts.removeAll { $0.id == postId }
@@ -468,14 +478,6 @@ final class UserPostsService: ObservableObject {
                 postId: postId
             )
         }
-    }
-
-    private func deleteBasePost(postId: UUID) async throws {
-        try await supabase
-            .database("posts")
-            .delete()
-            .eq("id", value: postId.uuidString)
-            .execute()
     }
 
     func fetchForumEditFields(postId: UUID) async throws -> ForumEditableFields {

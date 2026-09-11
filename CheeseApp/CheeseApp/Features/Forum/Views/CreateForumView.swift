@@ -62,13 +62,12 @@ struct CreateForumView: View {
     private var selectedBoard: ForumBoard? {
         service.boards.first { $0.id == selectedBoardID && $0.status == .active }
             ?? initialBoard.flatMap { $0.status == .active ? $0 : nil }
+            ?? service.boards.first { $0.slug == "casual-chat" && $0.status == .active }
     }
 
     var body: some View {
         ForumPostEditorSurface(
             isEditing: false,
-            boards: service.boards,
-            selectedBoardID: $selectedBoardID,
             isAnonymous: $isAnonymous,
             title: $title,
             content: $content,
@@ -92,10 +91,6 @@ struct CreateForumView: View {
                 CreateDraftStore.clear(.forum)
                 CreateComposerSessionStore.clear(.forum)
                 showDraftBanner(L10n.tr("Draft cleared", "草稿已清空"))
-            },
-            onBoardSelected: { board in
-                selectedBoardID = board.id
-                errorMessage = nil
             }
         )
         .alert(L10n.tr("Post not published", "帖子尚未发布"), isPresented: $showExitDraftPrompt) {
@@ -172,11 +167,6 @@ struct CreateForumView: View {
             return
         }
 
-        guard selectedBoard != nil else {
-            presentValidationMessage(L10n.tr("Please choose a Hashtag", "请选择 Hashtag"))
-            return
-        }
-
         errorMessage = nil
         dismissKeyboard()
         Task { await submit() }
@@ -195,14 +185,16 @@ struct CreateForumView: View {
             presentValidationMessage(L10n.tr("Please enter a title", "请填写标题"))
             return
         }
-        guard let board = selectedBoard else {
-            presentValidationMessage(L10n.tr("Please choose a Hashtag", "请选择 Hashtag"))
-            return
-        }
-
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+
+        // The board is internal routing metadata, never a user-required tag.
+        if selectedBoard == nil { await service.fetchBoards() }
+        guard let board = selectedBoard else {
+            presentValidationMessage(L10n.tr("Unable to publish right now. Please retry.", "暂时无法发布，请重试。"))
+            return
+        }
 
         do {
             let userID = try await AuthService.shared.requireAuthUserId()

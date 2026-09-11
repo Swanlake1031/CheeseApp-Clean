@@ -4,17 +4,243 @@ import Supabase
 @testable import CheeseApp
 
 final class HomeFeedServiceTests: XCTestCase {
-    func testRecommendationSessionPaginationKeepsSessionAndAdvancesByPage() {
-        let sessionID = UUID()
-        var state = RecommendationSessionPaginationState(sessionID: sessionID)
+    func testFailedRefreshOrPaginationStopsAutomaticFooterRetries() {
+        XCTAssertTrue(HomeForumContinuationPosition.allowsAutomaticLoad(refreshError: nil, paginationError: nil))
+        XCTAssertFalse(HomeForumContinuationPosition.allowsAutomaticLoad(refreshError: "expired session refresh failed", paginationError: nil))
+        XCTAssertFalse(HomeForumContinuationPosition.allowsAutomaticLoad(refreshError: nil, paginationError: "page failed"))
+        XCTAssertFalse(HomeForumContinuationPosition.allowsAutomaticLoad(refreshError: "refresh failed", paginationError: "page failed"))
+        let ids = (0..<4).map { _ in UUID() }
+        XCTAssertEqual(HomeForumContinuationPosition.unseen([], after: ids), [])
+        XCTAssertEqual(HomeForumContinuationPosition.unseen(ids + ids, after: ids), [])
+        XCTAssertEqual(HomeForumContinuationPosition.unseen([ids[3], ids[2], ids[3], ids[0]], after: [ids[0], ids[1]]), [ids[3], ids[2]])
+    }
 
-        state.recordPage(itemCount: 20)
-        XCTAssertEqual(state.sessionID, sessionID)
-        XCTAssertEqual(state.offset, 20)
+    @MainActor
+    func testFailedRefreshCanRetryWithoutLeakingPullIntent() async {
+        let coordinator = HomeRefreshCoordinator()
+        let failed = await coordinator.run(intent: .explicitPull) { false }
+        XCTAssertFalse(failed)
+        XCTAssertFalse(coordinator.explicitPullRequested)
+        let retried = await coordinator.run(intent: .normal) {
+            XCTAssertFalse(coordinator.explicitPullRequested)
+            return true
+        }
+        XCTAssertTrue(retried)
+    }
 
-        state.recordPage(itemCount: 20)
-        XCTAssertEqual(state.sessionID, sessionID)
-        XCTAssertEqual(state.offset, 40)
+    func testSameSessionRotationPreservesContinuationCursorAndNewSessionResetsIt() {
+        let session = UUID(), ids = (0..<5).map { _ in UUID() }
+        let cursor = ForumContinuationReference(post_id: UUID(), created_at: "2026-09-10T00:00:00.123456Z")
+        var position = HomeForumContinuationPosition()
+        XCTAssertTrue(position.resolve(session: session))
+        position.cursor = cursor
+        position.exclusions = ids
+        for _ in 0..<3 {
+            XCTAssertFalse(position.resolve(session: session))
+            XCTAssertEqual(position.cursor, cursor)
+            XCTAssertEqual(position.exclusions, ids)
+        }
+        XCTAssertTrue(position.resolve(session: UUID()))
+        XCTAssertNil(position.cursor)
+        XCTAssertNil(position.exclusions)
+        XCTAssertEqual(HomeForumContinuationPosition.unseen([ids[0],ids[2],ids[2],ids[3]], after: [ids[0],ids[1]]), [ids[2],ids[3]])
+    }
+
+    func testRefreshThreeStableTiers() {
+        let ids = (0..<6).map { _ in UUID() }
+        XCTAssertEqual(HomeForumPresentation.tiers(ids, previous: Array(ids[0..<2]), older: Array(ids[2..<4])),
+                       [Array(ids[4..<6]), Array(ids[2..<4]), Array(ids[0..<2])])
+    }
+
+    func testExplicitPullRotatesWithinSameSessionAndBoundsHistory() {
+        let account = UUID(), session = UUID(), ids = (0..<60).map { _ in UUID() }
+        var state = HomeForumPresentation()
+        state.resolve(account: account, session: session, candidates: ids, featured: [], intent: .normal)
+        XCTAssertEqual(state.orderedIDs, ids)
+        XCTAssertEqual(state.generation, 0)
+        state.resolve(account: account, session: session, candidates: ids, featured: [], intent: .explicitPull)
+        XCTAssertEqual(Array(state.orderedIDs.prefix(20)), Array(ids[20..<40]))
+        state.resolve(account: account, session: session, candidates: ids, featured: [], intent: .explicitPull)
+        XCTAssertEqual(Array(state.orderedIDs.prefix(20)), Array(ids[40..<60]))
+        XCTAssertEqual(state.sessionID, session)
+        XCTAssertEqual(state.generation, 2)
+        for _ in 0..<10 { state.resolve(account: account, session: session, candidates: ids, featured: [], intent: .explicitPull) }
+        XCTAssertEqual(state.recentTops.count, 2)
+        XCTAssertTrue(state.recentTops.allSatisfy { $0.count == 20 })
+        XCTAssertEqual(Set(state.orderedIDs), Set(ids))
+    }
+
+    func testNormalLifecycleRequestsDoNotRotate() {
+        let account = UUID(), session = UUID(), ids = (0..<45).map { _ in UUID() }
+        var state = HomeForumPresentation()
+        state.resolve(account: account, session: session, candidates: ids, featured: [], intent: .normal)
+        state.resolve(account: account, session: session, candidates: ids, featured: [], intent: .explicitPull)
+        let order = state.orderedIDs, history = state.recentTops
+        for event in ["view appearance", "foreground", "tab switch", "home reselect"] {
+            state.resolve(account: account, session: session, candidates: ids, featured: [], intent: .normal)
+            XCTAssertEqual(state.orderedIDs, order, event)
+            XCTAssertEqual(state.recentTops, history, event)
+            XCTAssertEqual(state.generation, 1, event)
+        }
+    }
+
+    func testNewSessionAndAccountResetRotationIncludingExpiredPull() {
+        let a = UUID(), b = UUID(), s1 = UUID(), s2 = UUID(), ids = (0..<45).map { _ in UUID() }
+        var state = HomeForumPresentation()
+        state.resolve(account: a, session: s1, candidates: ids, featured: [], intent: .normal)
+        state.resolve(account: a, session: s1, candidates: ids, featured: [], intent: .explicitPull)
+        state.resolve(account: a, session: s2, candidates: ids, featured: [], intent: .explicitPull)
+        XCTAssertEqual(state.orderedIDs, ids)
+        XCTAssertEqual(state.generation, 0)
+        XCTAssertEqual(state.recentTops.count, 1)
+        state.resolve(account: b, session: s2, candidates: Array(ids.reversed()), featured: [], intent: .normal)
+        XCTAssertEqual(state.accountID, b)
+        XCTAssertEqual(state.orderedIDs, Array(ids.reversed()))
+        XCTAssertEqual(state.generation, 0)
+    }
+
+    func testProcessRestartForgetsOnlyPresentationNotServerSessionIdentity() {
+        let account = UUID(), session = UUID(), ids = (0..<25).map { _ in UUID() }
+        var restarted = HomeForumPresentation()
+        restarted.resolve(account: account, session: session, candidates: ids, featured: [], intent: .normal)
+        XCTAssertEqual(restarted.sessionID, session)
+        XCTAssertEqual(restarted.orderedIDs, ids)
+        XCTAssertEqual(restarted.generation, 0)
+    }
+
+    func testSmallInventoryDefersRatherThanDeletesAndFeaturedNeverUsesHistorySlots() {
+        let account = UUID(), session = UUID(), ids = (0..<26).map { _ in UUID() }, featured = UUID()
+        var state = HomeForumPresentation()
+        state.resolve(account: account, session: session, candidates: [featured] + ids, featured: [featured], intent: .normal)
+        state.resolve(account: account, session: session, candidates: [featured] + ids, featured: [featured], intent: .explicitPull)
+        XCTAssertEqual(state.orderedIDs, Array(ids[20..<26]) + Array(ids[0..<20]))
+        XCTAssertFalse(state.recentTops.flatMap { $0 }.contains(featured))
+        XCTAssertEqual(state.tierCounts, [6, 0, 20])
+        for count in [0, 1, 5, 20] {
+            var small = HomeForumPresentation()
+            let subset = Array(ids.prefix(count))
+            small.resolve(account: account, session: session, candidates: subset, featured: [], intent: .normal)
+            small.resolve(account: account, session: session, candidates: subset, featured: [], intent: .explicitPull)
+            XCTAssertEqual(small.orderedIDs, subset)
+        }
+    }
+
+    @MainActor
+    func testOverlappingPullsCoalesceAndRotateOnce() async {
+        let coordinator = HomeRefreshCoordinator()
+        var calls = 0
+        var release: CheckedContinuation<Void, Never>?
+        let first = Task { await coordinator.run(intent: .explicitPull) {
+            calls += 1
+            await withCheckedContinuation { release = $0 }
+            XCTAssertTrue(coordinator.explicitPullRequested)
+            return true
+        } }
+        while release == nil { await Task.yield() }
+        var secondStarted = false
+        let second = Task {
+            secondStarted = true
+            return await coordinator.run(intent: .explicitPull) { calls += 1; return true }
+        }
+        while !secondStarted { await Task.yield() }
+        release?.resume()
+        let a = await first.value, b = await second.value
+        XCTAssertTrue(a && b)
+        XCTAssertEqual(calls, 1)
+        XCTAssertFalse(coordinator.explicitPullRequested)
+    }
+
+    @MainActor
+    func testPullDuringNormalRequestUpgradesIntentWithoutSecondRequest() async {
+        let coordinator = HomeRefreshCoordinator()
+        var release: CheckedContinuation<Void, Never>?
+        let normal = Task { await coordinator.run(intent: .normal) {
+            await withCheckedContinuation { release = $0 }
+            return coordinator.explicitPullRequested
+        } }
+        while release == nil { await Task.yield() }
+        let pull = Task { await coordinator.run(intent: .explicitPull) { XCTFail("duplicate request"); return false } }
+        while !coordinator.explicitPullRequested { await Task.yield() }
+        release?.resume()
+        let a = await normal.value, b = await pull.value
+        XCTAssertTrue(a && b)
+    }
+
+    @MainActor
+    func testCancelledAccountOperationCannotClearNewRequestIntent() async {
+        let coordinator = HomeRefreshCoordinator()
+        var oldRelease: CheckedContinuation<Void, Never>?
+        var newRelease: CheckedContinuation<Void, Never>?
+        let old = Task { await coordinator.run(intent: .explicitPull) {
+            await withCheckedContinuation { oldRelease = $0 }; return !Task.isCancelled
+        } }
+        while oldRelease == nil { await Task.yield() }
+        coordinator.cancel()
+        let new = Task { await coordinator.run(intent: .explicitPull) {
+            await withCheckedContinuation { newRelease = $0 }; return !Task.isCancelled
+        } }
+        while newRelease == nil { await Task.yield() }
+        oldRelease?.resume()
+        let oldResult = await old.value
+        XCTAssertFalse(oldResult)
+        XCTAssertTrue(coordinator.explicitPullRequested)
+        newRelease?.resume()
+        let newResult = await new.value
+        XCTAssertTrue(newResult)
+    }
+
+    @MainActor
+    func testForumTabDoesNotTruncateAfterTwelveOrSixtyPosts() {
+        let board = UUID()
+        let cards = (0..<125).map {
+            HomeCardItem(postId: UUID(), title: "Post \($0)", subtitle: "", boardID: board)
+        }
+        XCTAssertEqual(HomeViewModel.composeForumTabCards(
+            featured: [], ranked: cards, selectedBoardID: board).map(\.id), cards.map(\.id))
+    }
+
+    func testForumContinuationPreservesMicrosecondCursor() throws {
+        let id = UUID()
+        let json = "{\"post_id\":\"\(id)\",\"created_at\":\"2026-09-01T00:00:00.123456+00:00\"}"
+        let cursor = try JSONDecoder().decode(ForumContinuationReference.self, from: Data(json.utf8))
+        XCTAssertEqual(cursor.post_id, id)
+        XCTAssertEqual(cursor.created_at, "2026-09-01T00:00:00.123456+00:00")
+    }
+
+    @MainActor
+    func testForumTabUsesServerOrderWithFeaturedDeduplication() {
+        let board = UUID()
+        let pinned = HomeCardItem(postId: UUID(), title: "Pinned", subtitle: "", boardID: board, isSystemPinned: true)
+        let ranked = (0..<15).map { HomeCardItem(postId: UUID(), title: "Rank \($0)", subtitle: "", boardID: board) }
+        let cards = HomeViewModel.composeForumTabCards(featured: [pinned], ranked: ranked + [pinned], selectedBoardID: nil)
+        XCTAssertEqual(cards.map(\.id), ([pinned] + ranked).map(\.id))
+    }
+
+    @MainActor
+    func testForumBoardFilterPreservesV2RelativeOrder() {
+        let selected = UUID()
+        let other = UUID()
+        let cards = [selected, other, selected].map { HomeCardItem(postId: UUID(), title: "Post", subtitle: "", boardID: $0) }
+        XCTAssertEqual(HomeViewModel.composeForumTabCards(featured: [], ranked: cards, selectedBoardID: selected).map(\.id),
+                       [cards[0].id, cards[2].id])
+    }
+
+    @MainActor
+    func testCachedForumSessionOrderDoesNotChangeWithRefreshSeed() {
+        let cards = (0..<15).map { HomeCardItem(postId: UUID(), title: "Rank \($0)", subtitle: "") }
+        let session = UUID()
+        for seed in [UInt64(0), 1, 100, UInt64.max] {
+            XCTAssertEqual(HomeViewModel.orderForumCards(cards, sessionID: session, seed: seed).map(\.id), cards.map(\.id))
+        }
+    }
+
+    func testV2FeaturedEligibilityPreservesExistingOrderAndBadges() {
+        let first = HomeFeaturedPost(postID: UUID(), badge: "First", displayOrder: 1)
+        let excluded = HomeFeaturedPost(postID: UUID(), badge: nil, displayOrder: 2)
+        let last = HomeFeaturedPost(postID: UUID(), badge: "Last", displayOrder: 3)
+        XCTAssertEqual(HomeFeedService.eligibleFeaturedPosts(
+            [first, excluded, last], allowedIDs: [last.postID, first.postID]), [first, last])
+        XCTAssertTrue(HomeFeedService.eligibleFeaturedPosts([first], allowedIDs: []).isEmpty)
     }
 
     func testRecommendationVisibilityThresholdsIgnoreFastScrolling() {
@@ -225,15 +451,14 @@ final class HomeFeedServiceTests: XCTestCase {
             category: .secondhand,
             views: 72
         )
-        let course = makeCard(title: "Course", category: .course, views: 45)
 
         let ranked = HomeViewRanker.rankedByViews(
-            [forum, secondhand, course]
+            [forum, secondhand]
         )
 
         XCTAssertEqual(
             ranked.map(\.title),
-            ["Secondhand", "Course", "Forum"]
+            ["Secondhand", "Forum"]
         )
     }
 
@@ -251,16 +476,16 @@ final class HomeFeedServiceTests: XCTestCase {
             category: .forum,
             views: 100
         )
-        let course = makeCard(title: "Course", category: .course, views: 50)
+        let secondhand = makeCard(title: "Secondhand", category: .secondhand, views: 50)
         let forum = makeCard(title: "Forum", category: .forum, views: 20)
 
         let ranked = HomeViewRanker.featuredFirst(
             [official],
-            rankedCards: [forum, duplicate, course],
+            rankedCards: [forum, duplicate, secondhand],
             limit: 3
         )
 
-        XCTAssertEqual(ranked.map(\.title), ["MSAF", "Course", "Forum"])
+        XCTAssertEqual(ranked.map(\.title), ["MSAF", "Secondhand", "Forum"])
         XCTAssertEqual(ranked.filter { $0.postId == postID }.count, 1)
     }
 

@@ -1,0 +1,8 @@
+{
+  "extends": "../../cheeseapp-ai-worker/tsconfig.json",
+  "compilerOptions": {
+    "typeRoots": ["../../cheeseapp-ai-worker/node_modules/@types", "../../cheeseapp-ai-worker/node_modules"],
+    "noEmit": true
+  },
+  "include": ["embed_dataset.ts", "tests/*.test.ts"]
+}

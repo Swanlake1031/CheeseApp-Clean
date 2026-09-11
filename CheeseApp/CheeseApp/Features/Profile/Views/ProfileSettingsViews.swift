@@ -602,6 +602,9 @@ struct SettingsView: View {
             await loadAccountIdentityStatuses(forceRefresh: true)
             settingsError = nil
         } catch {
+            if AuthService.isUserCancelledSocialSignIn(error) {
+                return
+            }
             settingsError = error.localizedDescription
         }
     }
@@ -621,6 +624,9 @@ struct SettingsView: View {
             await loadAccountIdentityStatuses(forceRefresh: true)
             settingsError = nil
         } catch {
+            if AuthService.isUserCancelledSocialSignIn(error) {
+                return
+            }
             settingsError = error.localizedDescription
         }
     }

@@ -1,0 +1,3293 @@
+{
+  "status": "candidate_offline_only",
+  "seed": 20260909,
+  "confidence_threshold": 0.8,
+  "max_fpr": 0.05,
+  "min_recall": 0.1,
+  "threshold_sweep": [
+    {
+      "threshold": 0.5,
+      "confusion_matrix": [
+        [
+          14,
+          2
+        ],
+        [
+          2,
+          14
+        ]
+      ],
+      "n": 32,
+      "accuracy": 0.875,
+      "precision": 0.875,
+      "recall": 0.875,
+      "f1": 0.875,
+      "fpr": 0.125,
+      "fnr": 0.125,
+      "accepted": 16,
+      "fpr_wilson_upper_95": 0.3602282726575869
+    },
+    {
+      "threshold": 0.55,
+      "confusion_matrix": [
+        [
+          16,
+          0
+        ],
+        [
+          3,
+          13
+        ]
+      ],
+      "n": 32,
+      "accuracy": 0.90625,
+      "precision": 1.0,
+      "recall": 0.8125,
+      "f1": 0.896551724137931,
+      "fpr": 0.0,
+      "fnr": 0.1875,
+      "accepted": 13,
+      "fpr_wilson_upper_95": 0.1936076805344365
+    },
+    {
+      "threshold": 0.6,
+      "confusion_matrix": [
+        [
+          16,
+          0
+        ],
+        [
+          11,
+          5
+        ]
+      ],
+      "n": 32,
+      "accuracy": 0.65625,
+      "precision": 1.0,
+      "recall": 0.3125,
+      "f1": 0.47619047619047616,
+      "fpr": 0.0,
+      "fnr": 0.6875,
+      "accepted": 5,
+      "fpr_wilson_upper_95": 0.1936076805344365
+    },
+    {
+      "threshold": 0.65,
+      "confusion_matrix": [
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          0
+        ]
+      ],
+      "n": 32,
+      "accuracy": 0.5,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "fpr": 0.0,
+      "fnr": 1.0,
+      "accepted": 0,
+      "fpr_wilson_upper_95": 0.1936076805344365
+    },
+    {
+      "threshold": 0.7,
+      "confusion_matrix": [
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          0
+        ]
+      ],
+      "n": 32,
+      "accuracy": 0.5,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "fpr": 0.0,
+      "fnr": 1.0,
+      "accepted": 0,
+      "fpr_wilson_upper_95": 0.1936076805344365
+    },
+    {
+      "threshold": 0.75,
+      "confusion_matrix": [
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          0
+        ]
+      ],
+      "n": 32,
+      "accuracy": 0.5,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "fpr": 0.0,
+      "fnr": 1.0,
+      "accepted": 0,
+      "fpr_wilson_upper_95": 0.1936076805344365
+    },
+    {
+      "threshold": 0.8,
+      "confusion_matrix": [
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          0
+        ]
+      ],
+      "n": 32,
+      "accuracy": 0.5,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "fpr": 0.0,
+      "fnr": 1.0,
+      "accepted": 0,
+      "fpr_wilson_upper_95": 0.1936076805344365
+    },
+    {
+      "threshold": 0.85,
+      "confusion_matrix": [
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          0
+        ]
+      ],
+      "n": 32,
+      "accuracy": 0.5,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "fpr": 0.0,
+      "fnr": 1.0,
+      "accepted": 0,
+      "fpr_wilson_upper_95": 0.1936076805344365
+    },
+    {
+      "threshold": 0.9,
+      "confusion_matrix": [
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          0
+        ]
+      ],
+      "n": 32,
+      "accuracy": 0.5,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "fpr": 0.0,
+      "fnr": 1.0,
+      "accepted": 0,
+      "fpr_wilson_upper_95": 0.1936076805344365
+    },
+    {
+      "threshold": 0.95,
+      "confusion_matrix": [
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          0
+        ]
+      ],
+      "n": 32,
+      "accuracy": 0.5,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "fpr": 0.0,
+      "fnr": 1.0,
+      "accepted": 0,
+      "fpr_wilson_upper_95": 0.1936076805344365
+    }
+  ],
+  "selected_validation_point": {
+    "threshold": 0.55,
+    "confusion_matrix": [
+      [
+        16,
+        0
+      ],
+      [
+        3,
+        13
+      ]
+    ],
+    "n": 32,
+    "accuracy": 0.90625,
+    "precision": 1.0,
+    "recall": 0.8125,
+    "f1": 0.896551724137931,
+    "fpr": 0.0,
+    "fnr": 0.1875,
+    "accepted": 13,
+    "fpr_wilson_upper_95": 0.1936076805344365
+  },
+  "split": {
+    "train": {
+      "all_ids": [
+        "cs_001",
+        "cs_002",
+        "cs_003",
+        "cs_004",
+        "cs_005",
+        "cs_006",
+        "cs_007",
+        "cs_008",
+        "cs_009",
+        "cs_010",
+        "cs_011",
+        "cs_012",
+        "cs_013",
+        "cs_014",
+        "cs_015",
+        "cs_016",
+        "cs_017",
+        "cs_018",
+        "cs_019",
+        "cs_020",
+        "cs_021",
+        "cs_022",
+        "cs_023",
+        "cs_024",
+        "cs_025",
+        "cs_026",
+        "cs_027",
+        "cs_028",
+        "cs_029",
+        "cs_030",
+        "cs_031",
+        "cs_032",
+        "cs_033",
+        "cs_034",
+        "cs_035",
+        "cs_036",
+        "cs_049",
+        "cs_050",
+        "cs_051",
+        "cs_052",
+        "cs_053",
+        "cs_054",
+        "cs_055",
+        "cs_056",
+        "cs_057",
+        "cs_058",
+        "cs_059",
+        "cs_060",
+        "cs_061",
+        "cs_062",
+        "cs_063",
+        "cs_064",
+        "cs_065",
+        "cs_066",
+        "cs_067",
+        "cs_068",
+        "cs_069",
+        "cs_070",
+        "cs_071",
+        "cs_072",
+        "cs_073",
+        "cs_074",
+        "cs_075",
+        "cs_076",
+        "cs_077",
+        "cs_078",
+        "cs_079",
+        "cs_080",
+        "cs_081",
+        "cs_082",
+        "cs_083",
+        "cs_084",
+        "cs_085",
+        "cs_086",
+        "cs_087",
+        "cs_088",
+        "cs_089",
+        "cs_090",
+        "cs_091",
+        "cs_092",
+        "cs_093",
+        "cs_094",
+        "cs_095",
+        "cs_096",
+        "cs_097",
+        "cs_098",
+        "cs_099",
+        "cs_100",
+        "cs_101",
+        "cs_102",
+        "cs_103",
+        "cs_104",
+        "cs_105",
+        "cs_106",
+        "cs_107",
+        "cs_108",
+        "cs_133",
+        "cs_134",
+        "cs_135",
+        "cs_136",
+        "cs_137",
+        "cs_138",
+        "cs_139",
+        "cs_140",
+        "cs_141",
+        "cs_142",
+        "cs_143",
+        "cs_144",
+        "cs_145",
+        "cs_146",
+        "cs_147",
+        "cs_148",
+        "cs_149",
+        "cs_150",
+        "cs_151",
+        "cs_152",
+        "cs_153",
+        "cs_154",
+        "cs_155",
+        "cs_156",
+        "cs_157",
+        "cs_158",
+        "cs_159",
+        "cs_160",
+        "cs_161",
+        "cs_162",
+        "cs_163",
+        "cs_164",
+        "cs_165",
+        "cs_166",
+        "cs_167",
+        "cs_168",
+        "cs_169",
+        "cs_170",
+        "cs_171",
+        "cs_172",
+        "cs_173",
+        "cs_174",
+        "cs_175",
+        "cs_176",
+        "cs_177",
+        "cs_178",
+        "cs_179",
+        "cs_180",
+        "cs_181",
+        "cs_182",
+        "cs_183",
+        "cs_184",
+        "cs_185",
+        "cs_186",
+        "cs_187",
+        "cs_188",
+        "cs_189",
+        "cs_190",
+        "cs_191",
+        "cs_192",
+        "cs_205",
+        "cs_206",
+        "cs_207",
+        "cs_208",
+        "cs_209",
+        "cs_210",
+        "cs_211",
+        "cs_212",
+        "cs_213",
+        "cs_214",
+        "cs_215",
+        "cs_216",
+        "cs_229",
+        "cs_230",
+        "cs_231",
+        "cs_232",
+        "cs_233",
+        "cs_234",
+        "cs_235",
+        "cs_236",
+        "cs_237",
+        "cs_238",
+        "cs_239",
+        "cs_240",
+        "cs_241",
+        "cs_242",
+        "cs_243",
+        "cs_244",
+        "cs_245",
+        "cs_246",
+        "cs_247",
+        "cs_248",
+        "cs_249",
+        "cs_250",
+        "cs_251",
+        "cs_252",
+        "cs_277",
+        "cs_278",
+        "cs_279",
+        "cs_280",
+        "cs_281",
+        "cs_282",
+        "cs_283",
+        "cs_284",
+        "cs_285",
+        "cs_286",
+        "cs_287",
+        "cs_288",
+        "cs_289",
+        "cs_290",
+        "cs_291",
+        "cs_292",
+        "cs_293",
+        "cs_294",
+        "cs_295",
+        "cs_296",
+        "cs_297",
+        "cs_298",
+        "cs_299",
+        "cs_300"
+      ],
+      "trusted_ids": [
+        "cs_001",
+        "cs_002",
+        "cs_003",
+        "cs_004",
+        "cs_005",
+        "cs_006",
+        "cs_007",
+        "cs_008",
+        "cs_013",
+        "cs_014",
+        "cs_015",
+        "cs_016",
+        "cs_017",
+        "cs_018",
+        "cs_019",
+        "cs_020",
+        "cs_025",
+        "cs_026",
+        "cs_027",
+        "cs_028",
+        "cs_029",
+        "cs_030",
+        "cs_031",
+        "cs_032",
+        "cs_049",
+        "cs_050",
+        "cs_051",
+        "cs_052",
+        "cs_053",
+        "cs_054",
+        "cs_055",
+        "cs_056",
+        "cs_061",
+        "cs_062",
+        "cs_063",
+        "cs_064",
+        "cs_065",
+        "cs_066",
+        "cs_067",
+        "cs_068",
+        "cs_073",
+        "cs_074",
+        "cs_075",
+        "cs_076",
+        "cs_077",
+        "cs_078",
+        "cs_079",
+        "cs_080",
+        "cs_085",
+        "cs_086",
+        "cs_087",
+        "cs_088",
+        "cs_089",
+        "cs_090",
+        "cs_091",
+        "cs_092",
+        "cs_097",
+        "cs_098",
+        "cs_099",
+        "cs_100",
+        "cs_101",
+        "cs_102",
+        "cs_103",
+        "cs_104",
+        "cs_133",
+        "cs_134",
+        "cs_135",
+        "cs_136",
+        "cs_137",
+        "cs_138",
+        "cs_139",
+        "cs_140",
+        "cs_145",
+        "cs_146",
+        "cs_147",
+        "cs_148",
+        "cs_149",
+        "cs_150",
+        "cs_151",
+        "cs_152",
+        "cs_157",
+        "cs_158",
+        "cs_159",
+        "cs_160",
+        "cs_161",
+        "cs_162",
+        "cs_163",
+        "cs_164",
+        "cs_169",
+        "cs_170",
+        "cs_171",
+        "cs_172",
+        "cs_173",
+        "cs_174",
+        "cs_175",
+        "cs_176",
+        "cs_181",
+        "cs_182",
+        "cs_183",
+        "cs_184",
+        "cs_185",
+        "cs_186",
+        "cs_187",
+        "cs_188",
+        "cs_205",
+        "cs_206",
+        "cs_207",
+        "cs_208",
+        "cs_209",
+        "cs_210",
+        "cs_211",
+        "cs_212",
+        "cs_229",
+        "cs_230",
+        "cs_231",
+        "cs_232",
+        "cs_233",
+        "cs_234",
+        "cs_235",
+        "cs_236",
+        "cs_241",
+        "cs_242",
+        "cs_243",
+        "cs_244",
+        "cs_245",
+        "cs_246",
+        "cs_247",
+        "cs_248",
+        "cs_277",
+        "cs_278",
+        "cs_279",
+        "cs_280",
+        "cs_281",
+        "cs_282",
+        "cs_283",
+        "cs_284",
+        "cs_289",
+        "cs_290",
+        "cs_291",
+        "cs_292",
+        "cs_293",
+        "cs_294",
+        "cs_295",
+        "cs_296"
+      ],
+      "review_ids": [
+        "cs_009",
+        "cs_010",
+        "cs_011",
+        "cs_012",
+        "cs_021",
+        "cs_022",
+        "cs_023",
+        "cs_024",
+        "cs_033",
+        "cs_034",
+        "cs_035",
+        "cs_036",
+        "cs_057",
+        "cs_058",
+        "cs_059",
+        "cs_060",
+        "cs_069",
+        "cs_070",
+        "cs_071",
+        "cs_072",
+        "cs_081",
+        "cs_082",
+        "cs_083",
+        "cs_084",
+        "cs_093",
+        "cs_094",
+        "cs_095",
+        "cs_096",
+        "cs_105",
+        "cs_106",
+        "cs_107",
+        "cs_108",
+        "cs_141",
+        "cs_142",
+        "cs_143",
+        "cs_144",
+        "cs_153",
+        "cs_154",
+        "cs_155",
+        "cs_156",
+        "cs_165",
+        "cs_166",
+        "cs_167",
+        "cs_168",
+        "cs_177",
+        "cs_178",
+        "cs_179",
+        "cs_180",
+        "cs_189",
+        "cs_190",
+        "cs_191",
+        "cs_192",
+        "cs_213",
+        "cs_214",
+        "cs_215",
+        "cs_216",
+        "cs_237",
+        "cs_238",
+        "cs_239",
+        "cs_240",
+        "cs_249",
+        "cs_250",
+        "cs_251",
+        "cs_252",
+        "cs_285",
+        "cs_286",
+        "cs_287",
+        "cs_288",
+        "cs_297",
+        "cs_298",
+        "cs_299",
+        "cs_300"
+      ]
+    },
+    "validation": {
+      "all_ids": [
+        "cs_121",
+        "cs_122",
+        "cs_123",
+        "cs_124",
+        "cs_125",
+        "cs_126",
+        "cs_127",
+        "cs_128",
+        "cs_129",
+        "cs_130",
+        "cs_131",
+        "cs_132",
+        "cs_193",
+        "cs_194",
+        "cs_195",
+        "cs_196",
+        "cs_197",
+        "cs_198",
+        "cs_199",
+        "cs_200",
+        "cs_201",
+        "cs_202",
+        "cs_203",
+        "cs_204",
+        "cs_217",
+        "cs_218",
+        "cs_219",
+        "cs_220",
+        "cs_221",
+        "cs_222",
+        "cs_223",
+        "cs_224",
+        "cs_225",
+        "cs_226",
+        "cs_227",
+        "cs_228",
+        "cs_253",
+        "cs_254",
+        "cs_255",
+        "cs_256",
+        "cs_257",
+        "cs_258",
+        "cs_259",
+        "cs_260",
+        "cs_261",
+        "cs_262",
+        "cs_263",
+        "cs_264"
+      ],
+      "trusted_ids": [
+        "cs_121",
+        "cs_122",
+        "cs_123",
+        "cs_124",
+        "cs_125",
+        "cs_126",
+        "cs_127",
+        "cs_128",
+        "cs_193",
+        "cs_194",
+        "cs_195",
+        "cs_196",
+        "cs_197",
+        "cs_198",
+        "cs_199",
+        "cs_200",
+        "cs_217",
+        "cs_218",
+        "cs_219",
+        "cs_220",
+        "cs_221",
+        "cs_222",
+        "cs_223",
+        "cs_224",
+        "cs_253",
+        "cs_254",
+        "cs_255",
+        "cs_256",
+        "cs_257",
+        "cs_258",
+        "cs_259",
+        "cs_260"
+      ],
+      "review_ids": [
+        "cs_129",
+        "cs_130",
+        "cs_131",
+        "cs_132",
+        "cs_201",
+        "cs_202",
+        "cs_203",
+        "cs_204",
+        "cs_225",
+        "cs_226",
+        "cs_227",
+        "cs_228",
+        "cs_261",
+        "cs_262",
+        "cs_263",
+        "cs_264"
+      ]
+    },
+    "test": {
+      "all_ids": [
+        "cs_037",
+        "cs_038",
+        "cs_039",
+        "cs_040",
+        "cs_041",
+        "cs_042",
+        "cs_043",
+        "cs_044",
+        "cs_045",
+        "cs_046",
+        "cs_047",
+        "cs_048",
+        "cs_109",
+        "cs_110",
+        "cs_111",
+        "cs_112",
+        "cs_113",
+        "cs_114",
+        "cs_115",
+        "cs_116",
+        "cs_117",
+        "cs_118",
+        "cs_119",
+        "cs_120",
+        "cs_265",
+        "cs_266",
+        "cs_267",
+        "cs_268",
+        "cs_269",
+        "cs_270",
+        "cs_271",
+        "cs_272",
+        "cs_273",
+        "cs_274",
+        "cs_275",
+        "cs_276"
+      ],
+      "trusted_ids": [
+        "cs_037",
+        "cs_038",
+        "cs_039",
+        "cs_040",
+        "cs_041",
+        "cs_042",
+        "cs_043",
+        "cs_044",
+        "cs_109",
+        "cs_110",
+        "cs_111",
+        "cs_112",
+        "cs_113",
+        "cs_114",
+        "cs_115",
+        "cs_116",
+        "cs_265",
+        "cs_266",
+        "cs_267",
+        "cs_268",
+        "cs_269",
+        "cs_270",
+        "cs_271",
+        "cs_272"
+      ],
+      "review_ids": [
+        "cs_045",
+        "cs_046",
+        "cs_047",
+        "cs_048",
+        "cs_117",
+        "cs_118",
+        "cs_119",
+        "cs_120",
+        "cs_273",
+        "cs_274",
+        "cs_275",
+        "cs_276"
+      ]
+    }
+  },
+  "limitations": [
+    "Synthetic performance is NOT production validation.",
+    "The FPR limit is an experiment constraint, not a production acceptance policy.",
+    "Teacher labels/confidences are provisional, not human-reviewed."
+  ],
+  "predictions": {
+    "train": [
+      {
+        "id": "cs_001",
+        "label": 0,
+        "q": 0.3669334041005915,
+        "teacher_confidence": 0.98,
+        "scenario_group": "campus_building"
+      },
+      {
+        "id": "cs_002",
+        "label": 0,
+        "q": 0.35142203465047755,
+        "teacher_confidence": 0.96,
+        "scenario_group": "campus_building"
+      },
+      {
+        "id": "cs_003",
+        "label": 0,
+        "q": 0.369780434208987,
+        "teacher_confidence": 0.95,
+        "scenario_group": "campus_building"
+      },
+      {
+        "id": "cs_004",
+        "label": 0,
+        "q": 0.3920408667309809,
+        "teacher_confidence": 0.93,
+        "scenario_group": "campus_building"
+      },
+      {
+        "id": "cs_005",
+        "label": 1,
+        "q": 0.5224014119523752,
+        "teacher_confidence": 0.97,
+        "scenario_group": "campus_building"
+      },
+      {
+        "id": "cs_006",
+        "label": 1,
+        "q": 0.5572862194043078,
+        "teacher_confidence": 0.95,
+        "scenario_group": "campus_building"
+      },
+      {
+        "id": "cs_007",
+        "label": 1,
+        "q": 0.5542016671529189,
+        "teacher_confidence": 0.94,
+        "scenario_group": "campus_building"
+      },
+      {
+        "id": "cs_008",
+        "label": 1,
+        "q": 0.5364281925199483,
+        "teacher_confidence": 0.92,
+        "scenario_group": "campus_building"
+      },
+      {
+        "id": "cs_009",
+        "label": 0,
+        "q": 0.4977885470213882,
+        "teacher_confidence": 0.63,
+        "scenario_group": "campus_building"
+      },
+      {
+        "id": "cs_010",
+        "label": 0,
+        "q": 0.3721671726202952,
+        "teacher_confidence": 0.71,
+        "scenario_group": "campus_building"
+      },
+      {
+        "id": "cs_011",
+        "label": 1,
+        "q": 0.5454142835596544,
+        "teacher_confidence": 0.68,
+        "scenario_group": "campus_building"
+      },
+      {
+        "id": "cs_012",
+        "label": 1,
+        "q": 0.48134736210953993,
+        "teacher_confidence": 0.76,
+        "scenario_group": "campus_building"
+      },
+      {
+        "id": "cs_013",
+        "label": 0,
+        "q": 0.3976244676821232,
+        "teacher_confidence": 0.98,
+        "scenario_group": "lost_found"
+      },
+      {
+        "id": "cs_014",
+        "label": 0,
+        "q": 0.394056955974075,
+        "teacher_confidence": 0.96,
+        "scenario_group": "lost_found"
+      },
+      {
+        "id": "cs_015",
+        "label": 0,
+        "q": 0.3852414634865339,
+        "teacher_confidence": 0.95,
+        "scenario_group": "lost_found"
+      },
+      {
+        "id": "cs_016",
+        "label": 0,
+        "q": 0.4141306876348381,
+        "teacher_confidence": 0.93,
+        "scenario_group": "lost_found"
+      },
+      {
+        "id": "cs_017",
+        "label": 1,
+        "q": 0.5065923391701421,
+        "teacher_confidence": 0.97,
+        "scenario_group": "lost_found"
+      },
+      {
+        "id": "cs_018",
+        "label": 1,
+        "q": 0.5543031424317953,
+        "teacher_confidence": 0.95,
+        "scenario_group": "lost_found"
+      },
+      {
+        "id": "cs_019",
+        "label": 1,
+        "q": 0.5566906642568533,
+        "teacher_confidence": 0.94,
+        "scenario_group": "lost_found"
+      },
+      {
+        "id": "cs_020",
+        "label": 1,
+        "q": 0.5141619226854187,
+        "teacher_confidence": 0.92,
+        "scenario_group": "lost_found"
+      },
+      {
+        "id": "cs_021",
+        "label": 0,
+        "q": 0.47707243497228685,
+        "teacher_confidence": 0.61,
+        "scenario_group": "lost_found"
+      },
+      {
+        "id": "cs_022",
+        "label": 0,
+        "q": 0.434720571926966,
+        "teacher_confidence": 0.69,
+        "scenario_group": "lost_found"
+      },
+      {
+        "id": "cs_023",
+        "label": 1,
+        "q": 0.5758122542676583,
+        "teacher_confidence": 0.66,
+        "scenario_group": "lost_found"
+      },
+      {
+        "id": "cs_024",
+        "label": 1,
+        "q": 0.534523256972963,
+        "teacher_confidence": 0.74,
+        "scenario_group": "lost_found"
+      },
+      {
+        "id": "cs_025",
+        "label": 0,
+        "q": 0.41456973842235434,
+        "teacher_confidence": 0.98,
+        "scenario_group": "specific_course"
+      },
+      {
+        "id": "cs_026",
+        "label": 0,
+        "q": 0.4116445620827845,
+        "teacher_confidence": 0.96,
+        "scenario_group": "specific_course"
+      },
+      {
+        "id": "cs_027",
+        "label": 0,
+        "q": 0.35078727273633054,
+        "teacher_confidence": 0.95,
+        "scenario_group": "specific_course"
+      },
+      {
+        "id": "cs_028",
+        "label": 0,
+        "q": 0.3589220289136961,
+        "teacher_confidence": 0.93,
+        "scenario_group": "specific_course"
+      },
+      {
+        "id": "cs_029",
+        "label": 1,
+        "q": 0.5651037086659827,
+        "teacher_confidence": 0.97,
+        "scenario_group": "specific_course"
+      },
+      {
+        "id": "cs_030",
+        "label": 1,
+        "q": 0.628726177259548,
+        "teacher_confidence": 0.95,
+        "scenario_group": "specific_course"
+      },
+      {
+        "id": "cs_031",
+        "label": 1,
+        "q": 0.6086243952479498,
+        "teacher_confidence": 0.94,
+        "scenario_group": "specific_course"
+      },
+      {
+        "id": "cs_032",
+        "label": 1,
+        "q": 0.5703268976079886,
+        "teacher_confidence": 0.92,
+        "scenario_group": "specific_course"
+      },
+      {
+        "id": "cs_033",
+        "label": 0,
+        "q": 0.48512412680655653,
+        "teacher_confidence": 0.64,
+        "scenario_group": "specific_course"
+      },
+      {
+        "id": "cs_034",
+        "label": 0,
+        "q": 0.3680730264495981,
+        "teacher_confidence": 0.72,
+        "scenario_group": "specific_course"
+      },
+      {
+        "id": "cs_035",
+        "label": 1,
+        "q": 0.6052048021378469,
+        "teacher_confidence": 0.7,
+        "scenario_group": "specific_course"
+      },
+      {
+        "id": "cs_036",
+        "label": 1,
+        "q": 0.5236786323583797,
+        "teacher_confidence": 0.77,
+        "scenario_group": "specific_course"
+      },
+      {
+        "id": "cs_049",
+        "label": 0,
+        "q": 0.3592922022519436,
+        "teacher_confidence": 0.98,
+        "scenario_group": "local_service"
+      },
+      {
+        "id": "cs_050",
+        "label": 0,
+        "q": 0.44790982548619007,
+        "teacher_confidence": 0.96,
+        "scenario_group": "local_service"
+      },
+      {
+        "id": "cs_051",
+        "label": 0,
+        "q": 0.3579512005294785,
+        "teacher_confidence": 0.95,
+        "scenario_group": "local_service"
+      },
+      {
+        "id": "cs_052",
+        "label": 0,
+        "q": 0.4384123454189421,
+        "teacher_confidence": 0.93,
+        "scenario_group": "local_service"
+      },
+      {
+        "id": "cs_053",
+        "label": 1,
+        "q": 0.5637298410645639,
+        "teacher_confidence": 0.97,
+        "scenario_group": "local_service"
+      },
+      {
+        "id": "cs_054",
+        "label": 1,
+        "q": 0.5806991177655728,
+        "teacher_confidence": 0.95,
+        "scenario_group": "local_service"
+      },
+      {
+        "id": "cs_055",
+        "label": 1,
+        "q": 0.5515170495271948,
+        "teacher_confidence": 0.94,
+        "scenario_group": "local_service"
+      },
+      {
+        "id": "cs_056",
+        "label": 1,
+        "q": 0.5890270854745001,
+        "teacher_confidence": 0.92,
+        "scenario_group": "local_service"
+      },
+      {
+        "id": "cs_057",
+        "label": 0,
+        "q": 0.4954858919408439,
+        "teacher_confidence": 0.66,
+        "scenario_group": "local_service"
+      },
+      {
+        "id": "cs_058",
+        "label": 0,
+        "q": 0.4006947301515618,
+        "teacher_confidence": 0.72,
+        "scenario_group": "local_service"
+      },
+      {
+        "id": "cs_059",
+        "label": 1,
+        "q": 0.5695359140643241,
+        "teacher_confidence": 0.69,
+        "scenario_group": "local_service"
+      },
+      {
+        "id": "cs_060",
+        "label": 1,
+        "q": 0.5188645410476646,
+        "teacher_confidence": 0.73,
+        "scenario_group": "local_service"
+      },
+      {
+        "id": "cs_061",
+        "label": 0,
+        "q": 0.462537970039579,
+        "teacher_confidence": 0.98,
+        "scenario_group": "coop_market"
+      },
+      {
+        "id": "cs_062",
+        "label": 0,
+        "q": 0.40102724698111863,
+        "teacher_confidence": 0.96,
+        "scenario_group": "coop_market"
+      },
+      {
+        "id": "cs_063",
+        "label": 0,
+        "q": 0.3987827449835862,
+        "teacher_confidence": 0.95,
+        "scenario_group": "coop_market"
+      },
+      {
+        "id": "cs_064",
+        "label": 0,
+        "q": 0.4804350902464075,
+        "teacher_confidence": 0.93,
+        "scenario_group": "coop_market"
+      },
+      {
+        "id": "cs_065",
+        "label": 1,
+        "q": 0.585653422322407,
+        "teacher_confidence": 0.97,
+        "scenario_group": "coop_market"
+      },
+      {
+        "id": "cs_066",
+        "label": 1,
+        "q": 0.586245013856817,
+        "teacher_confidence": 0.95,
+        "scenario_group": "coop_market"
+      },
+      {
+        "id": "cs_067",
+        "label": 1,
+        "q": 0.5829879887603474,
+        "teacher_confidence": 0.94,
+        "scenario_group": "coop_market"
+      },
+      {
+        "id": "cs_068",
+        "label": 1,
+        "q": 0.6493392103184,
+        "teacher_confidence": 0.92,
+        "scenario_group": "coop_market"
+      },
+      {
+        "id": "cs_069",
+        "label": 0,
+        "q": 0.3873047501031216,
+        "teacher_confidence": 0.74,
+        "scenario_group": "coop_market"
+      },
+      {
+        "id": "cs_070",
+        "label": 0,
+        "q": 0.48391020418573377,
+        "teacher_confidence": 0.76,
+        "scenario_group": "coop_market"
+      },
+      {
+        "id": "cs_071",
+        "label": 1,
+        "q": 0.5939856451801406,
+        "teacher_confidence": 0.72,
+        "scenario_group": "coop_market"
+      },
+      {
+        "id": "cs_072",
+        "label": 1,
+        "q": 0.5498332012264737,
+        "teacher_confidence": 0.64,
+        "scenario_group": "coop_market"
+      },
+      {
+        "id": "cs_073",
+        "label": 0,
+        "q": 0.3587255488042674,
+        "teacher_confidence": 0.98,
+        "scenario_group": "career"
+      },
+      {
+        "id": "cs_074",
+        "label": 0,
+        "q": 0.33843023785151216,
+        "teacher_confidence": 0.96,
+        "scenario_group": "career"
+      },
+      {
+        "id": "cs_075",
+        "label": 0,
+        "q": 0.4707456607307112,
+        "teacher_confidence": 0.95,
+        "scenario_group": "career"
+      },
+      {
+        "id": "cs_076",
+        "label": 0,
+        "q": 0.4937567279455701,
+        "teacher_confidence": 0.93,
+        "scenario_group": "career"
+      },
+      {
+        "id": "cs_077",
+        "label": 1,
+        "q": 0.6223246764554387,
+        "teacher_confidence": 0.97,
+        "scenario_group": "career"
+      },
+      {
+        "id": "cs_078",
+        "label": 1,
+        "q": 0.6129956453198835,
+        "teacher_confidence": 0.95,
+        "scenario_group": "career"
+      },
+      {
+        "id": "cs_079",
+        "label": 1,
+        "q": 0.538853549595257,
+        "teacher_confidence": 0.94,
+        "scenario_group": "career"
+      },
+      {
+        "id": "cs_080",
+        "label": 1,
+        "q": 0.6323215138598477,
+        "teacher_confidence": 0.92,
+        "scenario_group": "career"
+      },
+      {
+        "id": "cs_081",
+        "label": 0,
+        "q": 0.5384785162685526,
+        "teacher_confidence": 0.59,
+        "scenario_group": "career"
+      },
+      {
+        "id": "cs_082",
+        "label": 0,
+        "q": 0.46361768907479406,
+        "teacher_confidence": 0.65,
+        "scenario_group": "career"
+      },
+      {
+        "id": "cs_083",
+        "label": 1,
+        "q": 0.6084047081020835,
+        "teacher_confidence": 0.71,
+        "scenario_group": "career"
+      },
+      {
+        "id": "cs_084",
+        "label": 1,
+        "q": 0.6031869188533742,
+        "teacher_confidence": 0.77,
+        "scenario_group": "career"
+      },
+      {
+        "id": "cs_085",
+        "label": 0,
+        "q": 0.43983659952401505,
+        "teacher_confidence": 0.98,
+        "scenario_group": "housing"
+      },
+      {
+        "id": "cs_086",
+        "label": 0,
+        "q": 0.4662576194677748,
+        "teacher_confidence": 0.96,
+        "scenario_group": "housing"
+      },
+      {
+        "id": "cs_087",
+        "label": 0,
+        "q": 0.4182755840840572,
+        "teacher_confidence": 0.95,
+        "scenario_group": "housing"
+      },
+      {
+        "id": "cs_088",
+        "label": 0,
+        "q": 0.5282972931733976,
+        "teacher_confidence": 0.93,
+        "scenario_group": "housing"
+      },
+      {
+        "id": "cs_089",
+        "label": 1,
+        "q": 0.6024329810169907,
+        "teacher_confidence": 0.97,
+        "scenario_group": "housing"
+      },
+      {
+        "id": "cs_090",
+        "label": 1,
+        "q": 0.5947615701897903,
+        "teacher_confidence": 0.95,
+        "scenario_group": "housing"
+      },
+      {
+        "id": "cs_091",
+        "label": 1,
+        "q": 0.5933382594190026,
+        "teacher_confidence": 0.94,
+        "scenario_group": "housing"
+      },
+      {
+        "id": "cs_092",
+        "label": 1,
+        "q": 0.6189958594548348,
+        "teacher_confidence": 0.92,
+        "scenario_group": "housing"
+      },
+      {
+        "id": "cs_093",
+        "label": 0,
+        "q": 0.4986760952709888,
+        "teacher_confidence": 0.62,
+        "scenario_group": "housing"
+      },
+      {
+        "id": "cs_094",
+        "label": 0,
+        "q": 0.5403066617657616,
+        "teacher_confidence": 0.68,
+        "scenario_group": "housing"
+      },
+      {
+        "id": "cs_095",
+        "label": 1,
+        "q": 0.5830127541960081,
+        "teacher_confidence": 0.75,
+        "scenario_group": "housing"
+      },
+      {
+        "id": "cs_096",
+        "label": 1,
+        "q": 0.5681512970621669,
+        "teacher_confidence": 0.77,
+        "scenario_group": "housing"
+      },
+      {
+        "id": "cs_097",
+        "label": 0,
+        "q": 0.5358526670731855,
+        "teacher_confidence": 0.98,
+        "scenario_group": "loneliness"
+      },
+      {
+        "id": "cs_098",
+        "label": 0,
+        "q": 0.5351501560963835,
+        "teacher_confidence": 0.96,
+        "scenario_group": "loneliness"
+      },
+      {
+        "id": "cs_099",
+        "label": 0,
+        "q": 0.5053261004795828,
+        "teacher_confidence": 0.95,
+        "scenario_group": "loneliness"
+      },
+      {
+        "id": "cs_100",
+        "label": 0,
+        "q": 0.5088603079553109,
+        "teacher_confidence": 0.93,
+        "scenario_group": "loneliness"
+      },
+      {
+        "id": "cs_101",
+        "label": 1,
+        "q": 0.646268168136308,
+        "teacher_confidence": 0.97,
+        "scenario_group": "loneliness"
+      },
+      {
+        "id": "cs_102",
+        "label": 1,
+        "q": 0.6082563601219686,
+        "teacher_confidence": 0.95,
+        "scenario_group": "loneliness"
+      },
+      {
+        "id": "cs_103",
+        "label": 1,
+        "q": 0.6113255594387779,
+        "teacher_confidence": 0.94,
+        "scenario_group": "loneliness"
+      },
+      {
+        "id": "cs_104",
+        "label": 1,
+        "q": 0.6161602889318549,
+        "teacher_confidence": 0.92,
+        "scenario_group": "loneliness"
+      },
+      {
+        "id": "cs_105",
+        "label": 0,
+        "q": 0.5584013286659492,
+        "teacher_confidence": 0.58,
+        "scenario_group": "loneliness"
+      },
+      {
+        "id": "cs_106",
+        "label": 0,
+        "q": 0.5830585278989229,
+        "teacher_confidence": 0.61,
+        "scenario_group": "loneliness"
+      },
+      {
+        "id": "cs_107",
+        "label": 1,
+        "q": 0.6710932687144278,
+        "teacher_confidence": 0.76,
+        "scenario_group": "loneliness"
+      },
+      {
+        "id": "cs_108",
+        "label": 1,
+        "q": 0.6112961089288719,
+        "teacher_confidence": 0.73,
+        "scenario_group": "loneliness"
+      },
+      {
+        "id": "cs_133",
+        "label": 0,
+        "q": 0.3555041663438029,
+        "teacher_confidence": 0.98,
+        "scenario_group": "food"
+      },
+      {
+        "id": "cs_134",
+        "label": 0,
+        "q": 0.4931539295097706,
+        "teacher_confidence": 0.96,
+        "scenario_group": "food"
+      },
+      {
+        "id": "cs_135",
+        "label": 0,
+        "q": 0.3566198434067916,
+        "teacher_confidence": 0.95,
+        "scenario_group": "food"
+      },
+      {
+        "id": "cs_136",
+        "label": 0,
+        "q": 0.5157370521830604,
+        "teacher_confidence": 0.93,
+        "scenario_group": "food"
+      },
+      {
+        "id": "cs_137",
+        "label": 1,
+        "q": 0.5714798468538432,
+        "teacher_confidence": 0.97,
+        "scenario_group": "food"
+      },
+      {
+        "id": "cs_138",
+        "label": 1,
+        "q": 0.6577526804454031,
+        "teacher_confidence": 0.95,
+        "scenario_group": "food"
+      },
+      {
+        "id": "cs_139",
+        "label": 1,
+        "q": 0.5899456480962832,
+        "teacher_confidence": 0.94,
+        "scenario_group": "food"
+      },
+      {
+        "id": "cs_140",
+        "label": 1,
+        "q": 0.5871159317202229,
+        "teacher_confidence": 0.92,
+        "scenario_group": "food"
+      },
+      {
+        "id": "cs_141",
+        "label": 0,
+        "q": 0.5439250508308957,
+        "teacher_confidence": 0.61,
+        "scenario_group": "food"
+      },
+      {
+        "id": "cs_142",
+        "label": 0,
+        "q": 0.35539595099412613,
+        "teacher_confidence": 0.75,
+        "scenario_group": "food"
+      },
+      {
+        "id": "cs_143",
+        "label": 1,
+        "q": 0.6086852564494442,
+        "teacher_confidence": 0.78,
+        "scenario_group": "food"
+      },
+      {
+        "id": "cs_144",
+        "label": 1,
+        "q": 0.5662876923454956,
+        "teacher_confidence": 0.6,
+        "scenario_group": "food"
+      },
+      {
+        "id": "cs_145",
+        "label": 0,
+        "q": 0.3986483666574843,
+        "teacher_confidence": 0.98,
+        "scenario_group": "transit"
+      },
+      {
+        "id": "cs_146",
+        "label": 0,
+        "q": 0.3591535216675774,
+        "teacher_confidence": 0.96,
+        "scenario_group": "transit"
+      },
+      {
+        "id": "cs_147",
+        "label": 0,
+        "q": 0.36744328746312016,
+        "teacher_confidence": 0.95,
+        "scenario_group": "transit"
+      },
+      {
+        "id": "cs_148",
+        "label": 0,
+        "q": 0.41573992999781,
+        "teacher_confidence": 0.93,
+        "scenario_group": "transit"
+      },
+      {
+        "id": "cs_149",
+        "label": 1,
+        "q": 0.6007577175535788,
+        "teacher_confidence": 0.97,
+        "scenario_group": "transit"
+      },
+      {
+        "id": "cs_150",
+        "label": 1,
+        "q": 0.652423901144148,
+        "teacher_confidence": 0.95,
+        "scenario_group": "transit"
+      },
+      {
+        "id": "cs_151",
+        "label": 1,
+        "q": 0.5269261938169232,
+        "teacher_confidence": 0.94,
+        "scenario_group": "transit"
+      },
+      {
+        "id": "cs_152",
+        "label": 1,
+        "q": 0.601227693859035,
+        "teacher_confidence": 0.92,
+        "scenario_group": "transit"
+      },
+      {
+        "id": "cs_153",
+        "label": 0,
+        "q": 0.46019170086090144,
+        "teacher_confidence": 0.66,
+        "scenario_group": "transit"
+      },
+      {
+        "id": "cs_154",
+        "label": 0,
+        "q": 0.3876271333973342,
+        "teacher_confidence": 0.78,
+        "scenario_group": "transit"
+      },
+      {
+        "id": "cs_155",
+        "label": 1,
+        "q": 0.6130214882186159,
+        "teacher_confidence": 0.74,
+        "scenario_group": "transit"
+      },
+      {
+        "id": "cs_156",
+        "label": 1,
+        "q": 0.5701864364085786,
+        "teacher_confidence": 0.71,
+        "scenario_group": "transit"
+      },
+      {
+        "id": "cs_157",
+        "label": 0,
+        "q": 0.40941553534576347,
+        "teacher_confidence": 0.98,
+        "scenario_group": "social_life"
+      },
+      {
+        "id": "cs_158",
+        "label": 0,
+        "q": 0.3549776978382702,
+        "teacher_confidence": 0.96,
+        "scenario_group": "social_life"
+      },
+      {
+        "id": "cs_159",
+        "label": 0,
+        "q": 0.3279510444119104,
+        "teacher_confidence": 0.95,
+        "scenario_group": "social_life"
+      },
+      {
+        "id": "cs_160",
+        "label": 0,
+        "q": 0.4295007677475524,
+        "teacher_confidence": 0.93,
+        "scenario_group": "social_life"
+      },
+      {
+        "id": "cs_161",
+        "label": 1,
+        "q": 0.6354520173874243,
+        "teacher_confidence": 0.97,
+        "scenario_group": "social_life"
+      },
+      {
+        "id": "cs_162",
+        "label": 1,
+        "q": 0.5943070978995991,
+        "teacher_confidence": 0.95,
+        "scenario_group": "social_life"
+      },
+      {
+        "id": "cs_163",
+        "label": 1,
+        "q": 0.6290114854143244,
+        "teacher_confidence": 0.94,
+        "scenario_group": "social_life"
+      },
+      {
+        "id": "cs_164",
+        "label": 1,
+        "q": 0.655740774695821,
+        "teacher_confidence": 0.92,
+        "scenario_group": "social_life"
+      },
+      {
+        "id": "cs_165",
+        "label": 0,
+        "q": 0.41268478447682955,
+        "teacher_confidence": 0.63,
+        "scenario_group": "social_life"
+      },
+      {
+        "id": "cs_166",
+        "label": 0,
+        "q": 0.5301634434109043,
+        "teacher_confidence": 0.66,
+        "scenario_group": "social_life"
+      },
+      {
+        "id": "cs_167",
+        "label": 1,
+        "q": 0.659327180155905,
+        "teacher_confidence": 0.76,
+        "scenario_group": "social_life"
+      },
+      {
+        "id": "cs_168",
+        "label": 1,
+        "q": 0.6131918199834827,
+        "teacher_confidence": 0.73,
+        "scenario_group": "social_life"
+      },
+      {
+        "id": "cs_169",
+        "label": 0,
+        "q": 0.35126188643981326,
+        "teacher_confidence": 0.98,
+        "scenario_group": "clubs"
+      },
+      {
+        "id": "cs_170",
+        "label": 0,
+        "q": 0.42294300671409274,
+        "teacher_confidence": 0.96,
+        "scenario_group": "clubs"
+      },
+      {
+        "id": "cs_171",
+        "label": 0,
+        "q": 0.3509139448162958,
+        "teacher_confidence": 0.95,
+        "scenario_group": "clubs"
+      },
+      {
+        "id": "cs_172",
+        "label": 0,
+        "q": 0.44933805706711816,
+        "teacher_confidence": 0.93,
+        "scenario_group": "clubs"
+      },
+      {
+        "id": "cs_173",
+        "label": 1,
+        "q": 0.6069646713151904,
+        "teacher_confidence": 0.97,
+        "scenario_group": "clubs"
+      },
+      {
+        "id": "cs_174",
+        "label": 1,
+        "q": 0.6128469151250228,
+        "teacher_confidence": 0.95,
+        "scenario_group": "clubs"
+      },
+      {
+        "id": "cs_175",
+        "label": 1,
+        "q": 0.6315749348397832,
+        "teacher_confidence": 0.94,
+        "scenario_group": "clubs"
+      },
+      {
+        "id": "cs_176",
+        "label": 1,
+        "q": 0.6456828443180341,
+        "teacher_confidence": 0.92,
+        "scenario_group": "clubs"
+      },
+      {
+        "id": "cs_177",
+        "label": 0,
+        "q": 0.41454110537779304,
+        "teacher_confidence": 0.72,
+        "scenario_group": "clubs"
+      },
+      {
+        "id": "cs_178",
+        "label": 0,
+        "q": 0.3470509831681428,
+        "teacher_confidence": 0.77,
+        "scenario_group": "clubs"
+      },
+      {
+        "id": "cs_179",
+        "label": 1,
+        "q": 0.6098134235647079,
+        "teacher_confidence": 0.75,
+        "scenario_group": "clubs"
+      },
+      {
+        "id": "cs_180",
+        "label": 1,
+        "q": 0.58440728995621,
+        "teacher_confidence": 0.7,
+        "scenario_group": "clubs"
+      },
+      {
+        "id": "cs_181",
+        "label": 0,
+        "q": 0.39432333783437934,
+        "teacher_confidence": 0.98,
+        "scenario_group": "internship"
+      },
+      {
+        "id": "cs_182",
+        "label": 0,
+        "q": 0.5107115013602136,
+        "teacher_confidence": 0.96,
+        "scenario_group": "internship"
+      },
+      {
+        "id": "cs_183",
+        "label": 0,
+        "q": 0.3986954371799964,
+        "teacher_confidence": 0.95,
+        "scenario_group": "internship"
+      },
+      {
+        "id": "cs_184",
+        "label": 0,
+        "q": 0.4383365593018952,
+        "teacher_confidence": 0.93,
+        "scenario_group": "internship"
+      },
+      {
+        "id": "cs_185",
+        "label": 1,
+        "q": 0.5898697444517945,
+        "teacher_confidence": 0.97,
+        "scenario_group": "internship"
+      },
+      {
+        "id": "cs_186",
+        "label": 1,
+        "q": 0.5759652348132673,
+        "teacher_confidence": 0.95,
+        "scenario_group": "internship"
+      },
+      {
+        "id": "cs_187",
+        "label": 1,
+        "q": 0.5968786030436344,
+        "teacher_confidence": 0.94,
+        "scenario_group": "internship"
+      },
+      {
+        "id": "cs_188",
+        "label": 1,
+        "q": 0.6614234279227846,
+        "teacher_confidence": 0.92,
+        "scenario_group": "internship"
+      },
+      {
+        "id": "cs_189",
+        "label": 0,
+        "q": 0.4103906677093662,
+        "teacher_confidence": 0.73,
+        "scenario_group": "internship"
+      },
+      {
+        "id": "cs_190",
+        "label": 0,
+        "q": 0.5359843035022039,
+        "teacher_confidence": 0.64,
+        "scenario_group": "internship"
+      },
+      {
+        "id": "cs_191",
+        "label": 1,
+        "q": 0.5728435784217657,
+        "teacher_confidence": 0.76,
+        "scenario_group": "internship"
+      },
+      {
+        "id": "cs_192",
+        "label": 1,
+        "q": 0.6169098007112938,
+        "teacher_confidence": 0.74,
+        "scenario_group": "internship"
+      },
+      {
+        "id": "cs_205",
+        "label": 0,
+        "q": 0.5037711915570071,
+        "teacher_confidence": 0.98,
+        "scenario_group": "exam_stress"
+      },
+      {
+        "id": "cs_206",
+        "label": 0,
+        "q": 0.37325646626079906,
+        "teacher_confidence": 0.96,
+        "scenario_group": "exam_stress"
+      },
+      {
+        "id": "cs_207",
+        "label": 0,
+        "q": 0.4281032694263261,
+        "teacher_confidence": 0.95,
+        "scenario_group": "exam_stress"
+      },
+      {
+        "id": "cs_208",
+        "label": 0,
+        "q": 0.34288156865452535,
+        "teacher_confidence": 0.93,
+        "scenario_group": "exam_stress"
+      },
+      {
+        "id": "cs_209",
+        "label": 1,
+        "q": 0.5795110833642647,
+        "teacher_confidence": 0.97,
+        "scenario_group": "exam_stress"
+      },
+      {
+        "id": "cs_210",
+        "label": 1,
+        "q": 0.6041744281011759,
+        "teacher_confidence": 0.95,
+        "scenario_group": "exam_stress"
+      },
+      {
+        "id": "cs_211",
+        "label": 1,
+        "q": 0.5573262500561185,
+        "teacher_confidence": 0.94,
+        "scenario_group": "exam_stress"
+      },
+      {
+        "id": "cs_212",
+        "label": 1,
+        "q": 0.5958731259582992,
+        "teacher_confidence": 0.92,
+        "scenario_group": "exam_stress"
+      },
+      {
+        "id": "cs_213",
+        "label": 0,
+        "q": 0.3708059835995301,
+        "teacher_confidence": 0.77,
+        "scenario_group": "exam_stress"
+      },
+      {
+        "id": "cs_214",
+        "label": 0,
+        "q": 0.48542524010055854,
+        "teacher_confidence": 0.65,
+        "scenario_group": "exam_stress"
+      },
+      {
+        "id": "cs_215",
+        "label": 1,
+        "q": 0.5951217703726511,
+        "teacher_confidence": 0.75,
+        "scenario_group": "exam_stress"
+      },
+      {
+        "id": "cs_216",
+        "label": 1,
+        "q": 0.5324358717755627,
+        "teacher_confidence": 0.78,
+        "scenario_group": "exam_stress"
+      },
+      {
+        "id": "cs_229",
+        "label": 0,
+        "q": 0.35725863197937224,
+        "teacher_confidence": 0.98,
+        "scenario_group": "gym_recreation"
+      },
+      {
+        "id": "cs_230",
+        "label": 0,
+        "q": 0.4124726586003148,
+        "teacher_confidence": 0.96,
+        "scenario_group": "gym_recreation"
+      },
+      {
+        "id": "cs_231",
+        "label": 0,
+        "q": 0.34596988360983605,
+        "teacher_confidence": 0.95,
+        "scenario_group": "gym_recreation"
+      },
+      {
+        "id": "cs_232",
+        "label": 0,
+        "q": 0.39566482970326167,
+        "teacher_confidence": 0.93,
+        "scenario_group": "gym_recreation"
+      },
+      {
+        "id": "cs_233",
+        "label": 1,
+        "q": 0.5437138637676401,
+        "teacher_confidence": 0.97,
+        "scenario_group": "gym_recreation"
+      },
+      {
+        "id": "cs_234",
+        "label": 1,
+        "q": 0.5832080604875547,
+        "teacher_confidence": 0.95,
+        "scenario_group": "gym_recreation"
+      },
+      {
+        "id": "cs_235",
+        "label": 1,
+        "q": 0.583778042827686,
+        "teacher_confidence": 0.94,
+        "scenario_group": "gym_recreation"
+      },
+      {
+        "id": "cs_236",
+        "label": 1,
+        "q": 0.5481253768062839,
+        "teacher_confidence": 0.92,
+        "scenario_group": "gym_recreation"
+      },
+      {
+        "id": "cs_237",
+        "label": 0,
+        "q": 0.3507233068949225,
+        "teacher_confidence": 0.78,
+        "scenario_group": "gym_recreation"
+      },
+      {
+        "id": "cs_238",
+        "label": 0,
+        "q": 0.32875230381085513,
+        "teacher_confidence": 0.79,
+        "scenario_group": "gym_recreation"
+      },
+      {
+        "id": "cs_239",
+        "label": 1,
+        "q": 0.5749236231852376,
+        "teacher_confidence": 0.73,
+        "scenario_group": "gym_recreation"
+      },
+      {
+        "id": "cs_240",
+        "label": 1,
+        "q": 0.546825523226886,
+        "teacher_confidence": 0.69,
+        "scenario_group": "gym_recreation"
+      },
+      {
+        "id": "cs_241",
+        "label": 0,
+        "q": 0.4144851537090671,
+        "teacher_confidence": 0.98,
+        "scenario_group": "weather_closure"
+      },
+      {
+        "id": "cs_242",
+        "label": 0,
+        "q": 0.416382317356397,
+        "teacher_confidence": 0.96,
+        "scenario_group": "weather_closure"
+      },
+      {
+        "id": "cs_243",
+        "label": 0,
+        "q": 0.3982879783333653,
+        "teacher_confidence": 0.95,
+        "scenario_group": "weather_closure"
+      },
+      {
+        "id": "cs_244",
+        "label": 0,
+        "q": 0.4543905871387395,
+        "teacher_confidence": 0.93,
+        "scenario_group": "weather_closure"
+      },
+      {
+        "id": "cs_245",
+        "label": 1,
+        "q": 0.5787130711006385,
+        "teacher_confidence": 0.97,
+        "scenario_group": "weather_closure"
+      },
+      {
+        "id": "cs_246",
+        "label": 1,
+        "q": 0.5342724253936099,
+        "teacher_confidence": 0.95,
+        "scenario_group": "weather_closure"
+      },
+      {
+        "id": "cs_247",
+        "label": 1,
+        "q": 0.5673298671409308,
+        "teacher_confidence": 0.94,
+        "scenario_group": "weather_closure"
+      },
+      {
+        "id": "cs_248",
+        "label": 1,
+        "q": 0.44336577791444476,
+        "teacher_confidence": 0.92,
+        "scenario_group": "weather_closure"
+      },
+      {
+        "id": "cs_249",
+        "label": 0,
+        "q": 0.45353181313973895,
+        "teacher_confidence": 0.69,
+        "scenario_group": "weather_closure"
+      },
+      {
+        "id": "cs_250",
+        "label": 0,
+        "q": 0.3579329036260566,
+        "teacher_confidence": 0.78,
+        "scenario_group": "weather_closure"
+      },
+      {
+        "id": "cs_251",
+        "label": 1,
+        "q": 0.5877426734642558,
+        "teacher_confidence": 0.73,
+        "scenario_group": "weather_closure"
+      },
+      {
+        "id": "cs_252",
+        "label": 1,
+        "q": 0.3830755872305201,
+        "teacher_confidence": 0.68,
+        "scenario_group": "weather_closure"
+      },
+      {
+        "id": "cs_277",
+        "label": 0,
+        "q": 0.33567833731526525,
+        "teacher_confidence": 0.98,
+        "scenario_group": "admin_registration"
+      },
+      {
+        "id": "cs_278",
+        "label": 0,
+        "q": 0.46385044809579445,
+        "teacher_confidence": 0.96,
+        "scenario_group": "admin_registration"
+      },
+      {
+        "id": "cs_279",
+        "label": 0,
+        "q": 0.44317330257888105,
+        "teacher_confidence": 0.95,
+        "scenario_group": "admin_registration"
+      },
+      {
+        "id": "cs_280",
+        "label": 0,
+        "q": 0.3965041453726027,
+        "teacher_confidence": 0.93,
+        "scenario_group": "admin_registration"
+      },
+      {
+        "id": "cs_281",
+        "label": 1,
+        "q": 0.5249754398806105,
+        "teacher_confidence": 0.97,
+        "scenario_group": "admin_registration"
+      },
+      {
+        "id": "cs_282",
+        "label": 1,
+        "q": 0.5661739623331671,
+        "teacher_confidence": 0.95,
+        "scenario_group": "admin_registration"
+      },
+      {
+        "id": "cs_283",
+        "label": 1,
+        "q": 0.5153596481706069,
+        "teacher_confidence": 0.94,
+        "scenario_group": "admin_registration"
+      },
+      {
+        "id": "cs_284",
+        "label": 1,
+        "q": 0.6077334309111421,
+        "teacher_confidence": 0.92,
+        "scenario_group": "admin_registration"
+      },
+      {
+        "id": "cs_285",
+        "label": 0,
+        "q": 0.45591519444820094,
+        "teacher_confidence": 0.62,
+        "scenario_group": "admin_registration"
+      },
+      {
+        "id": "cs_286",
+        "label": 0,
+        "q": 0.3828460418029567,
+        "teacher_confidence": 0.78,
+        "scenario_group": "admin_registration"
+      },
+      {
+        "id": "cs_287",
+        "label": 1,
+        "q": 0.5358455962837119,
+        "teacher_confidence": 0.75,
+        "scenario_group": "admin_registration"
+      },
+      {
+        "id": "cs_288",
+        "label": 1,
+        "q": 0.5858681906513749,
+        "teacher_confidence": 0.71,
+        "scenario_group": "admin_registration"
+      },
+      {
+        "id": "cs_289",
+        "label": 0,
+        "q": 0.4371001400972062,
+        "teacher_confidence": 0.98,
+        "scenario_group": "technology_wifi"
+      },
+      {
+        "id": "cs_290",
+        "label": 0,
+        "q": 0.460797532445561,
+        "teacher_confidence": 0.96,
+        "scenario_group": "technology_wifi"
+      },
+      {
+        "id": "cs_291",
+        "label": 0,
+        "q": 0.3936876977372393,
+        "teacher_confidence": 0.95,
+        "scenario_group": "technology_wifi"
+      },
+      {
+        "id": "cs_292",
+        "label": 0,
+        "q": 0.4422330717419861,
+        "teacher_confidence": 0.93,
+        "scenario_group": "technology_wifi"
+      },
+      {
+        "id": "cs_293",
+        "label": 1,
+        "q": 0.6075571375610599,
+        "teacher_confidence": 0.97,
+        "scenario_group": "technology_wifi"
+      },
+      {
+        "id": "cs_294",
+        "label": 1,
+        "q": 0.5834878726678825,
+        "teacher_confidence": 0.95,
+        "scenario_group": "technology_wifi"
+      },
+      {
+        "id": "cs_295",
+        "label": 1,
+        "q": 0.5917618366860005,
+        "teacher_confidence": 0.94,
+        "scenario_group": "technology_wifi"
+      },
+      {
+        "id": "cs_296",
+        "label": 1,
+        "q": 0.5287976845586303,
+        "teacher_confidence": 0.92,
+        "scenario_group": "technology_wifi"
+      },
+      {
+        "id": "cs_297",
+        "label": 0,
+        "q": 0.4381923695311336,
+        "teacher_confidence": 0.64,
+        "scenario_group": "technology_wifi"
+      },
+      {
+        "id": "cs_298",
+        "label": 0,
+        "q": 0.45229085455442947,
+        "teacher_confidence": 0.78,
+        "scenario_group": "technology_wifi"
+      },
+      {
+        "id": "cs_299",
+        "label": 1,
+        "q": 0.5680238571892253,
+        "teacher_confidence": 0.76,
+        "scenario_group": "technology_wifi"
+      },
+      {
+        "id": "cs_300",
+        "label": 1,
+        "q": 0.5553261969738309,
+        "teacher_confidence": 0.68,
+        "scenario_group": "technology_wifi"
+      }
+    ],
+    "validation": [
+      {
+        "id": "cs_121",
+        "label": 0,
+        "q": 0.4842315570142653,
+        "teacher_confidence": 0.98,
+        "scenario_group": "tuition"
+      },
+      {
+        "id": "cs_122",
+        "label": 0,
+        "q": 0.4585954091655962,
+        "teacher_confidence": 0.96,
+        "scenario_group": "tuition"
+      },
+      {
+        "id": "cs_123",
+        "label": 0,
+        "q": 0.5057214362291893,
+        "teacher_confidence": 0.95,
+        "scenario_group": "tuition"
+      },
+      {
+        "id": "cs_124",
+        "label": 0,
+        "q": 0.4404024115065549,
+        "teacher_confidence": 0.93,
+        "scenario_group": "tuition"
+      },
+      {
+        "id": "cs_125",
+        "label": 1,
+        "q": 0.6202151345759762,
+        "teacher_confidence": 0.97,
+        "scenario_group": "tuition"
+      },
+      {
+        "id": "cs_126",
+        "label": 1,
+        "q": 0.6040259800518237,
+        "teacher_confidence": 0.95,
+        "scenario_group": "tuition"
+      },
+      {
+        "id": "cs_127",
+        "label": 1,
+        "q": 0.5318797593778718,
+        "teacher_confidence": 0.94,
+        "scenario_group": "tuition"
+      },
+      {
+        "id": "cs_128",
+        "label": 1,
+        "q": 0.563669455364412,
+        "teacher_confidence": 0.92,
+        "scenario_group": "tuition"
+      },
+      {
+        "id": "cs_129",
+        "label": 0,
+        "q": 0.5015206924653443,
+        "teacher_confidence": 0.63,
+        "scenario_group": "tuition"
+      },
+      {
+        "id": "cs_130",
+        "label": 0,
+        "q": 0.5171644165494006,
+        "teacher_confidence": 0.67,
+        "scenario_group": "tuition"
+      },
+      {
+        "id": "cs_131",
+        "label": 1,
+        "q": 0.5943920997163243,
+        "teacher_confidence": 0.72,
+        "scenario_group": "tuition"
+      },
+      {
+        "id": "cs_132",
+        "label": 1,
+        "q": 0.5320494429972176,
+        "teacher_confidence": 0.75,
+        "scenario_group": "tuition"
+      },
+      {
+        "id": "cs_193",
+        "label": 0,
+        "q": 0.4912669915530408,
+        "teacher_confidence": 0.98,
+        "scenario_group": "study_advice"
+      },
+      {
+        "id": "cs_194",
+        "label": 0,
+        "q": 0.5150823866592164,
+        "teacher_confidence": 0.96,
+        "scenario_group": "study_advice"
+      },
+      {
+        "id": "cs_195",
+        "label": 0,
+        "q": 0.3950624232522024,
+        "teacher_confidence": 0.95,
+        "scenario_group": "study_advice"
+      },
+      {
+        "id": "cs_196",
+        "label": 0,
+        "q": 0.34273373536882534,
+        "teacher_confidence": 0.93,
+        "scenario_group": "study_advice"
+      },
+      {
+        "id": "cs_197",
+        "label": 1,
+        "q": 0.5924723337072464,
+        "teacher_confidence": 0.97,
+        "scenario_group": "study_advice"
+      },
+      {
+        "id": "cs_198",
+        "label": 1,
+        "q": 0.6257608320564544,
+        "teacher_confidence": 0.95,
+        "scenario_group": "study_advice"
+      },
+      {
+        "id": "cs_199",
+        "label": 1,
+        "q": 0.5865362891790982,
+        "teacher_confidence": 0.94,
+        "scenario_group": "study_advice"
+      },
+      {
+        "id": "cs_200",
+        "label": 1,
+        "q": 0.5741371609686092,
+        "teacher_confidence": 0.92,
+        "scenario_group": "study_advice"
+      },
+      {
+        "id": "cs_201",
+        "label": 0,
+        "q": 0.5426735953470511,
+        "teacher_confidence": 0.72,
+        "scenario_group": "study_advice"
+      },
+      {
+        "id": "cs_202",
+        "label": 0,
+        "q": 0.38806854626952386,
+        "teacher_confidence": 0.78,
+        "scenario_group": "study_advice"
+      },
+      {
+        "id": "cs_203",
+        "label": 1,
+        "q": 0.5508044818121788,
+        "teacher_confidence": 0.73,
+        "scenario_group": "study_advice"
+      },
+      {
+        "id": "cs_204",
+        "label": 1,
+        "q": 0.5457641315291991,
+        "teacher_confidence": 0.71,
+        "scenario_group": "study_advice"
+      },
+      {
+        "id": "cs_217",
+        "label": 0,
+        "q": 0.3288027986428841,
+        "teacher_confidence": 0.98,
+        "scenario_group": "library"
+      },
+      {
+        "id": "cs_218",
+        "label": 0,
+        "q": 0.41720246387956184,
+        "teacher_confidence": 0.96,
+        "scenario_group": "library"
+      },
+      {
+        "id": "cs_219",
+        "label": 0,
+        "q": 0.43331565261209276,
+        "teacher_confidence": 0.95,
+        "scenario_group": "library"
+      },
+      {
+        "id": "cs_220",
+        "label": 0,
+        "q": 0.41652812611651563,
+        "teacher_confidence": 0.93,
+        "scenario_group": "library"
+      },
+      {
+        "id": "cs_221",
+        "label": 1,
+        "q": 0.48691631836941285,
+        "teacher_confidence": 0.97,
+        "scenario_group": "library"
+      },
+      {
+        "id": "cs_222",
+        "label": 1,
+        "q": 0.4836806962045485,
+        "teacher_confidence": 0.95,
+        "scenario_group": "library"
+      },
+      {
+        "id": "cs_223",
+        "label": 1,
+        "q": 0.5976322057131676,
+        "teacher_confidence": 0.94,
+        "scenario_group": "library"
+      },
+      {
+        "id": "cs_224",
+        "label": 1,
+        "q": 0.5595536774040581,
+        "teacher_confidence": 0.92,
+        "scenario_group": "library"
+      },
+      {
+        "id": "cs_225",
+        "label": 0,
+        "q": 0.32749567841767885,
+        "teacher_confidence": 0.79,
+        "scenario_group": "library"
+      },
+      {
+        "id": "cs_226",
+        "label": 0,
+        "q": 0.3646574246640485,
+        "teacher_confidence": 0.76,
+        "scenario_group": "library"
+      },
+      {
+        "id": "cs_227",
+        "label": 1,
+        "q": 0.4543086305518334,
+        "teacher_confidence": 0.74,
+        "scenario_group": "library"
+      },
+      {
+        "id": "cs_228",
+        "label": 1,
+        "q": 0.5136932036188671,
+        "teacher_confidence": 0.7,
+        "scenario_group": "library"
+      },
+      {
+        "id": "cs_253",
+        "label": 0,
+        "q": 0.42711919484908323,
+        "teacher_confidence": 0.98,
+        "scenario_group": "campus_jobs"
+      },
+      {
+        "id": "cs_254",
+        "label": 0,
+        "q": 0.41362114026041447,
+        "teacher_confidence": 0.96,
+        "scenario_group": "campus_jobs"
+      },
+      {
+        "id": "cs_255",
+        "label": 0,
+        "q": 0.48155168344569454,
+        "teacher_confidence": 0.95,
+        "scenario_group": "campus_jobs"
+      },
+      {
+        "id": "cs_256",
+        "label": 0,
+        "q": 0.3736265449168473,
+        "teacher_confidence": 0.93,
+        "scenario_group": "campus_jobs"
+      },
+      {
+        "id": "cs_257",
+        "label": 1,
+        "q": 0.558762478829648,
+        "teacher_confidence": 0.97,
+        "scenario_group": "campus_jobs"
+      },
+      {
+        "id": "cs_258",
+        "label": 1,
+        "q": 0.6067699640951147,
+        "teacher_confidence": 0.95,
+        "scenario_group": "campus_jobs"
+      },
+      {
+        "id": "cs_259",
+        "label": 1,
+        "q": 0.6020104598704333,
+        "teacher_confidence": 0.94,
+        "scenario_group": "campus_jobs"
+      },
+      {
+        "id": "cs_260",
+        "label": 1,
+        "q": 0.562557492943616,
+        "teacher_confidence": 0.92,
+        "scenario_group": "campus_jobs"
+      },
+      {
+        "id": "cs_261",
+        "label": 0,
+        "q": 0.4395395677792006,
+        "teacher_confidence": 0.75,
+        "scenario_group": "campus_jobs"
+      },
+      {
+        "id": "cs_262",
+        "label": 0,
+        "q": 0.4501720073771403,
+        "teacher_confidence": 0.78,
+        "scenario_group": "campus_jobs"
+      },
+      {
+        "id": "cs_263",
+        "label": 1,
+        "q": 0.5421293108229658,
+        "teacher_confidence": 0.72,
+        "scenario_group": "campus_jobs"
+      },
+      {
+        "id": "cs_264",
+        "label": 1,
+        "q": 0.5390989754642683,
+        "teacher_confidence": 0.77,
+        "scenario_group": "campus_jobs"
+      }
+    ],
+    "test": [
+      {
+        "id": "cs_037",
+        "label": 0,
+        "q": 0.3427223514641615,
+        "teacher_confidence": 0.98,
+        "scenario_group": "campus_event"
+      },
+      {
+        "id": "cs_038",
+        "label": 0,
+        "q": 0.39695146004805637,
+        "teacher_confidence": 0.96,
+        "scenario_group": "campus_event"
+      },
+      {
+        "id": "cs_039",
+        "label": 0,
+        "q": 0.3975302423798338,
+        "teacher_confidence": 0.95,
+        "scenario_group": "campus_event"
+      },
+      {
+        "id": "cs_040",
+        "label": 0,
+        "q": 0.3651577490231893,
+        "teacher_confidence": 0.93,
+        "scenario_group": "campus_event"
+      },
+      {
+        "id": "cs_041",
+        "label": 1,
+        "q": 0.6017293387788183,
+        "teacher_confidence": 0.97,
+        "scenario_group": "campus_event"
+      },
+      {
+        "id": "cs_042",
+        "label": 1,
+        "q": 0.5547366665049682,
+        "teacher_confidence": 0.95,
+        "scenario_group": "campus_event"
+      },
+      {
+        "id": "cs_043",
+        "label": 1,
+        "q": 0.6002412658841628,
+        "teacher_confidence": 0.94,
+        "scenario_group": "campus_event"
+      },
+      {
+        "id": "cs_044",
+        "label": 1,
+        "q": 0.555414290813625,
+        "teacher_confidence": 0.92,
+        "scenario_group": "campus_event"
+      },
+      {
+        "id": "cs_045",
+        "label": 0,
+        "q": 0.4336739194789406,
+        "teacher_confidence": 0.58,
+        "scenario_group": "campus_event"
+      },
+      {
+        "id": "cs_046",
+        "label": 0,
+        "q": 0.3838786296903997,
+        "teacher_confidence": 0.73,
+        "scenario_group": "campus_event"
+      },
+      {
+        "id": "cs_047",
+        "label": 1,
+        "q": 0.5393775270320593,
+        "teacher_confidence": 0.67,
+        "scenario_group": "campus_event"
+      },
+      {
+        "id": "cs_048",
+        "label": 1,
+        "q": 0.5226695933942291,
+        "teacher_confidence": 0.75,
+        "scenario_group": "campus_event"
+      },
+      {
+        "id": "cs_109",
+        "label": 0,
+        "q": 0.4496801420453233,
+        "teacher_confidence": 0.98,
+        "scenario_group": "academics_general"
+      },
+      {
+        "id": "cs_110",
+        "label": 0,
+        "q": 0.389191964359345,
+        "teacher_confidence": 0.96,
+        "scenario_group": "academics_general"
+      },
+      {
+        "id": "cs_111",
+        "label": 0,
+        "q": 0.39723786375939457,
+        "teacher_confidence": 0.95,
+        "scenario_group": "academics_general"
+      },
+      {
+        "id": "cs_112",
+        "label": 0,
+        "q": 0.4307437907153164,
+        "teacher_confidence": 0.93,
+        "scenario_group": "academics_general"
+      },
+      {
+        "id": "cs_113",
+        "label": 1,
+        "q": 0.6043163811391119,
+        "teacher_confidence": 0.97,
+        "scenario_group": "academics_general"
+      },
+      {
+        "id": "cs_114",
+        "label": 1,
+        "q": 0.6023823140593425,
+        "teacher_confidence": 0.95,
+        "scenario_group": "academics_general"
+      },
+      {
+        "id": "cs_115",
+        "label": 1,
+        "q": 0.5921444657897199,
+        "teacher_confidence": 0.94,
+        "scenario_group": "academics_general"
+      },
+      {
+        "id": "cs_116",
+        "label": 1,
+        "q": 0.6208464178192702,
+        "teacher_confidence": 0.92,
+        "scenario_group": "academics_general"
+      },
+      {
+        "id": "cs_117",
+        "label": 0,
+        "q": 0.4705109032413739,
+        "teacher_confidence": 0.69,
+        "scenario_group": "academics_general"
+      },
+      {
+        "id": "cs_118",
+        "label": 0,
+        "q": 0.4436383259217937,
+        "teacher_confidence": 0.74,
+        "scenario_group": "academics_general"
+      },
+      {
+        "id": "cs_119",
+        "label": 1,
+        "q": 0.5630510450853915,
+        "teacher_confidence": 0.72,
+        "scenario_group": "academics_general"
+      },
+      {
+        "id": "cs_120",
+        "label": 1,
+        "q": 0.6212248027279317,
+        "teacher_confidence": 0.7,
+        "scenario_group": "academics_general"
+      },
+      {
+        "id": "cs_265",
+        "label": 0,
+        "q": 0.36681601221448584,
+        "teacher_confidence": 0.98,
+        "scenario_group": "health_wellness"
+      },
+      {
+        "id": "cs_266",
+        "label": 0,
+        "q": 0.48520328066138474,
+        "teacher_confidence": 0.96,
+        "scenario_group": "health_wellness"
+      },
+      {
+        "id": "cs_267",
+        "label": 0,
+        "q": 0.48765929267376945,
+        "teacher_confidence": 0.95,
+        "scenario_group": "health_wellness"
+      },
+      {
+        "id": "cs_268",
+        "label": 0,
+        "q": 0.340024819727391,
+        "teacher_confidence": 0.93,
+        "scenario_group": "health_wellness"
+      },
+      {
+        "id": "cs_269",
+        "label": 1,
+        "q": 0.5871080926153078,
+        "teacher_confidence": 0.97,
+        "scenario_group": "health_wellness"
+      },
+      {
+        "id": "cs_270",
+        "label": 1,
+        "q": 0.543612308786541,
+        "teacher_confidence": 0.95,
+        "scenario_group": "health_wellness"
+      },
+      {
+        "id": "cs_271",
+        "label": 1,
+        "q": 0.5434292442676479,
+        "teacher_confidence": 0.94,
+        "scenario_group": "health_wellness"
+      },
+      {
+        "id": "cs_272",
+        "label": 1,
+        "q": 0.6301777768814276,
+        "teacher_confidence": 0.92,
+        "scenario_group": "health_wellness"
+      },
+      {
+        "id": "cs_273",
+        "label": 0,
+        "q": 0.39485188600202265,
+        "teacher_confidence": 0.79,
+        "scenario_group": "health_wellness"
+      },
+      {
+        "id": "cs_274",
+        "label": 0,
+        "q": 0.4815209293055486,
+        "teacher_confidence": 0.74,
+        "scenario_group": "health_wellness"
+      },
+      {
+        "id": "cs_275",
+        "label": 1,
+        "q": 0.574247688160496,
+        "teacher_confidence": 0.73,
+        "scenario_group": "health_wellness"
+      },
+      {
+        "id": "cs_276",
+        "label": 1,
+        "q": 0.5212665986747229,
+        "teacher_confidence": 0.76,
+        "scenario_group": "health_wellness"
+      }
+    ]
+  },
+  "evaluation_threshold": 0.55,
+  "evaluation_threshold_role": "validation_selected",
+  "trusted_metrics": {
+    "train": {
+      "threshold": 0.55,
+      "confusion_matrix": [
+        [
+          72,
+          0
+        ],
+        [
+          13,
+          59
+        ]
+      ],
+      "n": 144,
+      "accuracy": 0.9097222222222222,
+      "precision": 1.0,
+      "recall": 0.8194444444444444,
+      "f1": 0.9007633587786259,
+      "fpr": 0.0,
+      "fnr": 0.18055555555555555,
+      "accepted": 59,
+      "fpr_wilson_upper_95": 0.05065117259645781,
+      "roc_auc": 0.9911265432098766,
+      "pr_auc_average_precision": 0.9918846588508272,
+      "small_sample_warning": false,
+      "probability_by_class": {
+        "0": {
+          "n": 72,
+          "quantiles_0_25_50_75_100": [
+            0.3279510444119104,
+            0.3650231036384295,
+            0.410530048714274,
+            0.44826688338142207,
+            0.5358526670731855
+          ]
+        },
+        "1": {
+          "n": 72,
+          "quantiles_0_25_50_75_100": [
+            0.44336577791444476,
+            0.5573162423931658,
+            0.5880715085973616,
+            0.6092996862956568,
+            0.6614234279227846
+          ]
+        }
+      }
+    },
+    "validation": {
+      "threshold": 0.55,
+      "confusion_matrix": [
+        [
+          16,
+          0
+        ],
+        [
+          3,
+          13
+        ]
+      ],
+      "n": 32,
+      "accuracy": 0.90625,
+      "precision": 1.0,
+      "recall": 0.8125,
+      "f1": 0.896551724137931,
+      "fpr": 0.0,
+      "fnr": 0.1875,
+      "accepted": 13,
+      "fpr_wilson_upper_95": 0.1936076805344365,
+      "roc_auc": 0.97265625,
+      "pr_auc_average_precision": 0.9770833333333333,
+      "small_sample_warning": true,
+      "probability_by_class": {
+        "0": {
+          "n": 16,
+          "quantiles_0_25_50_75_100": [
+            0.3288027986428841,
+            0.40898146100836147,
+            0.430217423730588,
+            0.4822216518378372,
+            0.5150823866592164
+          ]
+        },
+        "1": {
+          "n": 16,
+          "quantiles_0_25_50_75_100": [
+            0.4836806962045485,
+            0.5593558777604556,
+            0.5803367250738537,
+            0.602514339915781,
+            0.6257608320564544
+          ]
+        }
+      }
+    },
+    "test": {
+      "threshold": 0.55,
+      "confusion_matrix": [
+        [
+          12,
+          0
+        ],
+        [
+          2,
+          10
+        ]
+      ],
+      "n": 24,
+      "accuracy": 0.9166666666666666,
+      "precision": 1.0,
+      "recall": 0.8333333333333334,
+      "f1": 0.9090909090909091,
+      "fpr": 0.0,
+      "fnr": 0.16666666666666666,
+      "accepted": 10,
+      "fpr_wilson_upper_95": 0.24249400665524087,
+      "roc_auc": 1.0,
+      "pr_auc_average_precision": 1.0,
+      "small_sample_warning": true,
+      "probability_by_class": {
+        "0": {
+          "n": 12,
+          "quantiles_0_25_50_75_100": [
+            0.340024819727391,
+            0.3664014464166617,
+            0.39709466190372544,
+            0.4354778785478181,
+            0.48765929267376945
+          ]
+        },
+        "1": {
+          "n": 12,
+          "quantiles_0_25_50_75_100": [
+            0.5434292442676479,
+            0.5552448847364607,
+            0.5961928658369413,
+            0.6028658308292849,
+            0.6301777768814276
+          ]
+        }
+      }
+    }
+  },
+  "all_provisional_metrics": {
+    "train": {
+      "threshold": 0.55,
+      "confusion_matrix": [
+        [
+          106,
+          2
+        ],
+        [
+          23,
+          85
+        ]
+      ],
+      "n": 216,
+      "accuracy": 0.8842592592592593,
+      "precision": 0.9770114942528736,
+      "recall": 0.7870370370370371,
+      "f1": 0.8717948717948718,
+      "fpr": 0.018518518518518517,
+      "fnr": 0.21296296296296297,
+      "accepted": 87,
+      "fpr_wilson_upper_95": 0.06501904800376766,
+      "roc_auc": 0.9728223593964335,
+      "pr_auc_average_precision": 0.9752473223086834,
+      "small_sample_warning": false,
+      "probability_by_class": {
+        "0": {
+          "n": 108,
+          "quantiles_0_25_50_75_100": [
+            0.3279510444119104,
+            0.3705495962518943,
+            0.41451312954343006,
+            0.46445224093878956,
+            0.5830585278989229
+          ]
+        },
+        "1": {
+          "n": 108,
+          "quantiles_0_25_50_75_100": [
+            0.3830755872305201,
+            0.5563495474360978,
+            0.5850303561393085,
+            0.6084596298885501,
+            0.6710932687144278
+          ]
+        }
+      }
+    },
+    "validation": {
+      "threshold": 0.55,
+      "confusion_matrix": [
+        [
+          24,
+          0
+        ],
+        [
+          9,
+          15
+        ]
+      ],
+      "n": 48,
+      "accuracy": 0.8125,
+      "precision": 1.0,
+      "recall": 0.625,
+      "f1": 0.7692307692307693,
+      "fpr": 0.0,
+      "fnr": 0.375,
+      "accepted": 15,
+      "fpr_wilson_upper_95": 0.1379762046749802,
+      "roc_auc": 0.9496527777777779,
+      "pr_auc_average_precision": 0.9562019790638212,
+      "small_sample_warning": true,
+      "probability_by_class": {
+        "0": {
+          "n": 24,
+          "quantiles_0_25_50_75_100": [
+            0.32749567841767885,
+            0.3933139540065328,
+            0.4364276101956467,
+            0.4859904156489592,
+            0.5426735953470511
+          ]
+        },
+        "1": {
+          "n": 24,
+          "quantiles_0_25_50_75_100": [
+            0.4543086305518334,
+            0.5373365923475056,
+            0.561055585173837,
+            0.5952021262155351,
+            0.6257608320564544
+          ]
+        }
+      }
+    },
+    "test": {
+      "threshold": 0.55,
+      "confusion_matrix": [
+        [
+          18,
+          0
+        ],
+        [
+          5,
+          13
+        ]
+      ],
+      "n": 36,
+      "accuracy": 0.8611111111111112,
+      "precision": 1.0,
+      "recall": 0.7222222222222222,
+      "f1": 0.8387096774193549,
+      "fpr": 0.0,
+      "fnr": 0.2777777777777778,
+      "accepted": 13,
+      "fpr_wilson_upper_95": 0.17587922364665765,
+      "roc_auc": 1.0,
+      "pr_auc_average_precision": 1.0,
+      "small_sample_warning": true,
+      "probability_by_class": {
+        "0": {
+          "n": 18,
+          "quantiles_0_25_50_75_100": [
+            0.340024819727391,
+            0.38520696335763605,
+            0.3973840530696142,
+            0.4481696880144409,
+            0.48765929267376945
+          ]
+        },
+        "1": {
+          "n": 18,
+          "quantiles_0_25_50_75_100": [
+            0.5212665986747229,
+            0.5463933982161477,
+            0.580677890387902,
+            0.6022190702392114,
+            0.6301777768814276
+          ]
+        }
+      }
+    }
+  },
+  "dataset_sha256": "a147f55c6b23ad8af178234d6df5aba8387a5695ec48dda50d61d09c631fe5ae",
+  "embedding_values_sha256": "b572a47d47ccd983c01cebc7eb5f6c3c4073c0f0828cc2aac93528b2d3f183a4",
+  "runtime": {
+    "python": "3.14.0",
+    "numpy": "2.4.2",
+    "scipy": "1.17.1",
+    "scikit_learn": "1.8.0"
+  },
+  "optimizer": {
+    "solver": "lbfgs",
+    "inverse_C": 1.0,
+    "class_weight": "none",
+    "max_iterations": 2000,
+    "soft_labels": false
+  }
+}

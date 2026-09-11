@@ -66,15 +66,120 @@ struct HomeForumRecommendationBundle {
     let algorithmVersion: String
     let posts: [HomeForumPreview]
     let positions: [UUID: Int]
+    let resolution: HomeForumSessionResolution
 }
 
-struct RecommendationSessionPaginationState: Equatable {
-    let sessionID: UUID
-    private(set) var offset = 0
+struct HomeForumSessionResolution: Decodable {
+    let session_id: UUID
+    let created_at: Date
+    let expires_at: Date
+    let reused: Bool
+    let reason: String
+    let items: [RecommendationFeedPageRow]
+}
 
-    mutating func recordPage(itemCount: Int) {
-        offset += max(itemCount, 0)
+enum HomeRefreshIntent { case normal, explicitPull }
+
+/// Presentation only. No ranking scores, exposure signals or continuation IDs.
+struct HomeForumPresentation {
+    private(set) var accountID: UUID?
+    private(set) var sessionID: UUID?
+    private(set) var orderedIDs: [UUID] = []
+    private(set) var recentTops: [[UUID]] = []
+    private(set) var generation = 0
+    private(set) var tierCounts = [0, 0, 0]
+
+    static func tiers(_ candidates: [UUID], previous: [UUID], older: [UUID]) -> [[UUID]] {
+        let last = Set(previous), before = Set(older)
+        return [candidates.filter { !last.contains($0) && !before.contains($0) },
+                candidates.filter { !last.contains($0) && before.contains($0) },
+                candidates.filter { last.contains($0) }]
     }
+
+    mutating func resolve(account: UUID, session: UUID, candidates: [UUID], featured: Set<UUID>, intent: HomeRefreshIntent) {
+        var seen = Set<UUID>()
+        let organic = candidates.filter { !featured.contains($0) && seen.insert($0).inserted }
+        let changed = accountID != account || sessionID != session
+        if changed {
+            self = HomeForumPresentation()
+            accountID = account; sessionID = session
+            orderedIDs = organic
+            // Seed first display so the first pull can rotate away from its top.
+            recentTops = [Array(organic.prefix(20))]
+            return
+        }
+        recentTops = recentTops.map { $0.filter { seen.contains($0) } }
+        guard intent == .explicitPull else {
+            let prior = Set(orderedIDs)
+            orderedIDs = orderedIDs.filter { seen.contains($0) } + organic.filter { !prior.contains($0) }
+            return
+        }
+        let groups = Self.tiers(organic, previous: recentTops.first ?? [], older: recentTops.dropFirst().first ?? [])
+        tierCounts = groups.map(\.count)
+        orderedIDs = groups.flatMap { $0 }
+        recentTops = Array(([Array(orderedIDs.prefix(20))] + recentTops).prefix(2))
+        generation += 1
+    }
+}
+
+/// One request/commit for overlapping pulls; a pull arriving during a normal
+/// request upgrades that operation's presentation intent, without another RPC.
+@MainActor
+final class HomeRefreshCoordinator {
+    private var task: Task<Bool, Never>?
+    private var token: UUID?
+    private(set) var explicitPullRequested = false
+
+    func run(intent: HomeRefreshIntent, operation: @escaping @MainActor () async -> Bool) async -> Bool {
+        if intent == .explicitPull { explicitPullRequested = true }
+        if let task { return await task.value }
+        let id = UUID()
+        token = id
+        let newTask = Task { await operation() }
+        task = newTask
+        let result = await newTask.value
+        if token == id { task = nil; token = nil; explicitPullRequested = false }
+        return result
+    }
+
+    func cancel() {
+        task?.cancel(); task = nil; token = nil; explicitPullRequested = false
+    }
+}
+
+/// Keep the database timestamp verbatim: converting through Date loses cursor precision.
+struct ForumContinuationReference: Codable, Equatable {
+    let post_id: UUID
+    let created_at: String
+}
+
+/// Presentation rotation has no access to this session-scoped browsing cursor.
+struct HomeForumContinuationPosition {
+    private(set) var sessionID: UUID?
+    var cursor: ForumContinuationReference?
+    var exclusions: [UUID]?
+
+    static func allowsAutomaticLoad(refreshError: String?, paginationError: String?) -> Bool {
+        refreshError == nil && paginationError == nil
+    }
+
+    mutating func resolve(session: UUID?) -> Bool {
+        guard session == nil || sessionID != session else { return false }
+        self = HomeForumContinuationPosition(sessionID: session)
+        return true
+    }
+
+    static func unseen(_ ids: [UUID], after existing: [UUID]) -> [UUID] {
+        var seen = Set(existing)
+        return ids.filter { seen.insert($0).inserted }
+    }
+}
+
+private struct ForumContinuationParams: Encodable {
+    let p_excluded_ids: [UUID]
+    let p_before_time: String?
+    let p_before_id: UUID?
+    let p_limit: Int
 }
 
 final class HomeFeedService {
@@ -83,6 +188,15 @@ final class HomeFeedService {
     private let supabase = SupabaseManager.shared
 
     private init() {}
+
+    func fetchForumContinuation(excluding: [UUID], before: ForumContinuationReference?) async throws -> [ForumContinuationReference] {
+        try await supabase.client
+            .rpc("get_forum_continuation_page", params: ForumContinuationParams(
+                p_excluded_ids: excluding, p_before_time: before?.created_at,
+                p_before_id: before?.post_id, p_limit: 20))
+            .setHeader(name: "x-cheese-recommendation-contract", value: "2")
+            .execute().value
+    }
 
     func fetchFeaturedBundle(secondhandLimit: Int) async throws -> HomeFeaturedFeedBundle {
         let secondhand = try await fetchFeaturedSecondhandRows(limit: secondhandLimit)
@@ -93,7 +207,7 @@ final class HomeFeedService {
     }
 
     func fetchHomeFeaturedPosts(limit: Int = 12) async throws -> [HomeFeaturedPost] {
-        try await supabase
+        let rows: [HomeFeaturedPost] = try await supabase
             .database("home_featured_posts")
             .select("post_id,badge,display_order")
             .eq("is_enabled", value: true)
@@ -102,6 +216,18 @@ final class HomeFeedService {
             .limit(limit)
             .execute()
             .value
+        guard !rows.isEmpty else { return [] }
+        let allowed: [UUID] = try await supabase.client
+            .rpc("filter_cross_school_recommendation_posts",
+                 params: CrossSchoolPostIDsParams(postIDs: rows.map(\.postID)))
+            .setHeader(name: "x-cheese-recommendation-contract", value: "2")
+            .execute()
+            .value
+        return Self.eligibleFeaturedPosts(rows, allowedIDs: Set(allowed))
+    }
+
+    static func eligibleFeaturedPosts(_ rows: [HomeFeaturedPost], allowedIDs: Set<UUID>) -> [HomeFeaturedPost] {
+        rows.filter { allowedIDs.contains($0.postID) }
     }
 
     func fetchForumPreview(limit: Int) async throws -> [HomeForumPreview] {
@@ -119,52 +245,24 @@ final class HomeFeedService {
         return rows.map(Self.makeForumPreview)
     }
 
-    /// Returns nil when server-side rollout keeps this account on the legacy
-    /// feed. A V1 session owns ordering; hydration below preserves that order.
-    func fetchRecommendationForumPreview(
-        limit: Int = 36,
-        forceRefresh: Bool
-    ) async throws -> HomeForumRecommendationBundle? {
+    /// Normal loads and pulls both resolve the same valid server session.
+    /// Only an explicit server-off mode may return nil; errors never fall back.
+    func resolveRecommendationForumPreview() async throws -> HomeForumRecommendationBundle? {
         let mode: RecommendationFeedModeRow = try await supabase.client
             .rpc("get_recommendation_feed_mode")
+            .setHeader(name: "x-cheese-recommendation-contract", value: "2")
             .execute()
             .value
         guard mode.useRecommendations else { return nil }
 
-        let sessionID: UUID? = try await supabase.client
-            .rpc(
-                "create_recommendation_feed_session",
-                params: CreateRecommendationSessionParams(
-                    forceRefresh: forceRefresh,
-                    shadow: false,
-                    userID: nil
-                )
-            )
+        let resolution: HomeForumSessionResolution? = try await supabase.client
+            .rpc("resolve_home_forum_session")
+            .setHeader(name: "x-cheese-recommendation-contract", value: "2")
             .execute()
             .value
-        guard let sessionID else { return nil }
-
-        var references: [RecommendationFeedPageRow] = []
-        var pagination = RecommendationSessionPaginationState(sessionID: sessionID)
-        let boundedLimit = min(max(limit, 1), 60)
-        while references.count < boundedLimit {
-            let page: [RecommendationFeedPageRow] = try await supabase.client
-                .rpc(
-                    "get_recommendation_feed_page",
-                    params: RecommendationFeedPageParams(
-                        sessionID: sessionID,
-                        offset: pagination.offset,
-                        limit: min(20, boundedLimit - references.count)
-                    )
-                )
-                .execute()
-                .value
-            references.append(contentsOf: page)
-            guard page.count == min(20, boundedLimit - (references.count - page.count)) else {
-                break
-            }
-            pagination.recordPage(itemCount: page.count)
-        }
+        guard let resolution else { throw PostgrestError(code: "P0001", message: "Recommendation mode changed; retry") }
+        let sessionID = resolution.session_id
+        let references = resolution.items
 
         let postIDs = references.map(\.postID)
         guard !postIDs.isEmpty else {
@@ -172,7 +270,7 @@ final class HomeFeedService {
                 sessionID: sessionID,
                 algorithmVersion: mode.algorithmVersion,
                 posts: [],
-                positions: [:]
+                positions: [:], resolution: resolution
             )
         }
         let rows: [ForumPreviewRow] = try await supabase
@@ -190,8 +288,20 @@ final class HomeFeedService {
             },
             positions: Dictionary(
                 uniqueKeysWithValues: references.map { ($0.postID, $0.position) }
-            )
+            ), resolution: resolution
         )
+    }
+
+    func validateForumPosts(_ ids: [UUID]) async throws -> Set<UUID> {
+        var allowed = Set<UUID>()
+        for start in stride(from: 0, to: ids.count, by: 100) {
+            let batch = Array(ids[start..<min(start + 100, ids.count)])
+            let rows: [UUID] = try await supabase.client
+                .rpc("validate_home_forum_posts", params: CrossSchoolPostIDsParams(postIDs: batch))
+                .setHeader(name: "x-cheese-recommendation-contract", value: "2").execute().value
+            allowed.formUnion(rows)
+        }
+        return allowed
     }
 
     func fetchFollowingFeed(
@@ -319,7 +429,15 @@ private struct RecommendationFeedModeRow: Decodable {
     }
 }
 
-private struct RecommendationFeedPageRow: Decodable {
+private struct CrossSchoolPostIDsParams: Encodable {
+    let postIDs: [UUID]
+
+    enum CodingKeys: String, CodingKey {
+        case postIDs = "p_post_ids"
+    }
+}
+
+struct RecommendationFeedPageRow: Decodable {
     let sessionID: UUID
     let postID: UUID
     let position: Int
@@ -328,30 +446,6 @@ private struct RecommendationFeedPageRow: Decodable {
         case sessionID = "session_id"
         case postID = "post_id"
         case position
-    }
-}
-
-private struct CreateRecommendationSessionParams: Encodable {
-    let forceRefresh: Bool
-    let shadow: Bool
-    let userID: UUID?
-
-    enum CodingKeys: String, CodingKey {
-        case forceRefresh = "p_force_refresh"
-        case shadow = "p_shadow"
-        case userID = "p_user_id"
-    }
-}
-
-private struct RecommendationFeedPageParams: Encodable {
-    let sessionID: UUID
-    let offset: Int
-    let limit: Int
-
-    enum CodingKeys: String, CodingKey {
-        case sessionID = "p_session_id"
-        case offset = "p_offset"
-        case limit = "p_limit"
     }
 }
 

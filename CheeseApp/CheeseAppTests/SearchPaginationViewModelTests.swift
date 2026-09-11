@@ -3,6 +3,77 @@ import XCTest
 
 @MainActor
 final class SearchPaginationViewModelTests: XCTestCase {
+    func testSearchPreloadsEveryTabOnceAndSwitchingDoesNotRefetch() async {
+        var calls: [SearchCategory: Int] = [:]
+        var profileCalls = 0
+        let forum = makeResult(title: "forum", rankScore: 1)
+        let market = makeResult(title: "market", category: .secondhand, rankScore: 2)
+        let model = SearchViewModel(
+            loadPostPage: { _, category, _, _ in
+                calls[category, default: 0] += 1
+                return SearchPostPage(results: category == .forum ? [forum] : category == .secondhand ? [market] : [forum, market], nextCursor: nil)
+            }, loadPostCounts: { [:] }, loadProfiles: { _, _ in profileCalls += 1; return [] },
+            searchDebounceNanoseconds: 0
+        )
+        model.updateSearch(text: "query", category: .all)
+        await waitUntil { !model.isSearching && calls.count == 3 }
+        XCTAssertEqual(model.cachedSearchResults(for: .forum).map(\.id), [forum.id])
+        XCTAssertEqual(model.cachedSearchResults(for: .secondhand).map(\.id), [market.id])
+        for category in [SearchCategory.forum, .secondhand, .all, .forum] {
+            model.updateSearch(text: " query ", category: category)
+            XCTAssertFalse(model.isSearching)
+            XCTAssertFalse(model.filteredResults.isEmpty)
+        }
+        await Task.yield()
+        XCTAssertEqual(calls, [.all: 1, .forum: 1, .secondhand: 1])
+        XCTAssertEqual(profileCalls, 1)
+        // A real post mutation must still invalidate all tabs for this query.
+        model.updateSearch(text: "query", category: .forum, forceRefresh: true)
+        await waitUntil { !model.isSearching && profileCalls == 2 }
+        XCTAssertEqual(calls, [.all: 2, .forum: 2, .secondhand: 2])
+    }
+
+    func testTabSwitchDuringBatchKeepsOneRequestAndPublishesTogether() async {
+        var started = Set<SearchCategory>()
+        var releaseProfiles = false
+        let result = makeResult(title: "result", rankScore: 1)
+        let model = SearchViewModel(
+            loadPostPage: { _, category, _, _ in
+                started.insert(category)
+                return SearchPostPage(results: [result], nextCursor: nil)
+            }, loadPostCounts: { [:] }, loadProfiles: { _, _ in
+                while !releaseProfiles { await Task.yield() }
+                return []
+            }, searchDebounceNanoseconds: 0
+        )
+        model.updateSearch(text: "query", category: .all)
+        await waitUntil { started.count == 3 }
+        model.updateSearch(text: "query", category: .forum)
+        XCTAssertTrue(model.isSearching)
+        XCTAssertTrue(model.cachedSearchResults(for: .all).isEmpty)
+        releaseProfiles = true
+        await waitUntil { !model.isSearching }
+        XCTAssertEqual(model.filteredResults.map(\.id), [result.id])
+        XCTAssertEqual(model.cachedSearchResults(for: .secondhand).map(\.id), [result.id])
+    }
+
+    func testOneFailedCategoryDoesNotDiscardOtherPreloadedTabs() async {
+        let result = makeResult(title: "forum", rankScore: 1)
+        let model = SearchViewModel(
+            loadPostPage: { _, category, _, _ in
+                if category == .secondhand { throw SearchPaginationTestError.failed }
+                return SearchPostPage(results: [result], nextCursor: nil)
+            }, loadPostCounts: { [:] }, loadProfiles: { _, _ in [] }, searchDebounceNanoseconds: 0
+        )
+        model.updateSearch(text: "query", category: .all)
+        await waitUntil { !model.isSearching }
+        model.updateSearch(text: "query", category: .secondhand)
+        XCTAssertEqual(model.searchPageErrorMessage, "failed")
+        model.updateSearch(text: "query", category: .forum)
+        XCTAssertEqual(model.filteredResults.map(\.id), [result.id])
+        XCTAssertNil(model.searchPageErrorMessage)
+    }
+
     func testStaleEarlierSearchCannotReplaceNewerQuery() async {
         let oldResult = makeResult(title: "old", rankScore: 1)
         let newResult = makeResult(title: "new", rankScore: 2)

@@ -231,7 +231,7 @@ struct AuthView: View {
             Text(L10n.tr("After registration, you'll complete your profile on first app entry.", "注册后首次进入 App 需要补充个人资料"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(AppColors.textMuted)
-            Text(L10n.tr("Required in profile completion: Nickname and school. Other details are optional.", "完善资料必填：昵称与学校。其他资料均为选填。"))
+            Text(L10n.tr("Required in profile completion: Nickname, school and gender. Other details are optional.", "完善资料必填：昵称、学校与性别。其他资料均为选填。"))
                 .font(.system(size: 12))
                 .foregroundStyle(AppColors.textMuted)
         }
@@ -501,6 +501,9 @@ struct AuthView: View {
                     authService.requiresProfileCompletion = true
                 }
             } catch {
+                if AuthService.isUserCancelledSocialSignIn(error) {
+                    return
+                }
                 if authService.errorMessage?.isEmpty ?? true {
                     authService.errorMessage = L10n.tr(
                         "Google sign-in failed. Please try again.",
@@ -524,6 +527,9 @@ struct AuthView: View {
                     authService.requiresProfileCompletion = true
                 }
             } catch {
+                if AuthService.isUserCancelledSocialSignIn(error) {
+                    return
+                }
                 if authService.errorMessage?.isEmpty ?? true {
                     authService.errorMessage = L10n.tr(
                         "Apple sign-in failed. Please try again.",

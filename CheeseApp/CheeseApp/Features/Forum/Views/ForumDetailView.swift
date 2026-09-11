@@ -1528,11 +1528,11 @@ struct ForumDetailView: View {
 
     private func deletePost() async {
         do {
-            try await postEditor.delete(postId: post.id)
+            try await postEditor.delete(postId: post.id, kind: .forum)
             dismiss()
         } catch {
             if isCancellation(error) { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.postActionMessage
         }
     }
 

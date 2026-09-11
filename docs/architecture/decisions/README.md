@@ -48,4 +48,4 @@ How we know the decision is correctly implemented.
 - [ADR-0001: Active Product Module Boundary](0001-active-product-module-boundary.md)
 - [ADR-0002: Base Post With Feature Detail Tables](0002-base-post-with-feature-detail-tables.md)
 - [ADR-0003: Supabase Access Boundary](0003-supabase-access-boundary.md)
-- [ADR-0004: Courses V1 Domain Contract](0004-courses-v1-domain-contract.md)
+- ADR-0004 was retired with the course module in migration 20260906203031.

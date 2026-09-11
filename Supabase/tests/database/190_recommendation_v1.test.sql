@@ -316,7 +316,7 @@ SELECT ok(
     public.create_recommendation_feed_session(TRUE, FALSE, NULL)::TEXT,
     TRUE
   ) IS NOT NULL,
-  'pull to refresh creates a stable recommendation session'
+  'explicit low-level creation creates a stable recommendation session (not Home pull semantics)'
 );
 SELECT ok(
   (SELECT COUNT(*) BETWEEN 1 AND 20

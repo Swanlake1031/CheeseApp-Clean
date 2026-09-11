@@ -30,30 +30,23 @@ struct CreatePostView: View {
             ZStack {
                 AppColors.pageBackground
                     .ignoresSafeArea()
-                
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 0) {
-                        // 发布类型选择
-                        VStack(spacing: 14) {
-                            ForEach([PostKind.forum, .secondhand], id: \.self) { type in
-                                PostTypeCard(
-                                    type: type,
-                                    isSelected: selectedType == type
-                                ) {
-                                    selectedType = type
-                                }
+
+                VStack(spacing: 0) {
+                    createHeader
+
+                    VStack(spacing: 2) {
+                        ForEach([PostKind.forum, .secondhand], id: \.self) { type in
+                            PostTypeCard(type: type, isSelected: selectedType == type) {
+                                selectedType = type
                             }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        
-                        Spacer(minLength: 12)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
                 }
-
+                .padding(.top, 8)
             }
-            .navigationTitle(L10n.tr("Create Post", "发布帖子"))
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if selectedType != nil {
                     continueButton
@@ -61,20 +54,6 @@ struct CreatePostView: View {
                 }
             }
             .animation(.easeOut(duration: 0.2), value: selectedType)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(L10n.tr("Cancel", "取消")) {
-                        closeComposer()
-                    }
-                    .foregroundStyle(AppColors.accentStrong)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(L10n.tr("Drafts", "草稿箱")) {
-                        showDraftBox = true
-                    }
-                    .foregroundStyle(AppColors.accentStrong)
-                }
-            }
             .sheet(
                 isPresented: $showDraftBox,
                 onDismiss: {
@@ -91,6 +70,42 @@ struct CreatePostView: View {
                 resumeInterruptedComposerIfNeeded()
             }
         }
+    }
+
+    private var createHeader: some View {
+        HStack(spacing: 0) {
+            Button(action: closeComposer) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 19, weight: .medium))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(AppColors.textMuted)
+            .accessibilityLabel(L10n.tr("Close", "关闭"))
+
+            Spacer()
+
+            Text(L10n.tr("Create Post", "发布帖子"))
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(AppColors.textPrimary)
+
+            Spacer()
+
+            Button {
+                showDraftBox = true
+            } label: {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 20, weight: .regular))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(AppColors.textMuted)
+            .accessibilityLabel(L10n.tr("Drafts", "草稿箱"))
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 52)
     }
 
     private var continueButton: some View {
@@ -154,14 +169,6 @@ private extension PostKind {
         }
     }
     
-    var createColor: Color {
-        switch self {
-        case .secondhand:
-            return AppColors.categoryColor(for: "secondhand")
-        case .forum:
-            return AppColors.categoryColor(for: "forum")
-        }
-    }
 }
 
 // MARK: - 帖子类型卡片
@@ -172,53 +179,33 @@ struct PostTypeCard: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 // 图标
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(type.createColor.opacity(0.15))
-                        .frame(width: 56, height: 56)
-                    
-                    Image(systemName: type.icon)
-                        .font(.system(size: 22, weight: .medium))
-                        .foregroundStyle(type.createColor)
-                }
+                Image(systemName: type.icon)
+                    .font(.system(size: 22, weight: .regular))
+                    .foregroundStyle(isSelected ? AppColors.textPrimary : AppColors.textMuted)
+                    .frame(width: 32, height: 32)
                 
                 // 文字
                 Text(type.createTitle)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(AppColors.textPrimary)
                 
                 Spacer()
                 
                 // 选中指示
-                ZStack {
-                    Circle()
-                        .stroke(isSelected ? type.createColor : Color.gray.opacity(0.3), lineWidth: 2)
-                        .frame(width: 24, height: 24)
-                    
-                    if isSelected {
-                        Circle()
-                            .fill(type.createColor)
-                            .frame(width: 14, height: 14)
-                    }
-                }
+                Image(systemName: "checkmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .opacity(isSelected ? 1 : 0)
+                    .accessibilityHidden(true)
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(AppColors.cardBackground)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .cheeseCardChrome(cornerRadius: 18)
-            .overlay {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(type.createColor, lineWidth: 2)
-                }
-            }
+            .padding(.horizontal, 8)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(CheeseContainerButtonStyle())
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

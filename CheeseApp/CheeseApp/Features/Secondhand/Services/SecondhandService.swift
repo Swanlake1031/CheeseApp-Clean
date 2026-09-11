@@ -918,10 +918,12 @@ class SecondhandService: ObservableObject {
     }
 
     func deletePost(postId: UUID, authorId: UUID) async throws {
-        try await supabase.client.rpc(
-            "delete_secondhand_post_with_media",
-            params: SecondhandPostIDParams(postID: postId)
-        ).execute()
+        try await PostMutationRetry.perform {
+            _ = try await supabase.client.rpc(
+                "delete_secondhand_post_with_media",
+                params: SecondhandPostIDParams(postID: postId)
+            ).execute()
+        }
 
         items.removeAll { $0.id == postId }
         await retryPendingMediaCleanup(postID: postId)

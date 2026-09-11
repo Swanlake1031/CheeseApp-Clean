@@ -31,7 +31,6 @@ Views do not directly query Supabase in the current baseline. Feature services a
 | Home | `HomeViewModel` | `HomeFeedService`, Forum/Secondhand services, interaction services | `HomeView` and `ContentCardView` |
 | Forum | `ForumChannelFeedModel`; detail-local state | `ForumService` | Forum list, card, detail, create/edit views |
 | Secondhand | `SecondhandService` plus screen-local filters | `SecondhandService`, post favorite service | list/detail/create/edit views |
-| Courses | `CourseDiscoveryViewModel`, `CourseReviewViewModel` | course catalog/review services | `CourseSummaryCard`, discovery/detail/review views |
 | Search | `SearchViewModel` | `SearchService` and feature services | `SearchView` and domain-specific result rows |
 | Profile | `AuthService.currentUser`; query-scoped activity/social services | profile, social, and activity services | profile/settings/activity/user-post views |
 | Chat | `ChatService`; room lifecycle controllers | chat repositories, Realtime, private media services | conversation/group/room views |
@@ -87,10 +86,6 @@ The current backend rejects likes for Secondhand posts (migration 140). Secondha
 
 Marketplace expiry is a scheduling deadline, not an independent presentation state. The worker calls `process_secondhand_availability_lifecycle`; at 30 days the database changes the canonical post visibility to hidden while preserving the active post row, images, metadata, and interactions. Restoring that same post starts a new availability cycle and sets a fresh `expires_at` deadline.
 
-### Course ratings
-
-`CourseDiscoveryViewModel` owns catalog discovery and `CourseReviewViewModel` owns a coherent course-review snapshot, filters, and mutations. `CourseSummaryCard` is the canonical reusable summary card. Home links to Courses; it does not maintain a second rating-card implementation.
-
 ### Profile data
 
 `AuthService.currentUser` owns the signed-in profile identity. `ProfileSocialService` is the canonical owner for follow mutations and cached relationship summaries; Search and Chat follow-search keep only result projections and reconcile them from `ProfileSocialEvents`. `ProfileActivityService` and `UserPostsService` own scoped activity/profile-post queries, caching, visibility mutations, and pagination. “我的发布” and “私密内容” use the same `ProfileActivityView`/`ProfileActivityService` flow, distinguished only by the server-side `visible` or `hidden` query parameter. The legacy Favorite Posts service/screen was removed; profile activity is the active path.
@@ -140,7 +135,6 @@ Do not add an authenticated-content `NavigationStack` above `MainTabView`, or ad
 
 - `PostInteractionStore`: cross-screen Forum-like/bookmark state.
 - `ContentCardView`: Home/shared feed card shell.
-- `CourseSummaryCard`: canonical course summary presentation.
 - `MutualFollowSelectionRow`: group-member selection row used by both group creation contexts.
 - `CachedRemoteImage` / `RemoteImageCache`: public remote images with bounded memory/disk caching, coalescing, and background decoding/downsampling.
 - Avatar and interaction components under `Shared/Components`: reuse when semantics match; keep full/compact/search layouts separate when density genuinely differs.

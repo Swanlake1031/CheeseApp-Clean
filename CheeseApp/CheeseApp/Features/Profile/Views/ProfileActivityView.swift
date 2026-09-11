@@ -766,11 +766,11 @@ struct ProfileActivityView: View {
         }
 
         do {
-            try await userPostsService.delete(postId: item.postID)
+            try await userPostsService.delete(postId: item.postID, kind: item.kind)
             refreshGeneration &+= 1
         } catch {
             if error.isCancellationLike { return }
-            navigationErrorMessage = error.localizedDescription
+            navigationErrorMessage = error.postActionMessage
         }
     }
 
