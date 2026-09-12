@@ -56,7 +56,7 @@ struct SettingsView: View {
                             NavigationLink(destination: SchoolVerificationView()) {
                                 settingsRow(
                                     icon: "graduationcap.fill",
-                                    title: "学生邮箱认证",
+                                    title: "学校验证",
                                     subtitle: authService.currentUser?.hasSchoolStudentBadge == true
                                         ? "已通过学校官方邮箱认证"
                                         : "验证后显示学校学生徽章",
@@ -791,7 +791,7 @@ struct SchoolVerificationView: View {
             .contentShape(Rectangle())
             .onTapGesture { dismissKeyboard() }
         }
-        .cheesePageTopBar(title: "学生邮箱认证")
+        .cheesePageTopBar(title: "学校验证")
         .task { await loadStatus() }
         .onDisappear { countdownTask?.cancel() }
         .alert("解除学生认证？", isPresented: $showingUnlinkConfirmation) {

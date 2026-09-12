@@ -413,6 +413,7 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertEqual(CheeseUniversityOption.option(matching: "Carleton University")?.badgeCode, "C")
         XCTAssertEqual(CheeseUniversityOption.option(matching: "Ontario Tech University")?.badgeCode, "OT")
         XCTAssertEqual(CheeseUniversityOption.option(matching: "University of Toronto")?.verificationDomains, ["mail.utoronto.ca"])
+        XCTAssertNil(CheeseUniversityOption.option(matching: "Typed Custom School"))
     }
 
     func testSystemShareMetadataAlwaysUsesTheOfficialCheeseLogo() throws {

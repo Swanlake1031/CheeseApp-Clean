@@ -797,13 +797,10 @@ struct CompleteProfileOnboardingView: View {
                         .pickerStyle(.segmented)
 
                         fieldTitle(profileStatus == "student" ? "学校（必填）" : "学校（选填）")
-                        Picker("请选择学校", selection: $school) {
-                            Text(profileStatus == "student" ? "请选择学校" : "不填写").tag("")
-                            ForEach(CheeseUniversityOption.all, id: \.name) { option in
-                                Text(option.localizedName).tag(option.name)
-                            }
-                        }
-                        .pickerStyle(.menu)
+                        UniversitySelectionButton(
+                            selection: $school,
+                            isRequired: profileStatus == "student"
+                        )
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.white)

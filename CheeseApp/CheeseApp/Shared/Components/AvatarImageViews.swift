@@ -851,3 +851,115 @@ struct SchoolStudentBadge: View {
         .accessibilityLabel(Text(label))
     }
 }
+
+struct UniversitySelectionButton: View {
+    @Binding var selection: String
+    let isRequired: Bool
+
+    @State private var isPresented = false
+    @State private var query = ""
+
+    private var selectedLabel: String {
+        CheeseUniversityOption.option(matching: selection)?.localizedName
+            ?? (isRequired ? L10n.tr("Select a university", "请选择学校") : L10n.tr("Not specified", "不填写"))
+    }
+
+    private var filteredOptions: [CheeseUniversityOption] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return CheeseUniversityOption.all }
+        return CheeseUniversityOption.all.filter {
+            $0.name.localizedCaseInsensitiveContains(needle)
+                || $0.localizedName.localizedCaseInsensitiveContains(needle)
+                || $0.city.localizedCaseInsensitiveContains(needle)
+        }
+    }
+
+    var body: some View {
+        Button {
+            query = ""
+            isPresented = true
+        } label: {
+            HStack(spacing: 8) {
+                Text(selectedLabel)
+                    .foregroundStyle(selection.isEmpty ? AppColors.textMuted : AppColors.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(AppColors.textMuted)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $isPresented) {
+            NavigationStack {
+                List {
+                    if !isRequired {
+                        selectionRow(
+                            title: L10n.tr("Not specified", "不填写"),
+                            subtitle: nil,
+                            value: ""
+                        )
+                    }
+
+                    ForEach(filteredOptions) { option in
+                        selectionRow(
+                            title: option.localizedName,
+                            subtitle: option.city,
+                            value: option.name
+                        )
+                    }
+
+                    if filteredOptions.isEmpty {
+                        Text(L10n.tr(
+                            "No matching university. Select Other from the list if needed.",
+                            "没有匹配的学校。如有需要，请从列表选择“其他”。"
+                        ))
+                        .font(.system(size: 14))
+                        .foregroundStyle(AppColors.textMuted)
+                    }
+                }
+                .searchable(
+                    text: $query,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: L10n.tr("Search universities", "输入学校名称筛选")
+                )
+                .navigationTitle(L10n.tr("Select University", "选择学校"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(L10n.tr("Cancel", "取消")) { isPresented = false }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
+    }
+
+    private func selectionRow(title: String, subtitle: String?, value: String) -> some View {
+        Button {
+            selection = value
+            isPresented = false
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .foregroundStyle(AppColors.textPrimary)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 12))
+                            .foregroundStyle(AppColors.textMuted)
+                    }
+                }
+                Spacer()
+                if selection == value {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppColors.accentStrong)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}

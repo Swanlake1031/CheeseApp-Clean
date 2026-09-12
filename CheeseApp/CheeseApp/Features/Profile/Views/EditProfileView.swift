@@ -530,13 +530,10 @@ struct EditProfileView: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(AppColors.textMuted)
                 .frame(width: 66, alignment: .leading)
-            Picker("学校", selection: $school) {
-                Text(profileStatus == "student" ? "请选择学校" : "不填写").tag("")
-                ForEach(CheeseUniversityOption.all, id: \.name) { option in
-                    Text(option.localizedName).tag(option.name)
-                }
-            }
-            .pickerStyle(.menu)
+            UniversitySelectionButton(
+                selection: $school,
+                isRequired: profileStatus == "student"
+            )
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 16)
