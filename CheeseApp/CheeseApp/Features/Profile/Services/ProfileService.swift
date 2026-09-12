@@ -5,7 +5,8 @@ import UIKit
 struct ProfileUpdateInput {
     let userId: UUID
     let fullName: String
-    let schoolName: String
+    let profileStatus: String
+    let schoolName: String?
     let avatarURL: String
     let gender: String
     let isGenderVisible: Bool
@@ -54,10 +55,13 @@ enum ProfileService {
         input: ProfileUpdateInput,
         currentProfile: Profile?
     ) async throws -> Profile? {
-        let normalizedSchool = input.schoolName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let selection = normalizedSchool.isEmpty
-            ? nil
-            : try await SchoolDirectoryService.profileSelection(named: normalizedSchool)
+        let normalizedStatus = input.profileStatus == "working" ? "working" : "student"
+        let normalizedSchool = input.schoolName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard normalizedStatus == "working" || !normalizedSchool.isEmpty else {
+            throw NSError(domain: "ProfileService", code: 422, userInfo: [NSLocalizedDescriptionKey: "在校状态必须选择学校。"])
+        }
+        let directorySchool = normalizedSchool.isEmpty ? "Other" : normalizedSchool
+        let selection = try await SchoolDirectoryService.profileSelection(named: directorySchool)
         let normalizedGender = input.gender.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedOccupation = input.occupation.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedPhoneNumber = input.phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -65,15 +69,16 @@ enum ProfileService {
 
         let payload = ProfileUpdatePayload(
             fullName: input.fullName,
-            university: normalizedSchool,
+            university: normalizedSchool.isEmpty ? nil : normalizedSchool,
+            profileStatus: normalizedStatus,
             avatarURL: input.avatarURL,
             gender: normalizedGender,
             showGender: input.isGenderVisible,
             occupation: normalizedOccupation,
             phone: normalizedPhoneNumber,
             bio: normalizedBio,
-            schoolId: selection?.schoolId,
-            campusId: selection?.campusId
+            schoolId: selection.schoolId,
+            campusId: selection.campusId
         )
 
         try await SupabaseManager.shared
@@ -85,10 +90,12 @@ enum ProfileService {
         guard var updatedProfile = currentProfile else { return nil }
         updatedProfile.fullName = input.fullName
         updatedProfile.school = normalizedSchool.isEmpty ? nil : normalizedSchool
-        if let selection {
-            updatedProfile.schoolId = selection.schoolId
-            updatedProfile.campusId = selection.campusId
+        if updatedProfile.schoolId != selection.schoolId || updatedProfile.profileStatus != normalizedStatus {
+            updatedProfile.isMcMasterVerified = false
         }
+        updatedProfile.profileStatus = normalizedStatus
+        updatedProfile.schoolId = selection.schoolId
+        updatedProfile.campusId = selection.campusId
         updatedProfile.avatarUrl = input.avatarURL
         updatedProfile.gender = normalizedGender.isEmpty ? nil : normalizedGender
         updatedProfile.isGenderVisible = input.isGenderVisible
@@ -169,7 +176,8 @@ private struct ProfileCoverImageUpdatePayload: Encodable {
 
 private struct ProfileUpdatePayload: Encodable {
     let fullName: String
-    let university: String
+    let university: String?
+    let profileStatus: String
     let avatarURL: String
     let gender: String
     let showGender: Bool
@@ -182,6 +190,7 @@ private struct ProfileUpdatePayload: Encodable {
     enum CodingKeys: String, CodingKey {
         case fullName = "full_name"
         case university
+        case profileStatus = "profile_status"
         case avatarURL = "avatar_url"
         case gender
         case showGender = "show_gender"
@@ -191,19 +200,27 @@ private struct ProfileUpdatePayload: Encodable {
     }
 }
 
-struct McMasterVerificationStatus: Decodable {
+struct SchoolVerificationStatus: Decodable {
     let verified: Bool
     let maskedEmail: String?
     let verifiedAt: String?
+    let schoolName: String?
+    let schoolId: UUID?
+    let emailDomains: [String]?
+    let badgeCode: String?
 
     enum CodingKeys: String, CodingKey {
         case verified
         case maskedEmail = "masked_email"
         case verifiedAt = "verified_at"
+        case schoolName = "school_name"
+        case schoolId = "school_id"
+        case emailDomains = "email_domains"
+        case badgeCode = "badge_code"
     }
 }
 
-struct McMasterVerificationSendResult: Decodable {
+struct SchoolVerificationSendResult: Decodable {
     let sent: Bool?
     let verified: Bool?
     let retryAfterSeconds: Int?
@@ -217,25 +234,25 @@ struct McMasterVerificationSendResult: Decodable {
     }
 }
 
-enum McMasterVerificationService {
-    static func status() async throws -> McMasterVerificationStatus {
-        try await invoke(McMasterVerificationRequest(action: "status"))
+enum SchoolVerificationService {
+    static func status() async throws -> SchoolVerificationStatus {
+        try await invoke(SchoolVerificationRequest(action: "status"))
     }
 
-    static func sendCode(to email: String) async throws -> McMasterVerificationSendResult {
-        try await invoke(McMasterVerificationRequest(action: "send", email: email))
+    static func sendCode(to email: String) async throws -> SchoolVerificationSendResult {
+        try await invoke(SchoolVerificationRequest(action: "send", email: email))
     }
 
-    static func verify(email: String, code: String) async throws -> McMasterVerificationStatus {
-        try await invoke(McMasterVerificationRequest(action: "verify", email: email, code: code))
+    static func verify(email: String, code: String) async throws -> SchoolVerificationStatus {
+        try await invoke(SchoolVerificationRequest(action: "verify", email: email, code: code))
     }
 
-    static func unlink() async throws -> McMasterVerificationStatus {
-        try await invoke(McMasterVerificationRequest(action: "unlink"))
+    static func unlink() async throws -> SchoolVerificationStatus {
+        try await invoke(SchoolVerificationRequest(action: "unlink"))
     }
 
     private static func invoke<Response: Decodable>(
-        _ request: McMasterVerificationRequest
+        _ request: SchoolVerificationRequest
     ) async throws -> Response {
         do {
             return try await SupabaseManager.shared.client.functions.invoke(
@@ -244,28 +261,28 @@ enum McMasterVerificationService {
             )
         } catch let functionError as FunctionsError {
             if case .httpError(_, let data) = functionError,
-               let payload = try? JSONDecoder().decode(McMasterVerificationErrorPayload.self, from: data),
+               let payload = try? JSONDecoder().decode(SchoolVerificationErrorPayload.self, from: data),
                !payload.error.isEmpty {
-                throw McMasterVerificationError.server(payload.error)
+                throw SchoolVerificationError.server(payload.error)
             }
-            throw McMasterVerificationError.server("认证服务暂时不可用，请稍后再试。")
+            throw SchoolVerificationError.server("认证服务暂时不可用，请稍后再试。")
         } catch {
-            throw McMasterVerificationError.server(error.localizedDescription)
+            throw SchoolVerificationError.server(error.localizedDescription)
         }
     }
 }
 
-private struct McMasterVerificationRequest: Encodable {
+private struct SchoolVerificationRequest: Encodable {
     let action: String
     var email: String?
     var code: String?
 }
 
-private struct McMasterVerificationErrorPayload: Decodable {
+private struct SchoolVerificationErrorPayload: Decodable {
     let error: String
 }
 
-private enum McMasterVerificationError: LocalizedError {
+private enum SchoolVerificationError: LocalizedError {
     case server(String)
 
     var errorDescription: String? {

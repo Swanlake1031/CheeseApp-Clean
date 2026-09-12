@@ -364,6 +364,7 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertTrue(
             ProfileCompletionPolicy.needsCompletion(
                 profileCompleted: false,
+                profileStatus: "student",
                 school: "McMaster University"
             )
         )
@@ -373,6 +374,7 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertFalse(
             ProfileCompletionPolicy.needsCompletion(
                 profileCompleted: true,
+                profileStatus: "student",
                 school: "McMaster University"
             )
         )
@@ -381,8 +383,36 @@ final class PostCorrectnessTests: XCTestCase {
     func testProfileOnboardingRejectsMissingOrUnsupportedSchoolEvenIfCompleted() {
         let schools: [String?] = [nil, "", "  ", "Unknown School"]
         for school in schools {
-            XCTAssertTrue(ProfileCompletionPolicy.needsCompletion(profileCompleted: true, school: school))
+            XCTAssertTrue(ProfileCompletionPolicy.needsCompletion(profileCompleted: true, profileStatus: "student", school: school))
         }
+    }
+
+    func testWorkingProfileMayOmitSchool() {
+        XCTAssertFalse(
+            ProfileCompletionPolicy.needsCompletion(
+                profileCompleted: true,
+                profileStatus: "working",
+                school: nil
+            )
+        )
+    }
+
+    func testUniversityDirectoryIncludesRequestedSchoolsAndOtherWithoutColleges() {
+        let names = Set(CheeseUniversityOption.all.map(\.name))
+        let required = [
+            "University of Alberta", "University of British Columbia", "Brock University",
+            "University of Calgary", "Carleton University", "Concordia University",
+            "Dalhousie University", "University of Guelph", "Simon Fraser University",
+            "Lakehead University", "McGill University", "University of Manitoba",
+            "McMaster University", "Université de Montréal", "Ontario Tech University",
+            "Queen's University", "University of Toronto", "Toronto Metropolitan University",
+            "Trent University", "University of Waterloo", "Other"
+        ]
+        XCTAssertTrue(Set(required).isSubset(of: names))
+        XCTAssertFalse(CheeseUniversityOption.all.contains { $0.name.localizedCaseInsensitiveContains("College") })
+        XCTAssertEqual(CheeseUniversityOption.option(matching: "Carleton University")?.badgeCode, "C")
+        XCTAssertEqual(CheeseUniversityOption.option(matching: "Ontario Tech University")?.badgeCode, "OT")
+        XCTAssertEqual(CheeseUniversityOption.option(matching: "University of Toronto")?.verificationDomains, ["mail.utoronto.ca"])
     }
 
     func testSystemShareMetadataAlwaysUsesTheOfficialCheeseLogo() throws {

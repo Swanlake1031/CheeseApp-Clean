@@ -16,9 +16,14 @@ type AuthUser = { id?: string };
 type IssueResult = { status: string; retry_after_seconds: number };
 type ConfirmResult = { status: string; remaining_attempts: number };
 type UnlinkResult = { unlinked: boolean };
-type VerificationRow = { email: string; verified_at: string };
+type VerificationRow = { email: string; verified_at: string; school_id: string };
+type SchoolRow = {
+  id: string;
+  name: string;
+  verification_domains: string[];
+  badge_code: string | null;
+};
 
-const MCMMASTER_EMAIL_PATTERN = /^[a-z0-9._%+-]+@mcmaster\.ca$/i;
 const VERIFICATION_FROM = "CheeseApp Student Verification <verify@mail.cheeseapp.org>";
 const encoder = new TextEncoder();
 
@@ -119,7 +124,7 @@ async function callRPC<T>(name: string, body: Record<string, JSONValue>): Promis
 
 async function verificationForUser(userID: string): Promise<VerificationRow | null> {
   const params = new URLSearchParams({
-    select: "email,verified_at",
+    select: "email,verified_at,school_id",
     user_id: `eq.${userID}`,
     limit: "1",
   });
@@ -130,6 +135,38 @@ async function verificationForUser(userID: string): Promise<VerificationRow | nu
   if (!response.ok) throw new Error(`Verification lookup failed with status ${response.status}`);
   const rows = await response.json() as VerificationRow[];
   return rows[0] ?? null;
+}
+
+async function selectedSchoolForUser(userID: string): Promise<SchoolRow | null> {
+  const profileParams = new URLSearchParams({
+    select: "school_id,profile_status",
+    id: `eq.${userID}`,
+    deactivated_at: "is.null",
+    limit: "1",
+  });
+  const profileResponse = await fetch(
+    `${projectURL()}/rest/v1/profiles?${profileParams.toString()}`,
+    { headers: serviceHeaders({ Accept: "application/json" }) },
+  );
+  if (!profileResponse.ok) throw new Error(`Profile lookup failed with status ${profileResponse.status}`);
+  const profiles = await profileResponse.json() as Array<{ school_id: string | null; profile_status: string }>;
+  const profile = profiles[0];
+  if (!profile || profile.profile_status !== "student" || !profile.school_id) return null;
+
+  const schoolParams = new URLSearchParams({
+    select: "id,name,verification_domains,badge_code",
+    id: `eq.${profile.school_id}`,
+    active: "eq.true",
+    limit: "1",
+  });
+  const schoolResponse = await fetch(
+    `${projectURL()}/rest/v1/schools?${schoolParams.toString()}`,
+    { headers: serviceHeaders({ Accept: "application/json" }) },
+  );
+  if (!schoolResponse.ok) throw new Error(`School lookup failed with status ${schoolResponse.status}`);
+  const schools = await schoolResponse.json() as SchoolRow[];
+  const school = schools[0] ?? null;
+  return school && school.verification_domains.length > 0 ? school : null;
 }
 
 async function verificationHash(userID: string, email: string, code: string): Promise<string> {
@@ -156,8 +193,8 @@ function generateCode(): string {
   return String(bytes[0] % 1_000_000).padStart(6, "0");
 }
 
-function verificationEmailText(code: string): string {
-  return `麦马学生认证验证码：${code}\n\n10 分钟内有效。如果不是你本人操作，请忽略。`;
+function verificationEmailText(code: string, schoolName: string): string {
+  return `CheeseApp ${schoolName} 学生认证验证码：${code}\n\n10 分钟内有效。如果不是你本人操作，请忽略。`;
 }
 
 async function emailIdempotencyKey(
@@ -179,6 +216,7 @@ async function sendVerificationEmail(
   email: string,
   code: string,
   idempotencyKey: string,
+  schoolName: string,
 ): Promise<boolean> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -188,14 +226,14 @@ async function sendVerificationEmail(
           Authorization: `Bearer ${requiredEnv("RESEND_API_KEY")}`,
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
-          "User-Agent": "CheeseApp-McMaster-Verification/1.0",
+          "User-Agent": "CheeseApp-School-Verification/1.0",
         },
         signal: AbortSignal.timeout(10_000),
         body: JSON.stringify({
           from: VERIFICATION_FROM,
           to: [email],
-          subject: "CheeseApp 麦马学生认证验证码",
-          text: verificationEmailText(code),
+          subject: `CheeseApp ${schoolName} 学生认证验证码`,
+          text: verificationEmailText(code, schoolName),
         }),
       });
       return response.ok;
@@ -219,7 +257,7 @@ function requestMessage(status: string, retryAfter: number): Response {
         retry_after_seconds: retryAfter,
       });
     case "already_verified":
-      return jsonResponse(200, { verified: true, message: "该账号已完成麦马学生认证。" });
+      return jsonResponse(200, { verified: true, message: "该账号已完成学生认证。" });
     default:
       return jsonResponse(500, { error: "暂时无法发送验证码，请稍后再试。" });
   }
@@ -241,39 +279,63 @@ Deno.serve(async (req: Request) => {
     }
 
     const action = body.action ?? "status";
+    const school = await selectedSchoolForUser(userID);
     if (action === "status") {
       const verification = await verificationForUser(userID);
-      return jsonResponse(200, verification
+      return jsonResponse(200, verification && school && verification.school_id === school.id
         ? {
           verified: true,
           masked_email: maskEmail(verification.email),
           verified_at: verification.verified_at,
+          school_id: school.id,
+          school_name: school.name,
+          email_domains: school.verification_domains,
+          badge_code: school.badge_code,
         }
-        : { verified: false });
+        : {
+          verified: false,
+          school_id: school?.id ?? null,
+          school_name: school?.name ?? null,
+          email_domains: school?.verification_domains ?? [],
+          badge_code: school?.badge_code ?? null,
+        });
+    }
+
+    if (!school) {
+      return jsonResponse(400, { error: "请先选择支持认证的学校，并将状态设为在校。" });
     }
 
     if (action === "unlink") {
       const [result] = await callRPC<UnlinkResult>(
-        "unlink_mcmaster_student_verification",
+        "unlink_school_student_verification",
         { p_user_id: userID },
       );
       return jsonResponse(200, {
         verified: false,
         unlinked: result?.unlinked ?? false,
-        message: "麦马学生认证已解除绑定。",
+        message: "学生认证已解除绑定。",
+        school_id: school.id,
+        school_name: school.name,
+        email_domains: school.verification_domains,
+        badge_code: school.badge_code,
       });
     }
 
     const email = normalizedEmail(body.email);
-    if (!MCMMASTER_EMAIL_PATTERN.test(email)) {
-      return jsonResponse(400, { error: "请输入有效的 @mcmaster.ca 邮箱。" });
+    const emailDomain = email.split("@").at(-1) ?? "";
+    if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email) ||
+      !school.verification_domains.includes(emailDomain)) {
+      return jsonResponse(400, {
+        error: `请输入有效的学校邮箱：${school.verification_domains.map((domain) => `@${domain}`).join(" / ")}`,
+      });
     }
 
     if (action === "send") {
       const code = generateCode();
       const codeHash = await verificationHash(userID, email, code);
-      const [result] = await callRPC<IssueResult>("issue_mcmaster_email_challenge", {
+      const [result] = await callRPC<IssueResult>("issue_school_email_challenge", {
         p_user_id: userID,
+        p_school_id: school.id,
         p_email: email,
         p_code_hash: codeHash,
       });
@@ -282,7 +344,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const idempotencyKey = await emailIdempotencyKey(userID, email, codeHash);
-      if (!await sendVerificationEmail(email, code, idempotencyKey)) {
+      if (!await sendVerificationEmail(email, code, idempotencyKey, school.name)) {
         return jsonResponse(502, { error: "邮件服务暂时不可用，请稍后再试。" });
       }
       return jsonResponse(200, {
@@ -299,15 +361,23 @@ Deno.serve(async (req: Request) => {
         return jsonResponse(400, { error: "请输入 6 位数字验证码。" });
       }
       const codeHash = await verificationHash(userID, email, code);
-      const [result] = await callRPC<ConfirmResult>("confirm_mcmaster_email_challenge", {
+      const [result] = await callRPC<ConfirmResult>("confirm_school_email_challenge", {
         p_user_id: userID,
+        p_school_id: school.id,
         p_email: email,
         p_code_hash: codeHash,
       });
 
       switch (result?.status) {
         case "verified":
-          return jsonResponse(200, { verified: true, masked_email: maskEmail(email) });
+          return jsonResponse(200, {
+            verified: true,
+            masked_email: maskEmail(email),
+            school_id: school.id,
+            school_name: school.name,
+            email_domains: school.verification_domains,
+            badge_code: school.badge_code,
+          });
         case "invalid":
           return jsonResponse(400, {
             error: `验证码不正确，还可尝试 ${result.remaining_attempts} 次。`,
@@ -318,7 +388,7 @@ Deno.serve(async (req: Request) => {
         case "locked":
           return jsonResponse(429, { error: "错误次数过多，请重新发送验证码。" });
         case "email_in_use":
-          return jsonResponse(409, { error: "该麦马邮箱已绑定其他账号。" });
+          return jsonResponse(409, { error: "该学校邮箱已绑定其他账号。" });
         default:
           return jsonResponse(400, { error: "请先发送验证码。" });
       }

@@ -700,6 +700,7 @@ struct CompleteProfileOnboardingView: View {
     @EnvironmentObject private var authService: AuthService
 
     @State private var fullName: String = ""
+    @State private var profileStatus: String = "student"
     @State private var school: String = ""
     @State private var gender: String = ""
     @State private var occupation: String = ""
@@ -719,7 +720,7 @@ struct CompleteProfileOnboardingView: View {
     private var canSave: Bool {
         !fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !gender.isEmpty
-            && CheeseUniversityOption.option(matching: school) != nil
+            && (profileStatus == "working" || CheeseUniversityOption.option(matching: school) != nil)
     }
 
     private var shouldShowNameValidationError: Bool {
@@ -764,7 +765,7 @@ struct CompleteProfileOnboardingView: View {
                             }
                         }
 
-                        Text("首次进入需要补充信息。昵称、学校和性别为必填，职业可选。")
+                        Text(profileStatus == "student" ? "昵称、学校和性别为必填，职业可选。" : "昵称和性别为必填，工作状态可不填写学校。")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(AppColors.textMuted)
 
@@ -788,11 +789,18 @@ struct CompleteProfileOnboardingView: View {
                             .padding(.horizontal, 2)
                         }
 
-                        fieldTitle("学校（必填）")
+                        fieldTitle("目前状态")
+                        Picker("目前状态", selection: $profileStatus) {
+                            Text("在校").tag("student")
+                            Text("工作").tag("working")
+                        }
+                        .pickerStyle(.segmented)
+
+                        fieldTitle(profileStatus == "student" ? "学校（必填）" : "学校（选填）")
                         Picker("请选择学校", selection: $school) {
-                            Text("请选择学校").tag("")
+                            Text(profileStatus == "student" ? "请选择学校" : "不填写").tag("")
                             ForEach(CheeseUniversityOption.all, id: \.name) { option in
-                                Text(option.name).tag(option.name)
+                                Text(option.localizedName).tag(option.name)
                             }
                         }
                         .pickerStyle(.menu)
@@ -802,18 +810,19 @@ struct CompleteProfileOnboardingView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .profileOnboardingOutline(cornerRadius: 12)
 
-                        studentVerificationInfo
+                        if profileStatus == "student", let selectedSchool, selectedSchool.supportsStudentVerification {
+                            studentVerificationInfo
 
-                        NavigationLink(destination: McMasterVerificationView()) {
+                            NavigationLink(destination: SchoolVerificationView()) {
                             HStack(spacing: 12) {
                                 Image(systemName: "checkmark.seal.fill")
                                     .foregroundStyle(AppColors.accentStrong)
                                     .frame(width: 24)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text("麦马学生验证")
+                                    Text("学生邮箱认证")
                                         .font(.system(size: 15, weight: .semibold))
                                         .foregroundStyle(AppColors.textPrimary)
-                                    Text("使用 @mcmaster.ca 邮箱完成验证；也可以稍后在设置里完成。")
+                                    Text("使用 \(selectedSchool.verificationDomainHint) 邮箱完成验证；也可以稍后在设置里完成。")
                                         .font(.system(size: 12))
                                         .foregroundStyle(AppColors.textMuted)
                                 }
@@ -828,6 +837,7 @@ struct CompleteProfileOnboardingView: View {
                             .profileOnboardingOutline(cornerRadius: 12)
                         }
                         .buttonStyle(.plain)
+                        }
 
                         fieldTitle("性别（必填）")
                         HStack(spacing: 8) {
@@ -923,6 +933,8 @@ struct CompleteProfileOnboardingView: View {
         fullName = profile.fullName?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         occupation = profile.occupation ?? ""
+        profileStatus = profile.profileStatus == "working" ? "working" : "student"
+        school = profile.school ?? ""
         if let existingGender = profile.gender, !existingGender.isEmpty {
             gender = existingGender
         }
@@ -939,7 +951,7 @@ struct CompleteProfileOnboardingView: View {
             Text("学生验证")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(AppColors.textPrimary)
-            Text("完成验证后，个人资料会显示学生标志。目前仅开放麦马验证，其他学校将陆续开放。验证是为了提升社区安全与信任；不想验证或已毕业，也欢迎使用 Cheese。")
+            Text("使用所选学校的官方邮箱完成验证后，个人资料和发布内容会显示对应学校的学生徽章。认证可稍后完成。")
                 .font(.system(size: 13))
                 .foregroundStyle(AppColors.textMuted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -969,13 +981,18 @@ struct CompleteProfileOnboardingView: View {
         do {
             try await authService.completeProfile(
                 fullName: fullName,
-                school: school,
+                profileStatus: profileStatus,
+                school: school.isEmpty ? nil : school,
                 gender: gender,
                 occupation: occupation
             )
         } catch {
             errorMessage = AppErrorMessage.userMessage(for: error)
         }
+    }
+
+    private var selectedSchool: CheeseUniversityOption? {
+        CheeseUniversityOption.option(matching: school)
     }
 
     private func leaveProfileCompletion() async {

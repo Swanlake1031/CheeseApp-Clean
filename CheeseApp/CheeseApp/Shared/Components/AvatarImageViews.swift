@@ -805,44 +805,49 @@ struct OfficialVerificationBadge: View {
     }
 }
 
-struct McMasterStudentBadge: View {
+struct SchoolStudentBadge: View {
     enum Style {
         case icon
         case label
     }
 
     var style: Style = .icon
+    var schoolName: String? = nil
 
-    private let maroon = Color(red: 122 / 255, green: 0, blue: 60 / 255)
-    private let gold = Color(red: 253 / 255, green: 191 / 255, blue: 87 / 255)
+    private var option: CheeseUniversityOption? { CheeseUniversityOption.option(matching: schoolName) }
+    private var code: String { option?.badgeCode ?? "✓" }
+    private var label: String {
+        if let option { return "\(option.name) 学生" }
+        return L10n.tr("Verified Student", "学生认证")
+    }
 
     var body: some View {
         HStack(spacing: 4) {
             ZStack {
                 Image(systemName: "shield.fill")
-                    .foregroundStyle(maroon)
-                Text("M")
+                    .foregroundStyle(AppColors.accentStrong)
+                Text(code)
                     .font(.system(size: 7, weight: .black, design: .rounded))
-                    .foregroundStyle(gold)
+                    .foregroundStyle(.white)
                     .offset(y: -0.5)
             }
             .font(.system(size: style == .label ? 15 : 14, weight: .semibold))
 
             if style == .label {
-                Text("麦马学生")
+                Text(label)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(maroon)
+                    .foregroundStyle(AppColors.textPrimary)
             }
         }
         .padding(.horizontal, style == .label ? 7 : 0)
         .padding(.vertical, style == .label ? 4 : 0)
         .background {
             if style == .label {
-                Capsule().fill(gold.opacity(0.24))
+                Capsule().fill(AppColors.accent.opacity(0.24))
             }
         }
         .fixedSize()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("麦马学生认证"))
+        .accessibilityLabel(Text(label))
     }
 }

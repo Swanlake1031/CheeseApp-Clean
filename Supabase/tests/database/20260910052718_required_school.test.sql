@@ -7,8 +7,8 @@ SELECT ok(NOT profile_completed,'new user remains incomplete despite routing fal
 SELECT set_config('request.jwt.claim.role','authenticated',true);
 SELECT set_config('request.jwt.claims','{"sub":"52718000-0000-4000-8000-000000000001","role":"authenticated"}',true);
 SET LOCAL ROLE authenticated;
-SELECT throws_ok($q$SELECT complete_profile('Test',NULL,'prefer_not_to_say')$q$,'22023','School is required','missing school rejected');
-SELECT throws_ok($q$SELECT complete_profile('Test','   ','prefer_not_to_say')$q$,'22023','School is required','whitespace school rejected');
+SELECT throws_ok($q$SELECT complete_profile('Test',NULL,'prefer_not_to_say')$q$,'22023','School is required for students','missing school rejected');
+SELECT throws_ok($q$SELECT complete_profile('Test','   ','prefer_not_to_say')$q$,'22023','School is required for students','whitespace school rejected');
 SELECT throws_ok($q$SELECT complete_profile('Test','Unknown School','prefer_not_to_say')$q$,'22023','Select a supported school','unknown school rejected');
 SELECT throws_ok($q$UPDATE profiles SET profile_completed=true WHERE id=auth.uid()$q$,'42501',NULL,'direct write cannot bypass required completion RPC');
 SELECT lives_ok($q$SELECT complete_profile('Test',' york university ','prefer_not_to_say')$q$,'explicit supported school completes registration');

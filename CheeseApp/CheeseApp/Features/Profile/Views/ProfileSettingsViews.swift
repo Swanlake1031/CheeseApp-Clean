@@ -51,21 +51,22 @@ struct SettingsView: View {
 
                         Divider().overlay(AppColors.divider)
 
-                        NavigationLink(destination: McMasterVerificationView()) {
-                            settingsRow(
-                                icon: "graduationcap.fill",
-                                title: "麦马学生认证",
-                                subtitle: authService.currentUser?.hasMcMasterStudentBadge == true
-                                    ? "已通过 @mcmaster.ca 邮箱认证"
-                                    : "验证后显示学生标志；目前仅开放麦马。",
-                                tint: authService.currentUser?.hasMcMasterStudentBadge == true
-                                    ? Color(red: 122 / 255, green: 0, blue: 60 / 255)
-                                    : AppColors.link
-                            )
+                        if authService.currentUser?.isStudent == true,
+                           CheeseUniversityOption.option(matching: authService.currentUser?.school)?.supportsStudentVerification == true {
+                            NavigationLink(destination: SchoolVerificationView()) {
+                                settingsRow(
+                                    icon: "graduationcap.fill",
+                                    title: "学生邮箱认证",
+                                    subtitle: authService.currentUser?.hasSchoolStudentBadge == true
+                                        ? "已通过学校官方邮箱认证"
+                                        : "验证后显示学校学生徽章",
+                                    tint: authService.currentUser?.hasSchoolStudentBadge == true
+                                        ? AppColors.accentStrong : AppColors.link
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            Divider().overlay(AppColors.divider)
                         }
-                        .buttonStyle(.plain)
-
-                        Divider().overlay(AppColors.divider)
 
                         settingsRow(
                             icon: "g.circle.fill",
@@ -714,12 +715,12 @@ extension MediaSafetyConsent {
     }
 }
 
-struct McMasterVerificationView: View {
+struct SchoolVerificationView: View {
     @EnvironmentObject private var authService: AuthService
 
-    @State private var localPart = ""
+    @State private var email = ""
     @State private var code = ""
-    @State private var status: McMasterVerificationStatus?
+    @State private var status: SchoolVerificationStatus?
     @State private var codeWasSent = false
     @State private var isLoading = true
     @State private var isSending = false
@@ -731,31 +732,25 @@ struct McMasterVerificationView: View {
     @State private var isError = false
     @State private var countdownTask: Task<Void, Never>?
 
-    private let maroon = Color(red: 122 / 255, green: 0, blue: 60 / 255)
-    private let gold = Color(red: 253 / 255, green: 191 / 255, blue: 87 / 255)
+    private let maroon = AppColors.accentStrong
+    private let gold = AppColors.accent
 
     private var isVerified: Bool {
-        status?.verified == true || authService.currentUser?.hasMcMasterStudentBadge == true
+        status?.verified == true || authService.currentUser?.hasSchoolStudentBadge == true
     }
 
-    private var normalizedLocalPart: String {
-        var value = localPart.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if value.hasSuffix("@mcmaster.ca") {
-            value.removeLast("@mcmaster.ca".count)
-        }
-        return value
+    private var school: CheeseUniversityOption? {
+        CheeseUniversityOption.option(matching: status?.schoolName ?? authService.currentUser?.school)
     }
 
-    private var email: String {
-        "\(normalizedLocalPart)@mcmaster.ca"
+    private var normalizedEmail: String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    private var hasValidLocalPart: Bool {
-        !normalizedLocalPart.isEmpty
-            && normalizedLocalPart.range(
-                of: "^[a-z0-9._%+-]+$",
-                options: .regularExpression
-            ) != nil
+    private var hasValidEmail: Bool {
+        guard let domain = normalizedEmail.split(separator: "@", maxSplits: 1).last.map(String.init),
+              normalizedEmail.contains("@") else { return false }
+        return (status?.emailDomains ?? school?.verificationDomains ?? []).contains(domain)
     }
 
     var body: some View {
@@ -784,7 +779,7 @@ struct McMasterVerificationView: View {
                             .padding(.horizontal, 4)
                     }
 
-                    Text("认证邮箱只用于确认麦马学生身份，不会显示在个人主页或帖子中。其他用户只能看到认证徽章。")
+                    Text("认证邮箱只用于确认学校学生身份，不会显示在个人主页或帖子中。其他用户只能看到认证徽章。")
                         .font(.system(size: 12))
                         .foregroundStyle(AppColors.textMuted)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -796,29 +791,29 @@ struct McMasterVerificationView: View {
             .contentShape(Rectangle())
             .onTapGesture { dismissKeyboard() }
         }
-        .cheesePageTopBar(title: "麦马学生认证")
+        .cheesePageTopBar(title: "学生邮箱认证")
         .task { await loadStatus() }
         .onDisappear { countdownTask?.cancel() }
-        .alert("解除麦马学生认证？", isPresented: $showingUnlinkConfirmation) {
+        .alert("解除学生认证？", isPresented: $showingUnlinkConfirmation) {
             Button("取消", role: .cancel) {}
             Button("确认解除绑定", role: .destructive) {
                 Task { await unlinkVerification() }
             }
         } message: {
-            Text("解除后学生徽章会立即消失，这个麦马邮箱也可以重新绑定其他账号。以后仍可再次完成认证。")
+            Text("解除后学生徽章会立即消失，这个学校邮箱也可以重新绑定其他账号。以后仍可再次完成认证。")
         }
     }
 
     private var verificationHeader: some View {
         VStack(spacing: 10) {
-            McMasterStudentBadge(style: .label)
+            SchoolStudentBadge(style: .label, schoolName: school?.name)
                 .scaleEffect(1.18)
 
-            Text("验证 McMaster 邮箱")
+            Text("验证 \(school?.name ?? "学校") 邮箱")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(AppColors.textPrimary)
 
-            Text("验证码会发送到你的 @mcmaster.ca 邮箱，通过后获得“麦马学生”徽章。")
+            Text("验证码会发送到 \(school?.verificationDomainHint ?? "学校官方邮箱")，通过后获得学校学生徽章。")
                 .font(.system(size: 13))
                 .foregroundStyle(AppColors.textMuted)
                 .multilineTextAlignment(.center)
@@ -843,7 +838,7 @@ struct McMasterVerificationView: View {
                     .foregroundStyle(AppColors.textMuted)
             }
 
-            Text("你的个人主页、论坛帖子和二手发布昵称旁会显示麦马学生徽章。")
+            Text("你的个人主页、论坛帖子和二手发布昵称旁会显示学校学生徽章。")
                 .font(.system(size: 13))
                 .foregroundStyle(AppColors.textMuted)
                 .multilineTextAlignment(.center)
@@ -885,22 +880,18 @@ struct McMasterVerificationView: View {
     private var verificationForm: some View {
         VStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("麦马邮箱")
+                Text("学校邮箱")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(AppColors.textPrimary)
 
                 HStack(spacing: 4) {
-                    TextField("MacID", text: $localPart)
+                    TextField(school?.verificationDomainHint ?? "name@university.ca", text: $email)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.asciiCapable)
                         .submitLabel(.send)
                         .onSubmit { Task { await sendCode() } }
 
-                    Text("@mcmaster.ca")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(AppColors.textMuted)
-                        .fixedSize()
                 }
                 .font(.system(size: 15))
                 .padding(.horizontal, 14)
@@ -928,8 +919,8 @@ struct McMasterVerificationView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
-            .disabled(isSending || cooldownSeconds > 0 || !hasValidLocalPart)
-            .opacity(isSending || cooldownSeconds > 0 || !hasValidLocalPart ? 0.55 : 1)
+            .disabled(isSending || cooldownSeconds > 0 || !hasValidEmail)
+            .opacity(isSending || cooldownSeconds > 0 || !hasValidEmail ? 0.55 : 1)
 
             if codeWasSent {
                 Divider().overlay(AppColors.divider)
@@ -991,7 +982,7 @@ struct McMasterVerificationView: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            status = try await McMasterVerificationService.status()
+            status = try await SchoolVerificationService.status()
             message = nil
         } catch {
             show(AppErrorMessage.userMessage(for: error), asError: true)
@@ -1001,8 +992,8 @@ struct McMasterVerificationView: View {
     @MainActor
     private func sendCode() async {
         guard !isSending, cooldownSeconds == 0 else { return }
-        guard hasValidLocalPart else {
-            show("请输入有效的 McMaster MacID。", asError: true)
+        guard hasValidEmail else {
+            show("请输入所选学校的有效官方邮箱。", asError: true)
             return
         }
         dismissKeyboard()
@@ -1010,7 +1001,7 @@ struct McMasterVerificationView: View {
         defer { isSending = false }
 
         do {
-            let result = try await McMasterVerificationService.sendCode(to: email)
+            let result = try await SchoolVerificationService.sendCode(to: normalizedEmail)
             if result.verified == true {
                 await loadStatus()
                 if let userID = authService.currentUser?.id {
@@ -1021,7 +1012,7 @@ struct McMasterVerificationView: View {
             codeWasSent = result.sent == true
             code = ""
             startCooldown(seconds: result.retryAfterSeconds ?? 60)
-            show("邮件服务器已接收验证码邮件，请检查麦马邮箱。", asError: false)
+            show("验证码邮件已发送，请检查学校邮箱。", asError: false)
         } catch {
             show(AppErrorMessage.userMessage(for: error), asError: true)
         }
@@ -1035,11 +1026,11 @@ struct McMasterVerificationView: View {
         defer { isVerifying = false }
 
         do {
-            status = try await McMasterVerificationService.verify(email: email, code: code)
+            status = try await SchoolVerificationService.verify(email: normalizedEmail, code: code)
             if let userID = authService.currentUser?.id {
                 await authService.fetchUserProfile(userId: userID)
             }
-            show("麦马学生认证成功。", asError: false)
+            show("学生邮箱认证成功。", asError: false)
         } catch {
             show(AppErrorMessage.userMessage(for: error), asError: true)
         }
@@ -1052,10 +1043,10 @@ struct McMasterVerificationView: View {
         defer { isUnlinking = false }
 
         do {
-            status = try await McMasterVerificationService.unlink()
+            status = try await SchoolVerificationService.unlink()
             codeWasSent = false
             code = ""
-            localPart = ""
+            email = ""
             if var profile = authService.currentUser {
                 profile.isMcMasterVerified = false
                 authService.currentUser = profile
@@ -1063,7 +1054,7 @@ struct McMasterVerificationView: View {
             if let userID = authService.currentUser?.id {
                 await authService.fetchUserProfile(userId: userID)
             }
-            show("麦马学生认证已解除绑定。", asError: false)
+            show("学生邮箱认证已解除绑定。", asError: false)
         } catch {
             show(AppErrorMessage.userMessage(for: error), asError: true)
         }

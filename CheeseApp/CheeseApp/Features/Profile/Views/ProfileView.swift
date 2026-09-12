@@ -565,8 +565,8 @@ struct ProfileHeaderSurface<AvatarContent: View, SocialContent: View, ActionCont
                             if profile?.isOfficialAccount == true {
                                 OfficialVerificationBadge()
                             }
-                            if profile?.hasMcMasterStudentBadge == true {
-                                McMasterStudentBadge(style: .label)
+                            if profile?.hasSchoolStudentBadge == true {
+                                SchoolStudentBadge(style: .label, schoolName: profile?.school)
                             }
                         }
 
@@ -579,6 +579,19 @@ struct ProfileHeaderSurface<AvatarContent: View, SocialContent: View, ActionCont
                 }
 
                 socialContent
+
+                if let school = profile?.school?.trimmingCharacters(in: .whitespacesAndNewlines), !school.isEmpty {
+                    HStack(spacing: 10) {
+                        Image(systemName: "building.columns.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(hasCover ? Color.white.opacity(0.78) : AppColors.textMuted)
+                            .frame(width: 18, alignment: .center)
+                        Text(CheeseUniversityOption.option(matching: school)?.localizedName ?? school)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(hasCover ? Color.white.opacity(0.9) : AppColors.textPrimary)
+                            .lineLimit(1)
+                    }
+                }
 
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Image(systemName: "text.alignleft")

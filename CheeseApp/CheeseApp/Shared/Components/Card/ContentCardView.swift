@@ -139,7 +139,7 @@ struct ContentCardView: View {
                         OfficialVerificationBadge(style: .icon)
                     }
                     if item.isAuthorMcMasterVerified {
-                        McMasterStudentBadge()
+                        SchoolStudentBadge()
                     }
                 }
 
@@ -280,7 +280,7 @@ struct ContentCardView: View {
         HStack(spacing: 5) {
             Text(footerName)
             if item.isAuthorMcMasterVerified {
-                McMasterStudentBadge()
+                SchoolStudentBadge()
             }
             if let timeText = item.timeText, !timeText.isEmpty {
                 Text("·")
@@ -303,7 +303,7 @@ struct ContentCardView: View {
                     )
 
                     if item.isAuthorMcMasterVerified {
-                        McMasterStudentBadge()
+                        SchoolStudentBadge()
                     }
                 }
 

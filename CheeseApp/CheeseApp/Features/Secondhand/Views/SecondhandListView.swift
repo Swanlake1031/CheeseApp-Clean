@@ -1173,7 +1173,7 @@ private struct SecondhandSellerIdentityLabel: View {
                         .foregroundStyle(AppColors.textPrimary)
                         .lineLimit(1)
                     if item.isSellerMcMasterVerified {
-                        McMasterStudentBadge()
+                        SchoolStudentBadge()
                     }
                 }
 

@@ -21,6 +21,8 @@ struct EditProfileView: View {
     @EnvironmentObject var authService: AuthService
 
     @State private var fullName: String = ""
+    @State private var profileStatus: String = "student"
+    @State private var school: String = ""
     @State private var phoneNumber: String = ""
     @State private var gender: String = ""
     @State private var isGenderVisible = true
@@ -53,8 +55,8 @@ struct EditProfileView: View {
         _showingAvatarActionPreview = State(initialValue: startsWithAvatarActions)
     }
 
-    private var storedSchoolName: String {
-        authService.currentUser?.school ?? CheeseUniversityOption.defaultSchoolName
+    private var selectedSchool: CheeseUniversityOption? {
+        CheeseUniversityOption.option(matching: school)
     }
 
     var body: some View {
@@ -93,6 +95,8 @@ struct EditProfileView: View {
         .onAppear {
             guard let user = authService.currentUser else { return }
             fullName = user.fullName ?? ""
+            profileStatus = user.profileStatus == "working" ? "working" : "student"
+            school = user.school ?? ""
             phoneNumber = user.phoneNumber ?? ""
             let savedGender = user.gender ?? ""
             gender = genderOptions.contains(where: { $0.value == savedGender }) ? savedGender : ""
@@ -138,12 +142,19 @@ struct EditProfileView: View {
                             Divider()
                                 .padding(.leading, 16)
 
-                            studentVerificationInfo
+                            profileStatusField
 
                             Divider()
                                 .padding(.leading, 16)
 
-                            studentVerificationField
+                            schoolField
+
+                            if profileStatus == "student", selectedSchool?.supportsStudentVerification == true {
+                                Divider().padding(.leading, 16)
+                                studentVerificationInfo
+                                Divider().padding(.leading, 16)
+                                studentVerificationField
+                            }
                         }
 
                         profileSectionCard {
@@ -452,16 +463,16 @@ struct EditProfileView: View {
     }
 
     private var studentVerificationField: some View {
-        NavigationLink(destination: McMasterVerificationView()) {
+        NavigationLink(destination: SchoolVerificationView()) {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.seal.fill")
                     .foregroundStyle(AppColors.accentStrong)
                     .frame(width: 24)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("麦马学生认证")
+                    Text("学生邮箱认证")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(AppColors.textPrimary)
-                    Text("使用 @mcmaster.ca 邮箱完成验证")
+                    Text("使用 \(selectedSchool?.verificationDomainHint ?? "学校官方") 邮箱完成验证")
                         .font(.system(size: 12))
                         .foregroundStyle(AppColors.textMuted)
                 }
@@ -487,11 +498,46 @@ struct EditProfileView: View {
                 Text("学生验证")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(AppColors.textPrimary)
-                Text("完成验证后，个人资料会显示学生标志。目前仅开放麦马验证，其他学校将陆续开放。验证是为了提升社区安全与信任；不想验证或已毕业，也欢迎使用 Cheese。")
+                Text("使用所选学校的官方邮箱认证后，个人资料和发布内容会显示学校学生徽章。")
                     .font(.system(size: 12))
                     .foregroundStyle(AppColors.textMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+    }
+
+    private var profileStatusField: some View {
+        HStack(spacing: 14) {
+            Text("状态")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(AppColors.textMuted)
+                .frame(width: 66, alignment: .leading)
+            Picker("状态", selection: $profileStatus) {
+                Text("在校").tag("student")
+                Text("工作").tag("working")
+            }
+            .pickerStyle(.segmented)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+    }
+
+    private var schoolField: some View {
+        HStack(spacing: 14) {
+            Text(profileStatus == "student" ? "学校*" : "学校")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(AppColors.textMuted)
+                .frame(width: 66, alignment: .leading)
+            Picker("学校", selection: $school) {
+                Text(profileStatus == "student" ? "请选择学校" : "不填写").tag("")
+                ForEach(CheeseUniversityOption.all, id: \.name) { option in
+                    Text(option.localizedName).tag(option.name)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
@@ -715,6 +761,10 @@ struct EditProfileView: View {
             saveErrorMessage = "请选择性别"
             return
         }
+        guard profileStatus == "working" || selectedSchool != nil else {
+            saveErrorMessage = "在校状态必须选择学校"
+            return
+        }
 
         let userId: UUID
         do {
@@ -736,7 +786,8 @@ struct EditProfileView: View {
             let input = ProfileUpdateInput(
                 userId: userId,
                 fullName: normalizedFullName,
-                schoolName: storedSchoolName,
+                profileStatus: profileStatus,
+                schoolName: school.isEmpty ? nil : school,
                 avatarURL: avatarURLToSave,
                 gender: gender,
                 isGenderVisible: isGenderVisible,

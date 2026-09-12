@@ -506,6 +506,7 @@ class AuthService: ObservableObject {
                 phoneNumber: nil,
                 gradYear: nil,
                 bio: nil,
+                profileStatus: nil,
                 profileCompleted: savedAccount?.profileCompleted ?? true,
                 createdAt: nil,
                 updatedAt: nil,
@@ -1612,17 +1613,36 @@ class AuthService: ObservableObject {
 
     func completeProfile(
         fullName: String?,
-        school: String,
+        profileStatus: String,
+        school: String?,
         gender: String,
         occupation: String
     ) async throws {
         let normalizedFullName = fullName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-        let normalizedSchool = school.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-        guard let selectedSchoolOption = CheeseUniversityOption.option(matching: normalizedSchool) else {
+        let normalizedStatus = profileStatus.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard ["student", "working"].contains(normalizedStatus) else {
             throw NSError(
                 domain: "AuthService",
                 code: 400,
-                userInfo: [NSLocalizedDescriptionKey: "学校为必填，请选择下拉列表中的学校"]
+                userInfo: [NSLocalizedDescriptionKey: "请选择在校或工作状态"]
+            )
+        }
+        let normalizedSchool = school?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        if normalizedStatus == "student", normalizedSchool == nil {
+            throw NSError(
+                domain: "AuthService",
+                code: 400,
+                userInfo: [NSLocalizedDescriptionKey: "在校状态必须选择学校"]
+            )
+        }
+        let selectedSchoolOption = CheeseUniversityOption.option(matching: normalizedSchool)
+            ?? CheeseUniversityOption.other
+        if normalizedSchool != nil,
+           CheeseUniversityOption.option(matching: normalizedSchool) == nil {
+            throw NSError(
+                domain: "AuthService",
+                code: 400,
+                userInfo: [NSLocalizedDescriptionKey: "请选择下拉列表中的学校"]
             )
         }
         let normalizedGender = gender.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1643,9 +1663,10 @@ class AuthService: ObservableObject {
 
         let params = CompleteProfileParams(
             pFullName: normalizedFullName,
-            pUniversity: selectedSchoolOption.name,
+            pUniversity: normalizedSchool == nil ? nil : selectedSchoolOption.name,
             pGender: normalizedGender,
-            pOccupation: normalizedOccupation
+            pOccupation: normalizedOccupation,
+            pProfileStatus: normalizedStatus
         )
         let completedProfile: Profile = try await supabase.client
             .rpc("complete_profile", params: params)
@@ -1727,6 +1748,7 @@ class AuthService: ObservableObject {
         guard let profile else { return true }
         return ProfileCompletionPolicy.needsCompletion(
             profileCompleted: profile.profileCompleted,
+            profileStatus: profile.profileStatus,
             school: profile.school
         )
     }
@@ -2446,12 +2468,14 @@ private struct CompleteProfileParams: Encodable {
     let pUniversity: String?
     let pGender: String
     let pOccupation: String?
+    let pProfileStatus: String
 
     enum CodingKeys: String, CodingKey {
         case pFullName = "p_full_name"
         case pUniversity = "p_university"
         case pGender = "p_gender"
         case pOccupation = "p_occupation"
+        case pProfileStatus = "p_profile_status"
     }
 }
 
