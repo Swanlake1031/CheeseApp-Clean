@@ -547,7 +547,9 @@ REVOKE ALL ON FUNCTION moderation_private.enqueue_post_media_cleanup(uuid, uuid,
 REVOKE ALL ON FUNCTION moderation_private.enqueue_suspension_avatar_cleanup(uuid)
   FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION moderation_private.is_user_suspended(uuid)
-  FROM PUBLIC, anon, authenticated;
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION moderation_private.is_user_suspended(uuid)
+  TO authenticated, service_role;
 REVOKE ALL ON FUNCTION moderation_private.require_admin()
   FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.moderation_resolve(text, uuid, text, text)
