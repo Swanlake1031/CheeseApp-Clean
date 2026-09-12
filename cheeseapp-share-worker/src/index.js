@@ -35,9 +35,12 @@ import { processSecondhandLifecycle } from "./secondhand/lifecycle.js";
   
 export default {
   async fetch(request, env) {
-    const legalPath = new URL(request.url).pathname.replace(/\/$/, "");
+    const requestURL = new URL(request.url);
+    const legalPath = requestURL.pathname.replace(/\/$/, "");
     if (["/privacy", "/support"].includes(legalPath) && ["GET", "HEAD"].includes(request.method)) {
-      return new Response(request.method === "HEAD" ? null : renderLegalPage(legalPath.slice(1)), {
+      return new Response(request.method === "HEAD" ? null : renderLegalPage(legalPath.slice(1), {
+        language: requestURL.searchParams.get("lang")
+      }), {
         headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff" }
       });
     }

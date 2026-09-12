@@ -8,12 +8,20 @@ export function pageShell({
   previewImageURL = "",
   deepLinkURL = "",
   appName = "Cheese",
-  body
+  body,
+  metaTitle = "",
+  metaDescription = "",
+  robots = "noindex, nofollow",
+  lang = "zh-CN",
+  pageClass = "",
+  footer = true,
+  footerTerms = false,
+  footerExtraLinks = []
 }) {
   const brandedAppName = /app/i.test(appName) ? appName : `${appName} App`;
   const module = inferModuleFromCanonicalURL(canonicalURL);
-  const metaTitle = buildMetaTitle({ title, module, brandedAppName });
-  const metaDescription = buildMetaDescription({
+  const resolvedMetaTitle = metaTitle || buildMetaTitle({ title, module, brandedAppName });
+  const resolvedMetaDescription = metaDescription || buildMetaDescription({
     description,
     brandedAppName
   });
@@ -30,7 +38,7 @@ export function pageShell({
         <meta property="og:image:type" content="${escapeHTML(previewImageType)}" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
-        <meta property="og:image:alt" content="${escapeHTML(metaTitle)}" />
+        <meta property="og:image:alt" content="${escapeHTML(resolvedMetaTitle)}" />
         <meta name="twitter:image" content="${escapeHTML(previewImageURL)}" />
       `
     : "";
@@ -42,13 +50,13 @@ export function pageShell({
     : "";
 
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="${escapeHTML(lang)}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHTML(metaTitle)}</title>
-    <meta name="description" content="${escapeHTML(metaDescription)}" />
-    <meta name="robots" content="noindex, nofollow" />
+    <title>${escapeHTML(resolvedMetaTitle)}</title>
+    <meta name="description" content="${escapeHTML(resolvedMetaDescription)}" />
+    <meta name="robots" content="${escapeHTML(robots)}" />
     <meta name="theme-color" content="#f7efd8" />
     <link rel="canonical" href="${escapeHTML(canonicalURL)}" />
     <link rel="manifest" href="${assetOrigin}/manifest.webmanifest?v=${iconVersion}" />
@@ -61,22 +69,52 @@ export function pageShell({
     <meta property="og:type" content="${ogType}" />
     <meta property="og:site_name" content="${escapeHTML(brandedAppName)}" />
     <meta property="og:locale" content="zh_CN" />
-    <meta property="og:title" content="${escapeHTML(metaTitle)}" />
-    <meta property="og:description" content="${escapeHTML(metaDescription)}" />
+    <meta property="og:title" content="${escapeHTML(resolvedMetaTitle)}" />
+    <meta property="og:description" content="${escapeHTML(resolvedMetaDescription)}" />
     <meta property="og:url" content="${escapeHTML(canonicalURL)}" />
     ${imageTags}
     <meta name="twitter:card" content="${twitterCardType}" />
-    <meta name="twitter:title" content="${escapeHTML(metaTitle)}" />
-    <meta name="twitter:description" content="${escapeHTML(metaDescription)}" />
+    <meta name="twitter:title" content="${escapeHTML(resolvedMetaTitle)}" />
+    <meta name="twitter:description" content="${escapeHTML(resolvedMetaDescription)}" />
     ${appLinkTags}
     <style>
 ${pageStyles}
     </style>
   </head>
   <body>
-    <div class="page">${body}</div>
+    <div class="page${pageClass ? ` ${escapeHTML(pageClass)}` : ""}">
+      ${body}
+      ${footer ? renderSiteFooter({ footerTerms, footerExtraLinks }) : ""}
+    </div>
   </body>
 </html>`;
+}
+
+function renderSiteFooter({ footerTerms, footerExtraLinks }) {
+  const links = [
+    '<a href="/privacy">Privacy Policy <span lang="zh-CN">隐私政策</span></a>',
+    '<a href="/support">Support <span lang="zh-CN">帮助与支持</span></a>',
+    '<a href="mailto:support.cheeseteam@gmail.com">Contact Us <span lang="zh-CN">联系我们</span></a>'
+  ];
+
+  if (footerTerms) {
+    links.splice(
+      1,
+      0,
+      '<span class="site-footer-link site-footer-link-disabled">Terms of Use <span lang="zh-CN">用户协议</span> <small>TODO</small></span>'
+    );
+  }
+
+  for (const link of footerExtraLinks) {
+    if (!link || !link.href || !link.label) {
+      continue;
+    }
+    links.push(
+      `<a href="${escapeHTML(link.href)}"${link.external ? ' target="_blank" rel="noreferrer"' : ""}>${escapeHTML(link.label)}</a>`
+    );
+  }
+
+  return `<footer class="site-footer" aria-label="Site footer">${links.join('<span class="site-footer-separator" aria-hidden="true">·</span>')}</footer>`;
 }
 
 function inferModuleFromCanonicalURL(canonicalURL) {

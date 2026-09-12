@@ -668,6 +668,264 @@ export const pageStyles = `
         text-transform: uppercase;
         color: var(--accent-soft);
       }
+      .page.support-page-shell,
+      .page.legal-page-shell {
+        max-width: 960px;
+      }
+      .support-page,
+      .legal-page {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .support-hero {
+        padding: 28px;
+        background: linear-gradient(145deg, #fff7d8 0%, #ffffff 72%);
+      }
+      .support-hero h1 {
+        margin: 10px 0 8px;
+        font-size: clamp(30px, 5vw, 46px);
+      }
+      .support-hero .support-hero-title-en {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: clamp(20px, 3vw, 28px);
+        font-weight: 650;
+      }
+      .support-hero .support-subtitle {
+        margin: 0;
+        color: var(--text);
+        font-size: 18px;
+        font-weight: 650;
+      }
+      .support-hero .support-subtitle-en {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 15px;
+        font-weight: 500;
+      }
+      .support-language-links {
+        display: inline-flex;
+        gap: 5px;
+        margin-top: 18px;
+        padding: 4px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.05);
+      }
+      .support-language-links a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 5px 11px;
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 750;
+        text-decoration: none;
+      }
+      .support-language-links a:hover,
+      .support-language-links a:focus-visible,
+      .support-language-links a.is-active {
+        background: #ffffff;
+        color: var(--text);
+      }
+      .support-hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 22px;
+      }
+      .support-hero-actions .button {
+        min-width: 0;
+      }
+      .support-section-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .support-section-card {
+        min-width: 0;
+        padding: 22px;
+      }
+      .support-section-heading {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .support-section-icon {
+        display: inline-flex;
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 13px;
+        background: #fff2be;
+        font-size: 20px;
+      }
+      .support-section-heading h2 {
+        margin: 0;
+        color: var(--text);
+        font-size: 20px;
+        line-height: 1.2;
+      }
+      .support-section-heading .support-title-en {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .support-copy-pair {
+        display: grid;
+        gap: 12px;
+      }
+      .support-list {
+        margin: 0;
+        padding-left: 21px;
+        color: var(--text);
+        font-size: 15px;
+        line-height: 1.6;
+      }
+      .support-list li + li {
+        margin-top: 7px;
+      }
+      .support-list-en {
+        color: var(--muted);
+      }
+      .support-disclaimer {
+        margin-top: 16px;
+        padding: 13px 14px;
+        border-radius: 14px;
+        background: #fff8df;
+        color: #5d4d27;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .support-disclaimer p {
+        margin: 0;
+        color: inherit;
+        font-size: inherit;
+      }
+      .support-disclaimer p + p {
+        margin-top: 8px;
+        color: #746341;
+      }
+      .support-contact {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 24px 28px;
+      }
+      .support-contact h2 {
+        margin: 8px 0 6px;
+        font-size: 24px;
+      }
+      .support-contact-copy {
+        max-width: 620px;
+        margin: 0;
+      }
+      .support-contact-email {
+        display: inline-flex;
+        align-items: center;
+        min-height: 46px;
+        padding: 12px 16px;
+        border-radius: 14px;
+        background: var(--accent);
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 750;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .legal-card {
+        padding: 28px;
+      }
+      .legal-card h1 {
+        margin-top: 0;
+      }
+      .legal-section {
+        padding: 17px 0;
+        border-top: 1px solid rgba(0, 0, 0, 0.07);
+      }
+      .legal-section:first-of-type {
+        padding-top: 0;
+        border-top: 0;
+      }
+      .legal-section p {
+        margin: 0;
+      }
+      .legal-section p + p {
+        margin-top: 9px;
+        color: var(--muted);
+      }
+      .site-footer {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 7px 12px;
+        margin: 18px auto 0;
+        padding: 4px 8px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+        text-align: center;
+      }
+      .site-footer a,
+      .site-footer-link {
+        color: inherit;
+        text-decoration: none;
+      }
+      .site-footer a:hover,
+      .site-footer a:focus-visible {
+        color: var(--text);
+        text-decoration: underline;
+      }
+      .site-footer-link-disabled {
+        cursor: default;
+        opacity: 0.9;
+      }
+      .site-footer-link-disabled small {
+        color: var(--accent-soft);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .site-footer-separator {
+        color: rgba(107, 99, 88, 0.55);
+      }
+      @media (max-width: 680px) {
+        .page.support-page-shell,
+        .page.legal-page-shell {
+          max-width: 100%;
+        }
+        .support-hero,
+        .support-contact,
+        .legal-card {
+          padding: 22px 18px;
+        }
+        .support-section-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .support-section-card {
+          padding: 19px 18px;
+        }
+        .support-contact {
+          align-items: stretch;
+        }
+        .support-contact-email {
+          width: 100%;
+          justify-content: center;
+          white-space: normal;
+          text-align: center;
+        }
+      }
       code {
         display: inline-block;
         padding: 10px 12px;
