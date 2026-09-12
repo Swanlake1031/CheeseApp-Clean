@@ -111,47 +111,25 @@ enum SecondhandPost {
 /// A manually selected marketplace area. This stays separate from device
 /// location, so Marketplace never requests or stores GPS coordinates.
 enum MarketplaceRegion: String, Codable, CaseIterable, Identifiable {
-    case greaterTorontoArea = "greater_toronto_area"
+    case toronto
+    case northYork = "north_york"
     case hamilton
-    case waterlooRegion = "waterloo_region"
-    case guelph
-    case ottawa
-    case montreal
-    case metroVancouver = "metro_vancouver"
-    case calgary
-    case edmonton
-    case halifax
-    case winnipeg
-    case oshawaDurham = "oshawa_durham"
-    case kingston
-    case peterborough
-    case niagaraRegion = "niagara_region"
-    case thunderBay = "thunder_bay"
-    case otherCanada = "other_canada"
-    case unitedStates = "united_states"
+    case oakville
+    case etobicoke
+    case richmond
+    case outside
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .greaterTorontoArea: return L10n.tr("Greater Toronto Area", "大多伦多地区")
+        case .toronto: return "Toronto"
+        case .northYork: return "NorthYork"
         case .hamilton: return "Hamilton"
-        case .waterlooRegion: return L10n.tr("Waterloo Region", "滑铁卢地区")
-        case .guelph: return "Guelph"
-        case .ottawa: return "Ottawa"
-        case .montreal: return "Montréal"
-        case .metroVancouver: return L10n.tr("Metro Vancouver", "大温哥华地区")
-        case .calgary: return "Calgary"
-        case .edmonton: return "Edmonton"
-        case .halifax: return "Halifax"
-        case .winnipeg: return "Winnipeg"
-        case .oshawaDurham: return L10n.tr("Oshawa / Durham", "奥沙瓦 / 杜林区")
-        case .kingston: return "Kingston"
-        case .peterborough: return "Peterborough"
-        case .niagaraRegion: return L10n.tr("Niagara Region", "尼亚加拉地区")
-        case .thunderBay: return "Thunder Bay"
-        case .otherCanada: return L10n.tr("Other Canada", "加拿大其他地区")
-        case .unitedStates: return L10n.tr("United States", "美国")
+        case .oakville: return "Oakville"
+        case .etobicoke: return "Etobicoke"
+        case .richmond: return "Richmond"
+        case .outside: return "Outside"
         }
     }
 }

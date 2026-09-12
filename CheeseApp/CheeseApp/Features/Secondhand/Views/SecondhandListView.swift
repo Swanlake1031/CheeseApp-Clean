@@ -14,6 +14,7 @@ private struct SecondhandSellerRoute: Identifiable, Hashable {
 
 struct SecondhandListView: View {
     var isTabRoot = false
+    var isActive = true
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
     @StateObject private var service = SecondhandService.shared
@@ -33,9 +34,11 @@ struct SecondhandListView: View {
 
     init(
         isTabRoot: Bool = false,
+        isActive: Bool = true,
         initialCategory: SecondhandPost.Category? = nil
     ) {
         self.isTabRoot = isTabRoot
+        self.isActive = isActive
         _selectedCategory = State(initialValue: initialCategory)
     }
 
@@ -79,7 +82,6 @@ struct SecondhandListView: View {
                         emptyState
                     case .error(let message):
                         ErrorView(message) {
-                            guard let selectedRegion else { return }
                             Task { await service.fetchItems(region: selectedRegion) }
                         }
                         .frame(height: 220)
@@ -154,7 +156,6 @@ struct SecondhandListView: View {
                 }
             )
             .refreshable {
-                guard let selectedRegion else { return }
                 await service.fetchItems(region: selectedRegion)
             }
         }
@@ -195,21 +196,28 @@ struct SecondhandListView: View {
                 for: authService.currentUser?.id
             )
             selectedRegion = storedRegion
-            guard let storedRegion else {
-                isRegionPickerPresented = true
-                return
-            }
-            await service.fetchItems(region: storedRegion)
+            isRegionPickerPresented = true
+        }
+        .onChange(of: isActive) { wasActive, isActive in
+            guard isActive, !wasActive, hasLoadedInitialData else { return }
+            selectedRegion = MarketplaceRegionPreference.selected(
+                for: authService.currentUser?.id
+            )
+            isRegionPickerPresented = true
         }
         .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { notification in
             guard PostFeatureEvents.changedPostKind(from: notification) == .secondhand else { return }
-            guard let selectedRegion else { return }
             Task { await service.fetchItems(region: selectedRegion) }
         }
         .sheet(isPresented: $isRegionPickerPresented) {
             MarketplaceRegionPickerView(
                 selectedRegion: selectedRegion,
-                requiresSelection: selectedRegion == nil
+                requiresSelection: false,
+                onSkip: {
+                    selectedRegion = nil
+                    isRegionPickerPresented = false
+                    Task { await service.fetchItems(region: nil) }
+                }
             ) { region in
                 selectedRegion = region
                 MarketplaceRegionPreference.save(
@@ -219,7 +227,7 @@ struct SecondhandListView: View {
                 isRegionPickerPresented = false
                 Task { await service.fetchItems(region: region) }
             }
-            .interactiveDismissDisabled(selectedRegion == nil)
+            .interactiveDismissDisabled(true)
         }
         .alert(L10n.tr("Action failed", "操作失败"), isPresented: Binding(
             get: { interactionErrorMessage != nil },
@@ -244,7 +252,7 @@ struct SecondhandListView: View {
                         .font(.system(size: 15, weight: .semibold))
                     Text(
                         selectedRegion?.displayName
-                            ?? L10n.tr("Select region", "请选择地区")
+                            ?? L10n.tr("All regions", "全部地区")
                     )
                     .font(.system(size: 15, weight: .semibold))
                     .lineLimit(1)
@@ -374,6 +382,7 @@ struct MarketplaceRegionPickerView: View {
     @Environment(\.dismiss) private var dismiss
     let selectedRegion: MarketplaceRegion?
     let requiresSelection: Bool
+    var onSkip: (() -> Void)? = nil
     let onSelect: (MarketplaceRegion) -> Void
     @State private var searchText = ""
 
@@ -415,7 +424,11 @@ struct MarketplaceRegionPickerView: View {
             .navigationTitle(L10n.tr("Select Region", "选择地区"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if !requiresSelection {
+                if let onSkip {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(L10n.tr("Skip", "跳过")) { onSkip() }
+                    }
+                } else if !requiresSelection {
                     ToolbarItem(placement: .topBarLeading) {
                         Button(L10n.tr("Cancel", "取消")) { dismiss() }
                     }

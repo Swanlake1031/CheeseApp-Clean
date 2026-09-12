@@ -738,6 +738,16 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertNil(SecondhandCreateFormRules.defaultCategory)
     }
 
+    func testMarketplaceRegionListMatchesLaunchAreas() {
+        XCTAssertEqual(
+            MarketplaceRegion.allCases.map(\.rawValue),
+            [
+                "toronto", "north_york", "hamilton", "oakville",
+                "etobicoke", "richmond", "outside"
+            ]
+        )
+    }
+
     func testSecondhandCreateFormRejectsInvalidPricesAndTrimsRequiredText() {
         XCTAssertEqual(SecondhandCreateFormRules.normalizedRequiredText("  Desk lamp\n"), "Desk lamp")
         XCTAssertEqual(SecondhandCreateFormRules.validPrice(from: " 18.50 "), 18.5)

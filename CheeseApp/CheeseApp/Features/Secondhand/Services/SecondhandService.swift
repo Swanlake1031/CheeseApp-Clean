@@ -1161,9 +1161,7 @@ class SecondhandService: ObservableObject {
     // MARK: - 获取所有二手商品
     func fetchItems(region: MarketplaceRegion? = nil) async {
         guard let requestGeneration = requestGeneration() else { return }
-        if let region {
-            activeMarketplaceRegion = region
-        }
+        activeMarketplaceRegion = region
         let fetchID = UUID()
         latestItemFetchID = fetchID
         isLoading = true
@@ -1402,7 +1400,7 @@ class SecondhandService: ObservableObject {
             category: category,
             condition: SecondhandPost.Condition.displayName(for: dbPost.condition),
             marketplaceRegion: MarketplaceRegion(rawValue: dbPost.marketplaceRegion)
-                ?? .otherCanada,
+                ?? .outside,
             seller: Self.sellerDisplayName(
                 isAnonymous: dbPost.isAnonymous,
                 rawName: dbPost.userName

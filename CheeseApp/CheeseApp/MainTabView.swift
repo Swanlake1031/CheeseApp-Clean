@@ -110,6 +110,7 @@ struct MainTabView: View {
                     NavigationStack {
                         SecondhandListView(
                             isTabRoot: true,
+                            isActive: selectedTab == .secondhand,
                             initialCategory: requestedSecondhandCategory
                         )
                     }
