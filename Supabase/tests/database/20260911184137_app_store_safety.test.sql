@@ -69,6 +69,13 @@ SELECT ok((SELECT raw_user_meta_data - 'deactivated_at'='{}'::jsonb FROM auth.us
 SELECT ok((SELECT phone IS NULL AND wechat_id IS NULL AND cover_image_url IS NULL FROM public.profiles WHERE id='00000000-0000-0000-0000-000000000002'),'deletion erases profile contact data');
 SELECT is((SELECT count(*) FROM auth.identities WHERE user_id='00000000-0000-0000-0000-000000000002'),0::bigint,'sign-in identities removed');
 
+-- The deletion fixture intentionally leaves the old JWT in place to verify
+-- that an existing token cannot mutate the account. Clear that actor before
+-- creating the independent moderation-media fixture below; otherwise the
+-- safety trigger correctly rejects the fixture as account_restricted.
+SELECT set_config('request.jwt.claim.sub','',true);
+SELECT set_config('request.jwt.claims','{}',true);
+
 -- A moderator removing a post must queue its exact public image object before
 -- the post is hidden. The same item cannot be duplicated by a later suspension.
 INSERT INTO public.posts(id,user_id,school_id,type,title,description,status,is_anonymous,is_private)
