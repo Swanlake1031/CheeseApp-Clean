@@ -14,7 +14,7 @@ enum CheeseTabBarLayout {
 }
 
 enum CheeseCreateSheetLayout {
-    static let compactDetent: PresentationDetent = .height(260)
+    static let compactDetent: PresentationDetent = .height(248)
 }
 
 private struct CreateComposerRoute: Identifiable {
