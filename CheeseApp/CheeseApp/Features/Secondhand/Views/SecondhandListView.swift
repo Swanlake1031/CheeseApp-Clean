@@ -20,6 +20,8 @@ struct SecondhandListView: View {
     @State private var searchText = ""
     @State private var isSearchPresented = false
     @State private var selectedCategory: SecondhandPost.Category?
+    @State private var selectedRegion: MarketplaceRegion?
+    @State private var isRegionPickerPresented = false
     @State private var editingPost: UserPostSummary?
     @State private var selectedItem: SecondhandItem?
     @State private var selectedSellerRoute: SecondhandSellerRoute?
@@ -28,6 +30,14 @@ struct SecondhandListView: View {
     @State private var itemGridWidth: CGFloat = 0
 
     private let itemGridSpacing: CGFloat = 8
+
+    init(
+        isTabRoot: Bool = false,
+        initialCategory: SecondhandPost.Category? = nil
+    ) {
+        self.isTabRoot = isTabRoot
+        _selectedCategory = State(initialValue: initialCategory)
+    }
 
     private var itemCardWidth: CGFloat? {
         guard itemGridWidth > itemGridSpacing else { return nil }
@@ -54,6 +64,8 @@ struct SecondhandListView: View {
             
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
+                    regionButton
+                        .padding(.horizontal, 8)
                     secondhandSearchBar
                         .padding(.horizontal, 8)
                     SecondhandCategoryPicker(selection: $selectedCategory)
@@ -67,7 +79,8 @@ struct SecondhandListView: View {
                         emptyState
                     case .error(let message):
                         ErrorView(message) {
-                            Task { await service.fetchItems() }
+                            guard let selectedRegion else { return }
+                            Task { await service.fetchItems(region: selectedRegion) }
                         }
                         .frame(height: 220)
                         .padding(.top, 24)
@@ -141,7 +154,8 @@ struct SecondhandListView: View {
                 }
             )
             .refreshable {
-                await service.fetchItems()
+                guard let selectedRegion else { return }
+                await service.fetchItems(region: selectedRegion)
             }
         }
         .navigationTitle(L10n.tr("Secondhand", "二手"))
@@ -177,11 +191,35 @@ struct SecondhandListView: View {
         .task {
             guard !hasLoadedInitialData else { return }
             hasLoadedInitialData = true
-            await service.fetchItems()
+            let storedRegion = MarketplaceRegionPreference.selected(
+                for: authService.currentUser?.id
+            )
+            selectedRegion = storedRegion
+            guard let storedRegion else {
+                isRegionPickerPresented = true
+                return
+            }
+            await service.fetchItems(region: storedRegion)
         }
         .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { notification in
             guard PostFeatureEvents.changedPostKind(from: notification) == .secondhand else { return }
-            Task { await service.fetchItems() }
+            guard let selectedRegion else { return }
+            Task { await service.fetchItems(region: selectedRegion) }
+        }
+        .sheet(isPresented: $isRegionPickerPresented) {
+            MarketplaceRegionPickerView(
+                selectedRegion: selectedRegion,
+                requiresSelection: selectedRegion == nil
+            ) { region in
+                selectedRegion = region
+                MarketplaceRegionPreference.save(
+                    region,
+                    for: authService.currentUser?.id
+                )
+                isRegionPickerPresented = false
+                Task { await service.fetchItems(region: region) }
+            }
+            .interactiveDismissDisabled(selectedRegion == nil)
         }
         .alert(L10n.tr("Action failed", "操作失败"), isPresented: Binding(
             get: { interactionErrorMessage != nil },
@@ -195,6 +233,38 @@ struct SecondhandListView: View {
     }
 
     // MARK: - 空状态
+    private var regionButton: some View {
+        HStack {
+            Button {
+                dismissSearchKeyboard()
+                isRegionPickerPresented = true
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text(
+                        selectedRegion?.displayName
+                            ?? L10n.tr("Select region", "请选择地区")
+                    )
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .foregroundStyle(AppColors.textPrimary)
+                .padding(.horizontal, 13)
+                .frame(minHeight: 40)
+                .background(Color.white)
+                .clipShape(Capsule())
+                .cheeseInputChrome(cornerRadius: 20)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.tr("Choose marketplace region", "选择二手地区"))
+
+            Spacer()
+        }
+    }
+
     private var secondhandSearchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
@@ -300,6 +370,66 @@ struct SecondhandListView: View {
 
 }
 
+struct MarketplaceRegionPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    let selectedRegion: MarketplaceRegion?
+    let requiresSelection: Bool
+    let onSelect: (MarketplaceRegion) -> Void
+    @State private var searchText = ""
+
+    private var filteredRegions: [MarketplaceRegion] {
+        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return MarketplaceRegion.allCases
+        }
+        return MarketplaceRegion.allCases.filter {
+            $0.displayName.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List(filteredRegions) { region in
+                Button {
+                    onSelect(region)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "mappin.circle.fill")
+                            .foregroundStyle(AppColors.accentStrong)
+                        Text(region.displayName)
+                            .foregroundStyle(AppColors.textPrimary)
+                        Spacer()
+                        if selectedRegion == region {
+                            Image(systemName: "checkmark")
+                                .fontWeight(.semibold)
+                                .foregroundStyle(AppColors.accentStrong)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            .listStyle(.plain)
+            .searchable(
+                text: $searchText,
+                prompt: L10n.tr("Search regions", "搜索地区")
+            )
+            .navigationTitle(L10n.tr("Select Region", "选择地区"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if !requiresSelection {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(L10n.tr("Cancel", "取消")) { dismiss() }
+                    }
+                }
+            }
+            .overlay {
+                if filteredRegions.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                }
+            }
+        }
+    }
+}
+
 struct SecondhandCategoryPicker: View {
     @Binding var selection: SecondhandPost.Category?
 
@@ -345,10 +475,15 @@ struct SecondhandCardView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
 
-                Text(item.condition)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(AppColors.textMuted)
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(item.condition)
+                    Text("·")
+                    Image(systemName: "mappin")
+                    Text(item.marketplaceRegion.displayName)
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(AppColors.textMuted)
+                .lineLimit(1)
 
                 HStack(alignment: .firstTextBaseline, spacing: 7) {
                     Text(Formatters.formatUSDCompact(item.price))
@@ -1053,6 +1188,10 @@ private struct SecondhandDescriptionSection: View {
                     .buttonStyle(.plain)
                 }
             }
+
+            Label(item.marketplaceRegion.displayName, systemImage: "mappin.and.ellipse")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(AppColors.textMuted)
 
             HStack(spacing: 8) {
                 Label(item.category.displayName, systemImage: item.category.iconName)

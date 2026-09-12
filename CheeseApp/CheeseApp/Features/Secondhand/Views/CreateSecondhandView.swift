@@ -14,6 +14,7 @@ private struct SecondhandDraftPayload: Codable {
     let originalPrice: String?
     let category: SecondhandPost.Category?
     let condition: String
+    let marketplaceRegion: MarketplaceRegion?
     let isNegotiable: Bool
 }
 
@@ -51,13 +52,15 @@ enum SecondhandCreateFormRules {
         price: String,
         imageCount: Int,
         category: SecondhandPost.Category?,
-        condition: String
+        condition: String,
+        marketplaceRegion: MarketplaceRegion?
     ) -> Bool {
         !normalizedRequiredText(title).isEmpty
             && validPrice(from: price) != nil
             && imageCount > 0
             && category != nil
             && SecondhandPost.Condition(rawValue: condition) != nil
+            && marketplaceRegion != nil
     }
 
     static func validOriginalPrice(from value: String, sellingPrice: Double) -> Double? {
@@ -87,6 +90,8 @@ struct CreateSecondhandView: View {
     @State private var originalPrice = ""
     @State private var category: SecondhandPost.Category? = SecondhandCreateFormRules.defaultCategory
     @State private var condition = SecondhandCreateFormRules.defaultCondition
+    @State private var marketplaceRegion: MarketplaceRegion?
+    @State private var isRegionPickerPresented = false
     @State private var isNegotiable = SecondhandCreateFormRules.defaultIsNegotiable
     @State private var selectedImages: [UIImage] = []
     @State private var selectedMentions: [MentionCandidate] = []
@@ -112,7 +117,8 @@ struct CreateSecondhandView: View {
             price: price,
             imageCount: selectedImages.count,
             category: category,
-            condition: condition
+            condition: condition,
+            marketplaceRegion: marketplaceRegion
         )
     }
 
@@ -268,6 +274,39 @@ struct CreateSecondhandView: View {
                             showsTitle: false
                         )
 
+                        PostFormSection(
+                            title: L10n.tr("Region", "地区"),
+                            showsTitle: false
+                        ) {
+                            Button {
+                                isRegionPickerPresented = true
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "mappin.and.ellipse")
+                                        .foregroundStyle(AppColors.accentStrong)
+                                    Text(
+                                        marketplaceRegion?.displayName
+                                            ?? L10n.tr("Select a region (required)", "选择地区（必填）")
+                                    )
+                                    .foregroundStyle(
+                                        marketplaceRegion == nil
+                                            ? AppColors.textMuted
+                                            : AppColors.textPrimary
+                                    )
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(AppColors.textMuted)
+                                }
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 50)
+                                .background(Color.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .cheeseInputChrome(cornerRadius: 12)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
                         PostFormSection(title: "价格", showsTitle: false) {
                             SecondhandPriceFields(
                                 price: $price,
@@ -367,9 +406,28 @@ struct CreateSecondhandView: View {
             }
         }
         .onAppear {
-            guard autoRestoreDraft, !hasRestoredInitialDraft else { return }
-            hasRestoredInitialDraft = true
-            restoreDraft(showBanner: true)
+            if autoRestoreDraft, !hasRestoredInitialDraft {
+                hasRestoredInitialDraft = true
+                restoreDraft(showBanner: true)
+            }
+            if marketplaceRegion == nil {
+                marketplaceRegion = MarketplaceRegionPreference.selected(
+                    for: AuthService.shared.currentUser?.id
+                )
+            }
+        }
+        .sheet(isPresented: $isRegionPickerPresented) {
+            MarketplaceRegionPickerView(
+                selectedRegion: marketplaceRegion,
+                requiresSelection: false
+            ) { region in
+                marketplaceRegion = region
+                MarketplaceRegionPreference.save(
+                    region,
+                    for: AuthService.shared.currentUser?.id
+                )
+                isRegionPickerPresented = false
+            }
         }
         .onDisappear {
             aiGenerationTask?.cancel()
@@ -533,6 +591,10 @@ struct CreateSecondhandView: View {
             errorMessage = L10n.tr("Please choose the item condition", "请选择成色")
             return
         }
+        guard let marketplaceRegion else {
+            errorMessage = L10n.tr("Please choose a region", "请选择地区")
+            return
+        }
 
         isLoading = true
         errorMessage = nil
@@ -565,6 +627,7 @@ struct CreateSecondhandView: View {
             originalPrice: originalPriceValue,
             category: category,
             condition: selectedCondition,
+            marketplaceRegion: marketplaceRegion,
             isNegotiable: isNegotiable,
             mentionedUserIDs: MentionTextLogic.activeUserIDs(
                 in: description,
@@ -593,6 +656,7 @@ struct CreateSecondhandView: View {
             originalPrice: originalPrice,
             category: category,
             condition: condition,
+            marketplaceRegion: marketplaceRegion,
             isNegotiable: isNegotiable
         )
         CreateDraftStore.save(
@@ -617,6 +681,7 @@ struct CreateSecondhandView: View {
         originalPrice = payload.originalPrice ?? ""
         category = payload.category
         condition = payload.condition
+        marketplaceRegion = payload.marketplaceRegion
         isNegotiable = payload.isNegotiable
         selectedImages = CreateComposerSessionStore.images(for: .secondhand)
         if showBanner {

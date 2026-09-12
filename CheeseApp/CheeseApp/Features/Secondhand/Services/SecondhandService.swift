@@ -20,6 +20,7 @@ struct SecondhandItem: Identifiable, Hashable {
     let isNegotiable: Bool
     let category: SecondhandPost.Category
     let condition: String
+    let marketplaceRegion: MarketplaceRegion
     let seller: String
     let sellerAvatar: String?
     let isAnonymous: Bool
@@ -76,6 +77,7 @@ struct SecondhandItem: Identifiable, Hashable {
             isNegotiable: details.isNegotiable,
             category: details.category ?? category,
             condition: SecondhandPost.Condition.displayName(for: details.condition),
+            marketplaceRegion: marketplaceRegion,
             seller: seller,
             sellerAvatar: sellerAvatar,
             isAnonymous: isAnonymous,
@@ -104,6 +106,7 @@ struct SecondhandCreateInput {
     var originalPrice: Double? = nil
     let category: SecondhandPost.Category
     let condition: SecondhandPost.Condition
+    let marketplaceRegion: MarketplaceRegion
     let isNegotiable: Bool
     var mentionedUserIDs: [UUID] = []
 }
@@ -592,6 +595,7 @@ class SecondhandService: ObservableObject {
     private var itemCursor: SecondhandPageCursor?
     private var latestItemFetchID: UUID?
     private var stateOwnerID: UUID?
+    private var activeMarketplaceRegion: MarketplaceRegion?
     private static let pageSize = 24
 
     private init() {}
@@ -615,6 +619,7 @@ class SecondhandService: ObservableObject {
     private func resetAccountScopedState(ownerID: UUID?) {
         accountGeneration &+= 1
         stateOwnerID = ownerID
+        activeMarketplaceRegion = nil
         itemCursor = nil
         latestItemFetchID = nil
         items = []
@@ -1077,6 +1082,7 @@ class SecondhandService: ObservableObject {
                 category: input.category.rawValue,
                 condition: input.condition.rawValue,
                 isNegotiable: input.isNegotiable,
+                marketplaceRegion: input.marketplaceRegion.rawValue,
                 mentionedUserIDs: input.mentionedUserIDs
             )
         ).execute().value
@@ -1153,8 +1159,11 @@ class SecondhandService: ObservableObject {
     }
 
     // MARK: - 获取所有二手商品
-    func fetchItems() async {
+    func fetchItems(region: MarketplaceRegion? = nil) async {
         guard let requestGeneration = requestGeneration() else { return }
+        if let region {
+            activeMarketplaceRegion = region
+        }
         let fetchID = UUID()
         latestItemFetchID = fetchID
         isLoading = true
@@ -1169,7 +1178,10 @@ class SecondhandService: ObservableObject {
         }
 
         do {
-            let dbPosts = try await fetchItemPage(after: nil)
+            let dbPosts = try await fetchItemPage(
+                after: nil,
+                region: activeMarketplaceRegion
+            )
             guard isCurrentAccountRequest(generation: requestGeneration),
                   latestItemFetchID == fetchID
             else { return }
@@ -1217,7 +1229,10 @@ class SecondhandService: ObservableObject {
         }
 
         do {
-            let dbPosts = try await fetchItemPage(after: cursor)
+            let dbPosts = try await fetchItemPage(
+                after: cursor,
+                region: activeMarketplaceRegion
+            )
             guard isCurrentAccountRequest(generation: requestGeneration),
                   latestItemFetchID == expectedFetchID
             else { return }
@@ -1256,14 +1271,16 @@ class SecondhandService: ObservableObject {
     }
 
     private func fetchItemPage(
-        after cursor: SecondhandPageCursor?
+        after cursor: SecondhandPageCursor?,
+        region: MarketplaceRegion?
     ) async throws -> [DBSecondhandPost] {
         try await supabase.client.rpc(
             "get_secondhand_posts_page",
             params: SecondhandPageParams(
                 afterCreatedAt: cursor?.createdAt,
                 afterID: cursor?.id,
-                limit: Self.pageSize
+                limit: Self.pageSize,
+                marketplaceRegion: region?.rawValue
             )
         ).execute().value
     }
@@ -1384,6 +1401,8 @@ class SecondhandService: ObservableObject {
             isNegotiable: dbPost.isNegotiable,
             category: category,
             condition: SecondhandPost.Condition.displayName(for: dbPost.condition),
+            marketplaceRegion: MarketplaceRegion(rawValue: dbPost.marketplaceRegion)
+                ?? .otherCanada,
             seller: Self.sellerDisplayName(
                 isAnonymous: dbPost.isAnonymous,
                 rawName: dbPost.userName
@@ -1453,6 +1472,7 @@ struct DBSecondhandPost: Codable, Identifiable {
     let description: String?
     let category: String
     let condition: String
+    let marketplaceRegion: String
     let price: Double
     let originalPrice: Double?
     let isNegotiable: Bool
@@ -1475,6 +1495,7 @@ struct DBSecondhandPost: Codable, Identifiable {
         case description
         case category
         case condition
+        case marketplaceRegion = "marketplace_region"
         case price
         case originalPrice = "original_price"
         case isNegotiable = "is_negotiable"
@@ -1600,6 +1621,7 @@ private struct PublishSecondhandPostParams: Encodable {
     let category: String
     let condition: String
     let isNegotiable: Bool
+    let marketplaceRegion: String
     let mentionedUserIDs: [UUID]
 
     enum CodingKeys: String, CodingKey {
@@ -1614,6 +1636,7 @@ private struct PublishSecondhandPostParams: Encodable {
         case category = "p_category"
         case condition = "p_condition"
         case isNegotiable = "p_is_negotiable"
+        case marketplaceRegion = "p_marketplace_region"
         case mentionedUserIDs = "p_mentioned_user_ids"
     }
 
@@ -1634,6 +1657,7 @@ private struct PublishSecondhandPostParams: Encodable {
         try container.encode(category, forKey: .category)
         try container.encode(condition, forKey: .condition)
         try container.encode(isNegotiable, forKey: .isNegotiable)
+        try container.encode(marketplaceRegion, forKey: .marketplaceRegion)
         try container.encode(mentionedUserIDs, forKey: .mentionedUserIDs)
     }
 }
@@ -1741,10 +1765,12 @@ private struct SecondhandPageParams: Encodable {
     let afterCreatedAt: Date?
     let afterID: UUID?
     let limit: Int
+    let marketplaceRegion: String?
 
     enum CodingKeys: String, CodingKey {
         case afterCreatedAt = "p_after_created_at"
         case afterID = "p_after_id"
         case limit = "p_limit"
+        case marketplaceRegion = "p_marketplace_region"
     }
 }

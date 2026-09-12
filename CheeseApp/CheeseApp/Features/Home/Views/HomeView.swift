@@ -84,7 +84,7 @@ struct HomeView: View {
     @State private var highlightedCreatedPostID: UUID?
     @State private var createdPostHighlightToken = UUID()
 
-    private static let featuredCategories = HomeFeedTab.allCases
+    private static let featuredCategories: [HomeFeedTab] = [.following, .forum]
     private static let featuredPagerHorizontalInset: CGFloat = 8
     private static let featuredPageHorizontalInset: CGFloat = 12
     private static let secondhandCategoryStripHorizontalInset: CGFloat = 8
@@ -155,12 +155,10 @@ struct HomeView: View {
                     selectFeaturedCategory(.forum)
                 },
                 onSecondhandTap: {
-                    selectedSecondhandCategory = nil
-                    selectFeaturedCategory(.secondhand)
+                    MainTabNavigationEvents.postOpenSecondhand()
                 },
                 onSecondhandCategoryTap: { category in
-                    selectedSecondhandCategory = category
-                    selectFeaturedCategory(.secondhand)
+                    MainTabNavigationEvents.postOpenSecondhand(category: category)
                 },
                 onSettingsTap: {
                     showSettings = true
@@ -230,8 +228,7 @@ struct HomeView: View {
                 showForumList = false
                 selectFeaturedCategory(.forum)
             case .secondhand(let category):
-                selectedSecondhandCategory = category
-                selectFeaturedCategory(.secondhand)
+                MainTabNavigationEvents.postOpenSecondhand(category: category)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: HomeFeedNavigationEvents.homeReselected)) { _ in
@@ -961,7 +958,11 @@ struct HomeView: View {
         showForumList = false
         selectedForumBoardID = nil
         selectedSecondhandCategory = nil
-        selectFeaturedCategory(kind == .forum ? .forum : .secondhand)
+        if kind == .secondhand {
+            MainTabNavigationEvents.postOpenSecondhand()
+            return
+        }
+        selectFeaturedCategory(.forum)
         contentScrollResetID = UUID()
 
         ShareFeedbackPresenter.show(

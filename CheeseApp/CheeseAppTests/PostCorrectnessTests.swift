@@ -766,21 +766,32 @@ final class PostCorrectnessTests: XCTestCase {
             price: "20",
             imageCount: 0,
             category: nil,
-            condition: ""
+            condition: "",
+            marketplaceRegion: nil
         ))
         XCTAssertFalse(SecondhandCreateFormRules.isValid(
             title: "Desk",
             price: "20",
             imageCount: 1,
             category: nil,
-            condition: ""
+            condition: "",
+            marketplaceRegion: .hamilton
         ))
         XCTAssertTrue(SecondhandCreateFormRules.isValid(
             title: "Desk",
             price: "20",
             imageCount: 1,
             category: .homeAppliances,
-            condition: SecondhandPost.Condition.good.rawValue
+            condition: SecondhandPost.Condition.good.rawValue,
+            marketplaceRegion: .hamilton
+        ))
+        XCTAssertFalse(SecondhandCreateFormRules.isValid(
+            title: "Desk",
+            price: "20",
+            imageCount: 1,
+            category: .homeAppliances,
+            condition: SecondhandPost.Condition.good.rawValue,
+            marketplaceRegion: nil
         ))
     }
 
@@ -1320,6 +1331,7 @@ final class PostCorrectnessTests: XCTestCase {
             isNegotiable: false,
             category: .other,
             condition: SecondhandPost.Condition.good.displayName,
+            marketplaceRegion: .hamilton,
             seller: "Seller",
             sellerAvatar: nil,
             isAnonymous: false,
@@ -2097,6 +2109,7 @@ final class PostCorrectnessTests: XCTestCase {
             price: 18,
             category: category,
             condition: .good,
+            marketplaceRegion: .hamilton,
             isNegotiable: true
         )
     }

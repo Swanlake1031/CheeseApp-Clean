@@ -494,6 +494,7 @@ private extension SecondhandItem {
             isNegotiable: true,
             category: .homeAppliances,
             condition: "good",
+            marketplaceRegion: .hamilton,
             seller: "Account A",
             sellerAvatar: nil,
             isAnonymous: false,

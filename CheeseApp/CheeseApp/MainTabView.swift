@@ -27,11 +27,21 @@ enum MainTabNavigationEvents {
     static let openCurrentUserProfile = Notification.Name(
         "cheese.main-tab.open-current-user-profile"
     )
+    static let openSecondhand = Notification.Name(
+        "cheese.main-tab.open-secondhand"
+    )
 
     static func postOpenCurrentUserProfile(
         center: NotificationCenter = .default
     ) {
         center.post(name: openCurrentUserProfile, object: nil)
+    }
+
+    static func postOpenSecondhand(
+        category: SecondhandPost.Category? = nil,
+        center: NotificationCenter = .default
+    ) {
+        center.post(name: openSecondhand, object: category)
     }
 }
 
@@ -51,6 +61,7 @@ struct MainTabView: View {
     @State private var showProfileOnboarding = false
     @State private var homeRootResetID = UUID()
     @State private var secondhandRootResetID = UUID()
+    @State private var requestedSecondhandCategory: SecondhandPost.Category?
     @State private var chatRootResetID = UUID()
     @State private var profileRootResetID = UUID()
     @State private var isKeyboardVisible = false
@@ -97,7 +108,10 @@ struct MainTabView: View {
 
                 if shouldMount(.secondhand) {
                     NavigationStack {
-                        SecondhandListView(isTabRoot: true)
+                        SecondhandListView(
+                            isTabRoot: true,
+                            initialCategory: requestedSecondhandCategory
+                        )
                     }
                     .enableSwipeBackGesture()
                     .id(secondhandRootResetID)
@@ -127,9 +141,7 @@ struct MainTabView: View {
                                 selectedTab = .home
                             },
                             onOpenSecondhand: { category in
-                                HomeFeedNavigationEvents.post(.secondhand(category))
-                                activatedTabs.insert(.home)
-                                selectedTab = .home
+                                openSecondhandTab(category: category)
                             }
                         )
                     }
@@ -306,8 +318,12 @@ struct MainTabView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { notification in
             guard PostFeatureEvents.change(from: notification) == .created else { return }
-            activatedTabs.insert(.home)
-            selectedTab = .home
+            if PostFeatureEvents.changedPostKind(from: notification) == .secondhand {
+                openSecondhandTab(category: nil)
+            } else {
+                activatedTabs.insert(.home)
+                selectedTab = .home
+            }
         }
         .onReceive(
             NotificationCenter.default.publisher(
@@ -318,6 +334,15 @@ struct MainTabView: View {
             profileRootResetID = UUID()
             activatedTabs.insert(.profile)
             selectedTab = .profile
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: MainTabNavigationEvents.openSecondhand
+            )
+        ) { notification in
+            openSecondhandTab(
+                category: notification.object as? SecondhandPost.Category
+            )
         }
         .onChange(of: notificationRouter.pendingActionID) { _, _ in
             routeNotificationIfNeeded()
@@ -448,6 +473,14 @@ struct MainTabView: View {
 
     private func shouldMount(_ tab: TabItem) -> Bool {
         activatedTabs.contains(tab) || selectedTab == tab
+    }
+
+    private func openSecondhandTab(category: SecondhandPost.Category?) {
+        requestedSecondhandCategory = category
+        secondhandRootResetID = UUID()
+        tabBarVisibilityController.resetVisibility()
+        activatedTabs.insert(.secondhand)
+        selectedTab = .secondhand
     }
 
 }

@@ -13,7 +13,7 @@ struct HomeModuleGridView: View {
     let onMenuTap: () -> Void
     let onSearchTap: () -> Void
 
-    private let modules = HomeFeedTab.allCases
+    private let modules: [HomeFeedTab] = [.following, .forum]
 
     init(
         selectedModule: HomeFeedTab,
@@ -56,7 +56,7 @@ struct HomeModuleGridView: View {
                     .accessibilityAddTraits(selectedModule == module ? .isSelected : [])
                 }
             }
-            .frame(width: 228)
+            .frame(width: 168)
 
             HStack {
                 Button(action: onMenuTap) {
