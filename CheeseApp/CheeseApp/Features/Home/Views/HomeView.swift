@@ -163,15 +163,29 @@ struct HomeView: View {
                 }
             )
             .zIndex(100)
+
+            if showSearch {
+                // Keep search in the current hierarchy. A conditional overlay
+                // avoids both NavigationStack push and fullScreenCover
+                // presentation timing, so only UIKit's keyboard animates.
+                SearchView(
+                    shouldAutoFocus: $shouldAutoFocusSearch,
+                    showsBackButton: true,
+                    onDismiss: {
+                        var transaction = Transaction(animation: nil)
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            shouldAutoFocusSearch = false
+                            showSearch = false
+                        }
+                    }
+                )
+                .ignoresSafeArea()
+                .transition(.identity)
+                .zIndex(200)
+            }
         }
         .navigationBarHidden(true)
-        // 导航目标由 MainTabView 的 Home NavigationStack 承载。
-        .navigationDestination(isPresented: $showSearch) {
-            SearchView(
-                shouldAutoFocus: $shouldAutoFocusSearch,
-                showsBackButton: true
-            )
-        }
         .navigationDestination(isPresented: $showCustomerSupport) {
             SupportCenterView()
         }
@@ -255,8 +269,12 @@ struct HomeView: View {
                 navigationDrawerOpenRequest &+= 1
             },
             onSearchTap: {
-                shouldAutoFocusSearch = true
-                showSearch = true
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    shouldAutoFocusSearch = true
+                    showSearch = true
+                }
             }
         )
         .contentShape(Rectangle())

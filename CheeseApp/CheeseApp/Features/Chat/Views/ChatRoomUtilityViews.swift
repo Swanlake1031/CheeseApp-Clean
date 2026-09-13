@@ -24,15 +24,25 @@ struct ChatTimelineTimeSeparator: View {
 
 struct ChatRoomHistoryView: View {
     let conversation: ChatConversationPreview
+    let onSelectMessage: (UUID) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
     @StateObject private var chatService = ChatService.shared
 
     @State private var queryText = ""
+    @State private var isSearchFieldFocused = false
     @State private var messages: [Message] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+
+    init(
+        conversation: ChatConversationPreview,
+        onSelectMessage: @escaping (UUID) -> Void = { _ in }
+    ) {
+        self.conversation = conversation
+        self.onSelectMessage = onSelectMessage
+    }
 
     private var filteredMessages: [Message] {
         let source = messages.sorted { $0.createdAt > $1.createdAt }
@@ -73,6 +83,7 @@ struct ChatRoomHistoryView: View {
                     VStack(spacing: 10) {
                         searchBar
 
+                        Group {
                         if filteredMessages.isEmpty {
                             VStack(spacing: 8) {
                                 Text(queryText.isEmpty ? "暂无聊天记录" : "没有匹配结果")
@@ -90,7 +101,13 @@ struct ChatRoomHistoryView: View {
                         } else {
                             VStack(spacing: 0) {
                                 ForEach(filteredMessages) { message in
-                                    historyRow(message)
+                                    Button {
+                                        dismissSearchKeyboard()
+                                        onSelectMessage(message.id)
+                                    } label: {
+                                        historyRow(message)
+                                    }
+                                    .buttonStyle(.plain)
                                     if message.id != filteredMessages.last?.id {
                                         Divider()
                                             .padding(.leading, 68)
@@ -101,11 +118,13 @@ struct ChatRoomHistoryView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .cheeseCardChrome(cornerRadius: 14)
                         }
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                     .padding(.bottom, 24)
                 }
+                .scrollDismissesKeyboard(.immediately)
             }
         }
         .navigationTitle("聊天记录")
@@ -121,6 +140,7 @@ struct ChatRoomHistoryView: View {
                 .buttonStyle(.plain)
             }
         }
+        .dismissKeyboardOnTap()
         .task {
             await loadMessages()
         }
@@ -134,7 +154,8 @@ struct ChatRoomHistoryView: View {
             CheeseSearchTextField(
                 text: $queryText,
                 placeholder: "搜索聊天内容",
-                fontSize: 14
+                fontSize: 14,
+                isFirstResponder: $isSearchFieldFocused
             )
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 22)
         }
@@ -143,6 +164,16 @@ struct ChatRoomHistoryView: View {
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .cheeseInputChrome(cornerRadius: 12)
+    }
+
+    private func dismissSearchKeyboard() {
+        isSearchFieldFocused = false
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
     }
 
     @ViewBuilder
@@ -334,6 +365,7 @@ struct GroupChatHistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var chatService = ChatService.shared
     @State private var queryText = ""
+    @State private var isSearchFieldFocused = false
     @State private var messages: [GroupMessage] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -364,7 +396,8 @@ struct GroupChatHistoryView: View {
                             CheeseSearchTextField(
                                 text: $queryText,
                                 placeholder: "搜索聊天内容",
-                                fontSize: 14
+                                fontSize: 14,
+                                isFirstResponder: $isSearchFieldFocused
                             )
                         }
                         .padding(12)
@@ -372,6 +405,7 @@ struct GroupChatHistoryView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .cheeseInputChrome(cornerRadius: 12)
 
+                        Group {
                         if filteredMessages.isEmpty {
                             Text(queryText.isEmpty ? "暂无聊天记录" : "没有匹配结果")
                                 .font(.system(size: 15, weight: .semibold))
@@ -411,9 +445,15 @@ struct GroupChatHistoryView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .cheeseCardChrome(cornerRadius: 14)
                         }
+                        }
+                        .prioritizeKeyboardDismissal(
+                            while: isSearchFieldFocused,
+                            onDismiss: dismissSearchKeyboard
+                        )
                     }
                     .padding(16)
                 }
+                .scrollDismissesKeyboard(.immediately)
             }
         }
         .background(AppColors.pageBackground.ignoresSafeArea())
@@ -425,7 +465,18 @@ struct GroupChatHistoryView: View {
                 Button(action: { dismiss() }) { PostToolbarIconCircle(icon: "chevron.left") }
             }
         }
+        .dismissKeyboardOnTap()
         .task { await load() }
+    }
+
+    private func dismissSearchKeyboard() {
+        isSearchFieldFocused = false
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
     }
 
     private func load() async {

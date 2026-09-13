@@ -167,6 +167,7 @@ extension View {
 
 struct ChatRoomView: View {
     let conversation: ChatConversationPreview
+    let initialMessageID: UUID?
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
@@ -177,12 +178,14 @@ struct ChatRoomView: View {
     @State private var showingPhotoLibrary = false
     @State private var showingCamera = false
     @State private var keyboardHeight: CGFloat = 0
+    @State private var requestedMessageID: UUID?
 
     private let composerVerticalGap: CGFloat = 6
     private let timelineComposerGap: CGFloat = 8
 
-    init(conversation: ChatConversationPreview) {
+    init(conversation: ChatConversationPreview, initialMessageID: UUID? = nil) {
         self.conversation = conversation
+        self.initialMessageID = initialMessageID
         _viewModel = StateObject(
             wrappedValue: ChatRoomViewModel(
                 conversation: conversation,
@@ -207,6 +210,9 @@ struct ChatRoomView: View {
             .dismissKeyboardOnTap()
             .task {
                 await viewModel.bootstrap(currentUserID: currentUserID)
+                if let initialMessageID {
+                    await viewModel.revealMessage(id: initialMessageID)
+                }
             }
             .onReceive(
                 NotificationCenter.default.publisher(
@@ -467,8 +473,16 @@ struct ChatRoomView: View {
                 }
             )
             .onChange(of: viewModel.scrollToMessageID) { _, newID in
-                guard newID != nil else { return }
-                scrollToLatest(using: proxy)
+                guard let newID else { return }
+                if newID == initialMessageID || newID == requestedMessageID {
+                    DispatchQueue.main.async {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            proxy.scrollTo(newID, anchor: .center)
+                        }
+                    }
+                } else {
+                    scrollToLatest(using: proxy)
+                }
             }
             .onChange(of: keyboardHeight) { _, newHeight in
                 guard newHeight > 0, !viewModel.messages.isEmpty else { return }
@@ -477,7 +491,12 @@ struct ChatRoomView: View {
                 }
             }
             .onAppear {
-                if !viewModel.messages.isEmpty {
+                if let initialMessageID,
+                   viewModel.messages.contains(where: { $0.id == initialMessageID }) {
+                    DispatchQueue.main.async {
+                        proxy.scrollTo(initialMessageID, anchor: .center)
+                    }
+                } else if !viewModel.messages.isEmpty {
                     proxy.scrollTo("direct-chat-timeline-end", anchor: .bottom)
                 }
             }
@@ -914,7 +933,14 @@ struct ChatRoomView: View {
                 onSaveRemark: { viewModel.handleSettingsAction(.saveRemark($0)) },
                 onReport: { viewModel.handleSettingsAction(.report) },
                 onClearHistory: { viewModel.handleSettingsAction(.clearHistory) },
-                onToggleBlock: { viewModel.handleSettingsAction(.toggleBlock) }
+                onToggleBlock: { viewModel.handleSettingsAction(.toggleBlock) },
+                onOpenHistoryMessage: { messageID in
+                    requestedMessageID = messageID
+                    viewModel.navigationDestination = nil
+                    Task {
+                        await viewModel.revealMessage(id: messageID)
+                    }
+                }
             )
         }
     }

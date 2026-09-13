@@ -13,6 +13,7 @@ struct SearchView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding private var shouldAutoFocus: Bool
     private let showsBackButton: Bool
+    private let onDismiss: (() -> Void)?
     @StateObject private var viewModel = SearchViewModel()
     @StateObject private var chatService = ChatService.shared
     @State private var searchText = ""
@@ -24,14 +25,15 @@ struct SearchView: View {
     @State private var profileActionError: String?
     @State private var isOpeningResult = false
     @State private var resultOpenErrorMessage: String?
-    @State private var isSearchPageVisible = false
 
     init(
         shouldAutoFocus: Binding<Bool> = .constant(false),
-        showsBackButton: Bool = false
+        showsBackButton: Bool = false,
+        onDismiss: (() -> Void)? = nil
     ) {
         self._shouldAutoFocus = shouldAutoFocus
         self.showsBackButton = showsBackButton
+        self.onDismiss = onDismiss
     }
 
     var body: some View {
@@ -64,6 +66,7 @@ struct SearchView: View {
                 }
             }
         }
+        .dismissKeyboardOnTap()
         // Keep the search timeline's geometry stable while UIKit animates the
         // keyboard. Resizing this nested vertical/horizontal scroll hierarchy
         // made both category rows briefly jump when the keyboard was dismissed.
@@ -100,13 +103,10 @@ struct SearchView: View {
             )
         }
         .onAppear {
-            isSearchPageVisible = true
             if !showsBackButton {
                 CheeseTabBarVisibilityController.shared.resetVisibility()
             }
-        }
-        .task(id: shouldAutoFocus) {
-            await focusSearchFieldIfRequested()
+            searchPageDidAppear()
         }
         .onChange(of: searchText) { _, newValue in
             if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -140,12 +140,19 @@ struct SearchView: View {
             Text(resultOpenErrorMessage ?? "")
         }
         .onDisappear {
-            isSearchPageVisible = false
             shouldAutoFocus = false
             dismissSearchKeyboard()
         }
         .cheeseTabBarHidden(showsBackButton)
         .enableSwipeBackGesture()
+    }
+
+    private func closeSearchPage() {
+        if let onDismiss {
+            onDismiss()
+        } else {
+            dismiss()
+        }
     }
 
     // MARK: - 搜索框
@@ -158,7 +165,7 @@ struct SearchView: View {
             if showsBackButton {
                 Button {
                     dismissSearchKeyboard()
-                    dismiss()
+                    closeSearchPage()
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 17, weight: .semibold))
@@ -202,15 +209,14 @@ struct SearchView: View {
     }
 
     @MainActor
-    private func focusSearchFieldIfRequested() async {
-        guard shouldAutoFocus else { return }
-        try? await Task.sleep(for: .milliseconds(450))
-        guard !Task.isCancelled,
-              shouldAutoFocus,
-              isSearchPageVisible
-        else { return }
-        isSearchFieldFocused = true
+    private func searchPageDidAppear() {
+        guard shouldAutoFocus, !isSearchFieldFocused else { return }
+
+        // Clear the request before focusing so the parent and the field bridge
+        // settle in one SwiftUI update. This prevents a second responder
+        // request from being queued during the navigation transition.
         shouldAutoFocus = false
+        isSearchFieldFocused = true
     }
 
     // MARK: - 搜索标签

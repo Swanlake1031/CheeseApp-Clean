@@ -20,6 +20,7 @@ struct EditProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
 
+    @State private var hasHydratedProfileDraft = false
     @State private var fullName: String = ""
     @State private var profileStatus: String = "student"
     @State private var school: String = ""
@@ -93,7 +94,8 @@ struct EditProfileView: View {
             }
         }
         .onAppear {
-            guard let user = authService.currentUser else { return }
+            guard !hasHydratedProfileDraft, let user = authService.currentUser else { return }
+            hasHydratedProfileDraft = true
             fullName = user.fullName ?? ""
             profileStatus = user.profileStatus == "working" ? "working" : "student"
             school = user.school ?? ""
@@ -463,7 +465,7 @@ struct EditProfileView: View {
     }
 
     private var studentVerificationField: some View {
-        NavigationLink(destination: SchoolVerificationView()) {
+        NavigationLink(destination: SchoolVerificationView(selectedSchool: selectedSchool)) {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.seal.fill")
                     .foregroundStyle(AppColors.accentStrong)

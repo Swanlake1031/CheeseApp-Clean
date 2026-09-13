@@ -235,6 +235,29 @@ struct SchoolVerificationSendResult: Decodable {
 }
 
 enum SchoolVerificationService {
+    /// Persist only the school required by the verification endpoint. Other
+    /// onboarding/edit fields remain in the draft, including profile completion.
+    @MainActor
+    static func prepareSchool(_ school: CheeseUniversityOption, for profile: Profile) async throws {
+        let selection = try await SchoolDirectoryService.profileSelection(named: school.name)
+        guard profile.schoolId != selection.schoolId || profile.school != school.name
+                || profile.profileStatus != "student" else { return }
+
+        let payload = SchoolVerificationProfileSelection(
+            university: school.name,
+            schoolId: selection.schoolId,
+            campusId: selection.campusId
+        )
+        let _: Profile = try await SupabaseManager.shared
+            .database("profiles")
+            .update(payload)
+            .eq("id", value: profile.id.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
     static func status() async throws -> SchoolVerificationStatus {
         try await invoke(SchoolVerificationRequest(action: "status"))
     }
@@ -289,5 +312,27 @@ private enum SchoolVerificationError: LocalizedError {
         switch self {
         case .server(let message): message
         }
+    }
+}
+
+struct SchoolVerificationProfileSelection: Encodable {
+    let university: String
+    let schoolId: UUID
+    let campusId: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case university
+        case schoolId = "school_id"
+        case campusId = "campus_id"
+        case profileStatus = "profile_status"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(university, forKey: .university)
+        try container.encode(schoolId, forKey: .schoolId)
+        // Clear a previous school's campus when the new school has no default.
+        try container.encode(campusId, forKey: .campusId)
+        try container.encode("student", forKey: .profileStatus)
     }
 }

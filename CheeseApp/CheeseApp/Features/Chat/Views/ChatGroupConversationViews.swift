@@ -10,6 +10,8 @@ import SwiftUI
 import UIKit
 
 struct GroupChatRoomView: View {
+    let initialMessageID: UUID?
+
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
     @StateObject private var viewModel: GroupChatRoomViewModel
@@ -24,7 +26,8 @@ struct GroupChatRoomView: View {
     private let composerVerticalGap: CGFloat = 6
     private let timelineComposerGap: CGFloat = 8
 
-    init(group: ChatGroupPreview) {
+    init(group: ChatGroupPreview, initialMessageID: UUID? = nil) {
+        self.initialMessageID = initialMessageID
         _viewModel = StateObject(wrappedValue: GroupChatRoomViewModel(group: group))
     }
 
@@ -37,6 +40,9 @@ struct GroupChatRoomView: View {
             .cheeseTabBarHidden(true)
             .task {
                 await viewModel.bootstrap()
+                if let initialMessageID {
+                    await viewModel.revealMessage(id: initialMessageID)
+                }
             }
             .onReceive(
                 NotificationCenter.default.publisher(
@@ -183,8 +189,16 @@ struct GroupChatRoomView: View {
                 }
             )
             .onChange(of: viewModel.scrollToMessageID) { _, newID in
-                guard newID != nil else { return }
-                scrollToLatest(using: proxy)
+                guard let newID else { return }
+                if newID == initialMessageID {
+                    DispatchQueue.main.async {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            proxy.scrollTo(newID, anchor: .center)
+                        }
+                    }
+                } else {
+                    scrollToLatest(using: proxy)
+                }
             }
             .onChange(of: keyboardHeight) { _, newHeight in
                 guard newHeight > 0, !viewModel.messages.isEmpty else {
@@ -193,7 +207,12 @@ struct GroupChatRoomView: View {
                 scrollToLatest(using: proxy)
             }
             .onAppear {
-                if !viewModel.messages.isEmpty {
+                if let initialMessageID,
+                   viewModel.messages.contains(where: { $0.id == initialMessageID }) {
+                    DispatchQueue.main.async {
+                        proxy.scrollTo(initialMessageID, anchor: .center)
+                    }
+                } else if !viewModel.messages.isEmpty {
                     proxy.scrollTo("group-chat-timeline-end", anchor: .bottom)
                 }
             }

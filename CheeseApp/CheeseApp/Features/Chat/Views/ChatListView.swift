@@ -13,11 +13,13 @@ struct ChatListView: View {
     @StateObject private var systemMessageService = SystemMessageService.shared
 
     @State private var searchText = ""
+    @State private var isSearchPagePresented = false
     @State private var activeSheetDestination: ChatInboxSheetDestination?
     @State private var activeRoute: ChatInboxRoute?
     @State private var rowActionErrorMessage: String?
     @State private var activeSwipeConversationId: UUID?
     @State private var isSearchFieldFocused = false
+    @State private var suppressNextConversationOpen = false
     @State private var optimisticallyDeletedConversationIds: Set<UUID> = []
     @State private var optimisticallyDeletedGroupIds: Set<UUID> = []
 
@@ -57,6 +59,8 @@ struct ChatListView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        // Keep the inbox geometry fixed while UIKit animates the keyboard.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .navigationDestination(item: $activeRoute) { route in
             destinationView(route)
         }
@@ -100,6 +104,50 @@ struct ChatListView: View {
         .safeAreaInset(edge: .top) {
             inboxTopInset
         }
+        .overlay {
+            if isSearchPagePresented {
+                ChatInboxSearchView(
+                    chatService: chatService,
+                    onOpenConversation: { conversation in
+                        replaceSearchWithRoute(
+                            .conversation(currentConversationRoute(conversation))
+                        )
+                    },
+                    onOpenGroup: { group in
+                        replaceSearchWithRoute(
+                            .group(currentGroupRoute(group))
+                        )
+                    },
+                    onOpenMessage: { result in
+                        if let conversationID = result.conversationID,
+                           let conversation = chatService.conversations.first(where: {
+                               $0.id == conversationID
+                           }) {
+                            replaceSearchWithRoute(
+                                .conversationMessage(
+                                    currentConversationRoute(conversation),
+                                    messageID: result.messageID
+                                )
+                            )
+                        } else if let groupID = result.groupID,
+                                  let group = chatService.groupConversations.first(where: {
+                                      $0.id == groupID
+                                  }) {
+                            replaceSearchWithRoute(
+                                .groupMessage(
+                                    currentGroupRoute(group),
+                                    messageID: result.messageID
+                                )
+                            )
+                        }
+                    },
+                    onDismiss: closeSearchPage
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.identity)
+                .zIndex(200)
+            }
+        }
     }
 
     private var inboxTopInset: some View {
@@ -137,10 +185,17 @@ struct ChatListView: View {
                 }
             }
 
-            ChatInboxSearchField(
+            ChatInboxSearchEntry(
                 placeholder: "搜索聊天、群聊、消息内容",
-                text: $searchText,
-                focus: $isSearchFieldFocused
+                action: {
+                    dismissSearchKeyboard()
+                    searchText = ""
+                    var transaction = Transaction(animation: nil)
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        isSearchPagePresented = true
+                    }
+                }
             )
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
@@ -255,7 +310,19 @@ struct ChatListView: View {
             }
             .padding(.top, 4)
         }
-        .scrollDismissesKeyboard(.interactively)
+        .scrollDismissesKeyboard(.immediately)
+        // Handle taps without competing with the enclosing scroll view's
+        // interactive keyboard dismissal drag.
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                guard isSearchFieldFocused else { return }
+                suppressNextConversationOpen = true
+                dismissSearchKeyboard()
+                DispatchQueue.main.async {
+                    suppressNextConversationOpen = false
+                }
+            }
+        )
     }
 
     private var emptyState: some View {
@@ -484,8 +551,18 @@ struct ChatListView: View {
             SystemMessageTimelineView(category: category)
         case .group(let group):
             GroupChatRoomView(group: currentGroupRoute(group))
+        case .groupMessage(let group, let messageID):
+            GroupChatRoomView(
+                group: currentGroupRoute(group),
+                initialMessageID: messageID
+            )
         case .conversation(let conversation):
             ChatRoomView(conversation: currentConversationRoute(conversation))
+        case .conversationMessage(let conversation, let messageID):
+            ChatRoomView(
+                conversation: currentConversationRoute(conversation),
+                initialMessageID: messageID
+            )
         case .profile(let userID):
             UserPostsView(userId: userID)
         }
@@ -493,6 +570,23 @@ struct ChatListView: View {
 }
 
 private extension ChatListView {
+    func closeSearchPage() {
+        dismissSearchKeyboard()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isSearchPagePresented = false
+        }
+    }
+
+    func replaceSearchWithRoute(_ route: ChatInboxRoute) {
+        // Keep the route replacement in one SwiftUI update. Dispatching the
+        // route to the next run loop first popped search back to the inbox,
+        // which briefly exposed the message home before opening the target.
+        activeRoute = route
+        isSearchPagePresented = false
+    }
+
     func resetForAccountBoundary() {
         searchText = ""
         activeSheetDestination = nil
@@ -500,6 +594,7 @@ private extension ChatListView {
         rowActionErrorMessage = nil
         activeSwipeConversationId = nil
         isSearchFieldFocused = false
+        suppressNextConversationOpen = false
         optimisticallyDeletedConversationIds = []
         optimisticallyDeletedGroupIds = []
     }
@@ -555,12 +650,16 @@ private extension ChatListView {
     }
 
     func dismissSearchKeyboard() {
-        isSearchFieldFocused = false
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isSearchFieldFocused = false
+        }
     }
 
     func openConversation(_ conversation: ChatConversationPreview) {
-        if isSearchFieldFocused {
+        if isSearchFieldFocused || suppressNextConversationOpen {
             dismissSearchKeyboard()
             return
         }
@@ -568,7 +667,7 @@ private extension ChatListView {
     }
 
     func openGroup(_ group: ChatGroupPreview) {
-        if isSearchFieldFocused {
+        if isSearchFieldFocused || suppressNextConversationOpen {
             dismissSearchKeyboard()
             return
         }
@@ -576,7 +675,7 @@ private extension ChatListView {
     }
 
     func openProfile(_ userId: UUID) {
-        if isSearchFieldFocused {
+        if isSearchFieldFocused || suppressNextConversationOpen {
             dismissSearchKeyboard()
             return
         }

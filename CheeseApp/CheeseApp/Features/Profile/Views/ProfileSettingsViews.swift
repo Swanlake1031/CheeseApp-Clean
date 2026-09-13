@@ -716,6 +716,7 @@ extension MediaSafetyConsent {
 }
 
 struct SchoolVerificationView: View {
+    var selectedSchool: CheeseUniversityOption? = nil
     @EnvironmentObject private var authService: AuthService
 
     @State private var email = ""
@@ -736,11 +737,11 @@ struct SchoolVerificationView: View {
     private let gold = AppColors.accent
 
     private var isVerified: Bool {
-        status?.verified == true || authService.currentUser?.hasSchoolStudentBadge == true
+        status?.verified == true
     }
 
     private var school: CheeseUniversityOption? {
-        CheeseUniversityOption.option(matching: status?.schoolName ?? authService.currentUser?.school)
+        selectedSchool ?? CheeseUniversityOption.option(matching: status?.schoolName ?? authService.currentUser?.school)
     }
 
     private var normalizedEmail: String {
@@ -748,6 +749,7 @@ struct SchoolVerificationView: View {
     }
 
     private var hasValidEmail: Bool {
+        guard status != nil, !isLoading else { return false }
         guard let domain = normalizedEmail.split(separator: "@", maxSplits: 1).last.map(String.init),
               normalizedEmail.contains("@") else { return false }
         return (status?.emailDomains ?? school?.verificationDomains ?? []).contains(domain)
@@ -982,7 +984,23 @@ struct SchoolVerificationView: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            status = try await SchoolVerificationService.status()
+            status = nil
+            if let selectedSchool {
+                guard let user = authService.currentUser else {
+                    throw NSError(domain: "SchoolVerification", code: 401, userInfo: [
+                        NSLocalizedDescriptionKey: "登录状态已失效，请重新登录。"
+                    ])
+                }
+                try await SchoolVerificationService.prepareSchool(selectedSchool, for: user)
+                await authService.fetchUserProfile(userId: user.id)
+            }
+            let loadedStatus = try await SchoolVerificationService.status()
+            if let selectedSchool, loadedStatus.schoolName != selectedSchool.name {
+                throw NSError(domain: "SchoolVerification", code: 409, userInfo: [
+                    NSLocalizedDescriptionKey: "学校信息尚未同步，请返回后重试。"
+                ])
+            }
+            status = loadedStatus
             message = nil
         } catch {
             show(AppErrorMessage.userMessage(for: error), asError: true)

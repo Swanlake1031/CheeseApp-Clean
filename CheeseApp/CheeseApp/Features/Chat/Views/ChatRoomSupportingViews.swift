@@ -78,6 +78,7 @@ struct ChatRoomSettingsView: View {
     let onReport: () -> Void
     let onClearHistory: () -> Void
     let onToggleBlock: () -> Void
+    let onOpenHistoryMessage: (UUID) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var localMuted: Bool
@@ -103,7 +104,8 @@ struct ChatRoomSettingsView: View {
         onSaveRemark: @escaping (String?) -> Void,
         onReport: @escaping () -> Void,
         onClearHistory: @escaping () -> Void,
-        onToggleBlock: @escaping () -> Void
+        onToggleBlock: @escaping () -> Void,
+        onOpenHistoryMessage: @escaping (UUID) -> Void
     ) {
         self.conversation = conversation
         self.remark = remark
@@ -117,6 +119,7 @@ struct ChatRoomSettingsView: View {
         self.onReport = onReport
         self.onClearHistory = onClearHistory
         self.onToggleBlock = onToggleBlock
+        self.onOpenHistoryMessage = onOpenHistoryMessage
         _localMuted = State(initialValue: isMuted)
         _localPinned = State(initialValue: isPinned)
         _localRemark = State(initialValue: remark)
@@ -343,7 +346,10 @@ struct ChatRoomSettingsView: View {
             }
         }
         .navigationDestination(isPresented: $showChatHistoryPage) {
-            ChatRoomHistoryView(conversation: conversation)
+            ChatRoomHistoryView(
+                conversation: conversation,
+                onSelectMessage: onOpenHistoryMessage
+            )
         }
         .navigationDestination(isPresented: $showTradeRecordsPage) {
             ChatRoomTradeRecordsPlaceholderView(conversation: conversation)

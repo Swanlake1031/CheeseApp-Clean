@@ -368,6 +368,11 @@ final class ChatRoomViewModel: ObservableObject {
         await roomState.loadOlderHistory()
     }
 
+    @discardableResult
+    func revealMessage(id: UUID) async -> Bool {
+        await roomState.revealMessage(id: id)
+    }
+
     func stageMediaSelections(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty, canCompose, !isSubmittingComposer else { return }
         mediaPreparationTask?.cancel()

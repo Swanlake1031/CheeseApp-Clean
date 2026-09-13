@@ -60,92 +60,102 @@ struct SecondhandListView: View {
             GridItem(.fixed(itemCardWidth), spacing: itemGridSpacing)
         ]
     }
-    
+
     var body: some View {
         ZStack {
             AppColors.pageBackground
                 .ignoresSafeArea()
-            
+
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     regionButton
                         .padding(.horizontal, 8)
+                        .prioritizeKeyboardDismissal(
+                            while: isSearchPresented,
+                            onDismiss: dismissSearchKeyboard
+                        )
                     secondhandSearchBar
                         .padding(.horizontal, 8)
-                    SecondhandCategoryPicker(selection: $selectedCategory)
-                        .padding(.horizontal, 8)
+                    VStack(spacing: 16) {
+                        SecondhandCategoryPicker(selection: $selectedCategory)
+                            .padding(.horizontal, 8)
 
-                    switch service.itemListState {
-                    case .unresolved, .initialLoading:
-                        ProgressView()
-                            .padding(.top, 40)
-                    case .empty:
-                        emptyState
-                    case .error(let message):
-                        ErrorView(message) {
-                            Task { await service.fetchItems(region: selectedRegion) }
-                        }
-                        .frame(height: 220)
-                        .padding(.top, 24)
-                    case .loaded:
-                        if filteredItems.isEmpty {
-                            filteredEmptyState
-                        } else {
-                            LazyVGrid(
-                                columns: itemGridColumns,
-                                spacing: itemGridSpacing
-                            ) {
-                                ForEach(filteredItems) { item in
-                                    SecondhandCardView(
-                                        item: item,
-                                        isOwnPost: item.isOwned(by: authService.currentUser?.id),
-                                        constrainedWidth: itemCardWidth,
-                                        onEditTap: {
-                                            editingPost = item.editableSummary
-                                        },
-                                        onOpenTap: {
-                                            selectedItem = item
-                                        },
-                                        onAuthorTap: item.canOpenSellerProfile ? {
-                                            selectedSellerRoute = SecondhandSellerRoute(id: item.sellerId)
-                                        } : nil,
-                                        onFavoriteTap: {
-                                            Task { await toggleFavorite(item) }
-                                        }
-                                    )
-                                }
+                        switch service.itemListState {
+                        case .unresolved, .initialLoading:
+                            ProgressView()
+                                .padding(.top, 40)
+                        case .empty:
+                            emptyState
+                        case .error(let message):
+                            ErrorView(message) {
+                                Task { await service.fetchItems(region: selectedRegion) }
                             }
-                            .onGeometryChange(for: CGFloat.self) { proxy in
-                                proxy.size.width
-                            } action: { width in
-                                guard width > 0,
-                                      abs(itemGridWidth - width) > 0.5
-                                else { return }
-                                itemGridWidth = width
-                            }
-                        }
-                    }
-
-                    if service.hasMoreItems {
-                        Group {
-                            if service.isLoadingNextPage {
-                                ProgressView()
-                            } else if let message = service.pageErrorMessage {
-                                Button(message) {
-                                    Task { await service.loadNextItemPage() }
-                                }
-                                .font(.footnote)
+                            .frame(height: 220)
+                            .padding(.top, 24)
+                        case .loaded:
+                            if filteredItems.isEmpty {
+                                filteredEmptyState
                             } else {
-                                ProgressView()
-                                    .onAppear {
+                                LazyVGrid(
+                                    columns: itemGridColumns,
+                                    spacing: itemGridSpacing
+                                ) {
+                                    ForEach(filteredItems) { item in
+                                        SecondhandCardView(
+                                            item: item,
+                                            isOwnPost: item.isOwned(by: authService.currentUser?.id),
+                                            constrainedWidth: itemCardWidth,
+                                            onEditTap: {
+                                                editingPost = item.editableSummary
+                                            },
+                                            onOpenTap: {
+                                                selectedItem = item
+                                            },
+                                            onAuthorTap: item.canOpenSellerProfile ? {
+                                                selectedSellerRoute = SecondhandSellerRoute(id: item.sellerId)
+                                            } : nil,
+                                            onFavoriteTap: {
+                                                Task { await toggleFavorite(item) }
+                                            }
+                                        )
+                                    }
+                                }
+                                .onGeometryChange(for: CGFloat.self) { proxy in
+                                    proxy.size.width
+                                } action: { width in
+                                    guard width > 0,
+                                          abs(itemGridWidth - width) > 0.5
+                                    else { return }
+                                    itemGridWidth = width
+                                }
+                            }
+                        }
+
+                        if service.hasMoreItems {
+                            Group {
+                                if service.isLoadingNextPage {
+                                    ProgressView()
+                                } else if let message = service.pageErrorMessage {
+                                    Button(message) {
                                         Task { await service.loadNextItemPage() }
                                     }
+                                    .font(.footnote)
+                                } else {
+                                    ProgressView()
+                                        .onAppear {
+                                            Task { await service.loadNextItemPage() }
+                                        }
+                                }
                             }
+                            .padding(.vertical, 12)
                         }
-                        .padding(.vertical, 12)
+
+                        Spacer(minLength: 100)
                     }
-                    
-                    Spacer(minLength: 100)
+                    .prioritizeKeyboardDismissal(
+                        while: isSearchPresented,
+                        onDismiss: dismissSearchKeyboard
+                    )
                 }
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
@@ -350,7 +360,7 @@ struct SecondhandListView: View {
     // MARK: - 筛选后的商品
     private var filteredItems: [SecondhandItem] {
         var result = service.items
-        
+
         if !searchText.isEmpty {
             result = result.filter {
                 $0.title.localizedCaseInsensitiveContains(searchText)
@@ -465,7 +475,7 @@ struct SecondhandCardView: View {
             fallbackIsFavorited: item.isFavorited
         ).isFavorited
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             cardImage

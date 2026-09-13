@@ -72,6 +72,94 @@ struct ChatServiceRepository {
         )
     }
 
+    func searchMessages(query: String, limit: Int = 100) async throws -> [ChatMessageSearchResult] {
+        try await supabase.client
+            .rpc(
+                "search_chat_messages",
+                params: ChatMessageSearchParams(query: query, limit: limit)
+            )
+            .execute()
+            .value
+    }
+
+    /// Compatibility fallback for accounts whose database has not received
+    /// the inbox-search migration yet. The normal path is the single RPC
+    /// above; this path reuses the privacy-filtered room pagination RPCs so a
+    /// missing search function never turns the inbox search into an error.
+    func searchMessagesLocally(
+        query: String,
+        conversationIDs: [UUID],
+        groupIDs: [UUID],
+        limit: Int = 100
+    ) async throws -> [ChatMessageSearchResult] {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedQuery.isEmpty else { return [] }
+
+        var matches: [ChatMessageSearchResult] = []
+
+        for conversationID in conversationIDs {
+            var cursor: ChatMessagePageCursor?
+            repeat {
+                let page = try await fetchMessagesPage(
+                    conversationId: conversationID,
+                    before: cursor
+                )
+                matches.append(contentsOf: page.messages.compactMap { message in
+                    guard message.content.localizedCaseInsensitiveContains(normalizedQuery) else {
+                        return nil
+                    }
+                    return ChatMessageSearchResult(
+                        messageID: message.id,
+                        conversationID: conversationID,
+                        groupID: nil,
+                        content: message.content,
+                        messageType: message.messageType,
+                        createdAt: message.createdAt,
+                        senderName: nil
+                    )
+                })
+                cursor = page.nextCursor
+            } while cursor != nil && !Task.isCancelled
+        }
+
+        for groupID in groupIDs {
+            var cursor: ChatMessagePageCursor?
+            repeat {
+                let page = try await fetchGroupMessagesPage(
+                    groupId: groupID,
+                    before: cursor
+                )
+                matches.append(contentsOf: page.messages.compactMap { message in
+                    guard message.content.localizedCaseInsensitiveContains(normalizedQuery) else {
+                        return nil
+                    }
+                    return ChatMessageSearchResult(
+                        messageID: message.id,
+                        conversationID: nil,
+                        groupID: groupID,
+                        content: message.content,
+                        messageType: message.messageType,
+                        createdAt: message.createdAt,
+                        senderName: message.senderName
+                    )
+                })
+                cursor = page.nextCursor
+            } while cursor != nil && !Task.isCancelled
+        }
+
+        try Task.checkCancellation()
+        return Array(
+            matches
+                .sorted {
+                    if $0.createdAt != $1.createdAt {
+                        return $0.createdAt > $1.createdAt
+                    }
+                    return $0.messageID.uuidString > $1.messageID.uuidString
+                }
+                .prefix(max(1, min(limit, 100)))
+        )
+    }
+
     private func fetchMessage(messageId: UUID) async throws -> Message {
         try await supabase
             .database(Tables.messages)
@@ -767,6 +855,16 @@ private struct GroupMessagePageParams: Encodable {
         case groupID = "p_group_id"
         case beforeCreatedAt = "p_before_created_at"
         case beforeID = "p_before_id"
+        case limit = "p_limit"
+    }
+}
+
+private struct ChatMessageSearchParams: Encodable {
+    let query: String
+    let limit: Int
+
+    enum CodingKeys: String, CodingKey {
+        case query = "p_query"
         case limit = "p_limit"
     }
 }

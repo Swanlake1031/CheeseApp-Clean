@@ -115,6 +115,11 @@ final class GroupChatRoomViewModel: ObservableObject {
     var displayedError: String? { roomState.errorMessage }
     var scrollToMessageID: UUID? { roomState.scrollToMessageID }
 
+    @discardableResult
+    func revealMessage(id: UUID) async -> Bool {
+        await roomState.revealMessage(id: id)
+    }
+
     func bootstrap() async {
         async let settingsTask = chatService.fetchGroupConversationSettings(groupId: group.id)
         async let announcementTask = chatService.fetchChatGroupAnnouncement(groupId: group.id)

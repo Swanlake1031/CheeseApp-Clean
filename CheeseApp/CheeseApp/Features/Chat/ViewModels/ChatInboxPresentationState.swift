@@ -3,7 +3,9 @@ import Foundation
 enum ChatInboxRoute: Hashable, Identifiable {
     case systemMessages(SystemMessageCategory)
     case group(ChatGroupPreview)
+    case groupMessage(ChatGroupPreview, messageID: UUID)
     case conversation(ChatConversationPreview)
+    case conversationMessage(ChatConversationPreview, messageID: UUID)
     case profile(UUID)
 
     var id: String {
@@ -12,8 +14,12 @@ enum ChatInboxRoute: Hashable, Identifiable {
             return "system-messages:\(category.rawValue)"
         case .group(let group):
             return "group:\(group.id.uuidString)"
+        case .groupMessage(let group, let messageID):
+            return "group:\(group.id.uuidString):message:\(messageID.uuidString)"
         case .conversation(let conversation):
             return "conversation:\(conversation.id.uuidString)"
+        case .conversationMessage(let conversation, let messageID):
+            return "conversation:\(conversation.id.uuidString):message:\(messageID.uuidString)"
         case .profile(let userID):
             return "profile:\(userID.uuidString)"
         }

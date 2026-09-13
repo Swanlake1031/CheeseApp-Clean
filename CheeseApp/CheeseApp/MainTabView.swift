@@ -844,7 +844,7 @@ struct CompleteProfileOnboardingView: View {
                         if profileStatus == "student", let selectedSchool, selectedSchool.supportsStudentVerification {
                             studentVerificationInfo
 
-                            NavigationLink(destination: SchoolVerificationView()) {
+                            NavigationLink(destination: SchoolVerificationView(selectedSchool: selectedSchool)) {
                             HStack(spacing: 12) {
                                 Image(systemName: "checkmark.seal.fill")
                                     .foregroundStyle(AppColors.accentStrong)
@@ -953,7 +953,7 @@ struct CompleteProfileOnboardingView: View {
     }
 
     private func hydrateProfileDraftIfNeeded() {
-        // Returning from McMaster verification triggers onAppear again. Only
+        // Returning from school verification triggers onAppear again. Only
         // hydrate once so the server's still-incomplete profile cannot erase
         // the nickname, gender, or occupation entered in this onboarding run.
         guard !hasHydratedProfileDraft,

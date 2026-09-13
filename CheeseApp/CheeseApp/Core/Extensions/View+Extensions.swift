@@ -187,19 +187,21 @@ final class CheeseTabBarVisibilityController: ObservableObject {
 
     func setHidden(_ hidden: Bool, token: UUID) {
         if hidden {
-            hiddenTokens.insert(token)
+            guard hiddenTokens.insert(token).inserted else { return }
         } else {
-            hiddenTokens.remove(token)
+            guard hiddenTokens.remove(token) != nil else { return }
         }
     }
 
     func resetVisibility() {
+        guard !hiddenTokens.isEmpty else { return }
         hiddenTokens.removeAll()
     }
 }
 private final class CheeseTabBarVisibilityHostViewController: UIViewController {
     private let token = UUID()
     private var isParticipatingInAppearance = false
+    private var visibilityGeneration = 0
 
     var hidesTabBar = false {
         didSet {
@@ -250,17 +252,31 @@ private final class CheeseTabBarVisibilityHostViewController: UIViewController {
 
     deinit {
         let token = self.token
-        Task { @MainActor in
+        DispatchQueue.main.async {
             CheeseTabBarVisibilityController.shared.setHidden(false, token: token)
         }
     }
 
     private func updateVisibility() {
-        CheeseTabBarVisibilityController.shared.setHidden(hidesTabBar, token: token)
+        scheduleVisibility(hidesTabBar)
     }
 
     private func releaseVisibility() {
-        CheeseTabBarVisibilityController.shared.setHidden(false, token: token)
+        scheduleVisibility(false)
+    }
+
+    private func scheduleVisibility(_ hidden: Bool) {
+        visibilityGeneration &+= 1
+        let generation = visibilityGeneration
+        let token = self.token
+
+        // UIViewControllerRepresentable can call updateUIViewController while
+        // SwiftUI is applying a view update. Publish on the next main-run-loop
+        // turn so the ObservableObject mutation is outside that update cycle.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.visibilityGeneration == generation else { return }
+            CheeseTabBarVisibilityController.shared.setHidden(hidden, token: token)
+        }
     }
 }
 

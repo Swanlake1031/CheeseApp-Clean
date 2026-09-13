@@ -428,6 +428,32 @@ struct GroupMessage: Codable, Identifiable, Hashable {
     }
 }
 
+/// A lightweight result returned by the inbox-wide message search.
+/// The room and message identifiers let the caller open a chat and reveal the
+/// matching historical message.
+struct ChatMessageSearchResult: Codable, Identifiable, Hashable {
+    let messageID: UUID
+    let conversationID: UUID?
+    let groupID: UUID?
+    let content: String
+    let messageType: String
+    let createdAt: Date
+    let senderName: String?
+
+    var id: UUID { messageID }
+    var isGroupMessage: Bool { groupID != nil }
+
+    enum CodingKeys: String, CodingKey {
+        case messageID = "message_id"
+        case conversationID = "conversation_id"
+        case groupID = "group_id"
+        case content
+        case messageType = "message_type"
+        case createdAt = "created_at"
+        case senderName = "sender_name"
+    }
+}
+
 struct MutualFollowProfile: Codable, Identifiable, Hashable {
     let id: UUID
     let fullName: String

@@ -208,11 +208,28 @@ struct CheeseSearchTextField: UIViewRepresentable {
 
         guard let isFirstResponder else { return }
         if isFirstResponder.wrappedValue {
-            if !textField.isFirstResponder {
-                DispatchQueue.main.async { [weak textField] in
-                    guard let textField, textField.window != nil else { return }
-                    textField.becomeFirstResponder()
-                }
+            guard !textField.isFirstResponder,
+                  !context.coordinator.isFocusRequestScheduled
+            else { return }
+
+            // Search overlays are inserted into an already visible window.
+            // Focus immediately when UIKit is ready instead of always adding
+            // another main-queue turn before the keyboard can start.
+            if textField.window != nil {
+                textField.becomeFirstResponder()
+                guard !textField.isFirstResponder else { return }
+            }
+
+            context.coordinator.isFocusRequestScheduled = true
+            DispatchQueue.main.async { [weak textField, weak coordinator = context.coordinator] in
+                guard let coordinator else { return }
+                coordinator.isFocusRequestScheduled = false
+                guard let textField,
+                      textField.window != nil,
+                      !textField.isFirstResponder,
+                      isFirstResponder.wrappedValue
+                else { return }
+                textField.becomeFirstResponder()
             }
         } else if textField.isFirstResponder {
             textField.resignFirstResponder()
@@ -248,6 +265,7 @@ struct CheeseSearchTextField: UIViewRepresentable {
 
     final class Coordinator: NSObject, UITextFieldDelegate {
         var parent: CheeseSearchTextField
+        var isFocusRequestScheduled = false
 
         init(parent: CheeseSearchTextField) {
             self.parent = parent

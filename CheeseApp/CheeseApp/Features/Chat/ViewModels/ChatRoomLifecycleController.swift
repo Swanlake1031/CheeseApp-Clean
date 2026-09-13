@@ -214,6 +214,33 @@ final class ChatRoomMessageState<MessageType: ChatRoomTimelineMessage>: Observab
         isLoadingOlderHistory = false
     }
 
+    /// Loads older pages until a requested historical message is present.
+    @discardableResult
+    func revealMessage(id: UUID) async -> Bool {
+        guard let sessionID = lifecycle.activeSessionID,
+              lifecycle.acceptsEvents(for: sessionID)
+        else { return false }
+
+        if messages.contains(where: { $0.id == id }) {
+            scrollToMessageID = id
+            return true
+        }
+
+        while hasMoreHistory && !Task.isCancelled {
+            await loadOlderHistory()
+            guard lifecycle.acceptsEvents(for: sessionID) else { return false }
+            if messages.contains(where: { $0.id == id }) {
+                scrollToMessageID = id
+                return true
+            }
+            if historyErrorMessage != nil {
+                return false
+            }
+        }
+
+        return false
+    }
+
     @discardableResult
     func sendText(
         _ content: String,

@@ -435,6 +435,32 @@ class ChatService: ObservableObject {
         try await repository.fetchMessages(conversationId: conversationId)
     }
 
+    func searchMessages(query: String, limit: Int = 100) async throws -> [ChatMessageSearchResult] {
+        do {
+            return try await repository.searchMessages(query: query, limit: limit)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let rpcError {
+            // The search RPC is introduced by a new migration. Keep search
+            // usable while an environment is waiting for that migration by
+            // falling back to the existing room history pagination APIs.
+            do {
+                return try await repository.searchMessagesLocally(
+                    query: query,
+                    conversationIDs: conversations.map(\.id),
+                    groupIDs: groupConversations.map(\.id),
+                    limit: limit
+                )
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                // Preserve the original RPC error so the UI can report the
+                // actual server problem if the compatibility path also fails.
+                throw rpcError
+            }
+        }
+    }
+
     func fetchGroupMessages(groupId: UUID) async throws -> [GroupMessage] {
         var messages: [GroupMessage] = []
         var cursor: ChatMessagePageCursor?
