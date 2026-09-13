@@ -23,6 +23,7 @@ struct SecondhandListView: View {
     @State private var selectedCategory: SecondhandPost.Category?
     @State private var selectedRegion: MarketplaceRegion?
     @State private var isRegionPickerPresented = false
+    @State private var didHandleRegionPicker = false
     @State private var editingPost: UserPostSummary?
     @State private var selectedItem: SecondhandItem?
     @State private var selectedSellerRoute: SecondhandSellerRoute?
@@ -150,15 +151,11 @@ struct SecondhandListView: View {
                 .padding(.top, 8)
             }
             .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(
-                TapGesture().onEnded {
-                    dismissSearchKeyboard()
-                }
-            )
             .refreshable {
                 await service.fetchItems(region: selectedRegion)
             }
         }
+        .dismissKeyboardOnTap()
         .navigationTitle(L10n.tr("Secondhand", "二手"))
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
@@ -196,6 +193,7 @@ struct SecondhandListView: View {
                 for: authService.currentUser?.id
             )
             selectedRegion = storedRegion
+            didHandleRegionPicker = false
             isRegionPickerPresented = true
         }
         .onChange(of: isActive) { wasActive, isActive in
@@ -203,22 +201,32 @@ struct SecondhandListView: View {
             selectedRegion = MarketplaceRegionPreference.selected(
                 for: authService.currentUser?.id
             )
+            didHandleRegionPicker = false
             isRegionPickerPresented = true
         }
         .onReceive(NotificationCenter.default.publisher(for: PostFeatureEvents.postsDidChange)) { notification in
             guard PostFeatureEvents.changedPostKind(from: notification) == .secondhand else { return }
             Task { await service.fetchItems(region: selectedRegion) }
         }
-        .sheet(isPresented: $isRegionPickerPresented) {
+        .sheet(isPresented: $isRegionPickerPresented, onDismiss: {
+            if didHandleRegionPicker {
+                didHandleRegionPicker = false
+            } else {
+                selectedRegion = nil
+                Task { await service.fetchItems(region: nil) }
+            }
+        }) {
             MarketplaceRegionPickerView(
                 selectedRegion: selectedRegion,
                 requiresSelection: false,
                 onSkip: {
+                    didHandleRegionPicker = true
                     selectedRegion = nil
                     isRegionPickerPresented = false
                     Task { await service.fetchItems(region: nil) }
                 }
             ) { region in
+                didHandleRegionPicker = true
                 selectedRegion = region
                 MarketplaceRegionPreference.save(
                     region,
@@ -227,7 +235,7 @@ struct SecondhandListView: View {
                 isRegionPickerPresented = false
                 Task { await service.fetchItems(region: region) }
             }
-            .interactiveDismissDisabled(true)
+            .presentationDragIndicator(.visible)
         }
         .alert(L10n.tr("Action failed", "操作失败"), isPresented: Binding(
             get: { interactionErrorMessage != nil },
@@ -245,6 +253,7 @@ struct SecondhandListView: View {
         HStack {
             Button {
                 dismissSearchKeyboard()
+                didHandleRegionPicker = false
                 isRegionPickerPresented = true
             } label: {
                 HStack(spacing: 7) {
@@ -384,20 +393,9 @@ struct MarketplaceRegionPickerView: View {
     let requiresSelection: Bool
     var onSkip: (() -> Void)? = nil
     let onSelect: (MarketplaceRegion) -> Void
-    @State private var searchText = ""
-
-    private var filteredRegions: [MarketplaceRegion] {
-        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return MarketplaceRegion.allCases
-        }
-        return MarketplaceRegion.allCases.filter {
-            $0.displayName.localizedCaseInsensitiveContains(searchText)
-        }
-    }
-
     var body: some View {
         NavigationStack {
-            List(filteredRegions) { region in
+            List(MarketplaceRegion.allCases) { region in
                 Button {
                     onSelect(region)
                 } label: {
@@ -417,10 +415,6 @@ struct MarketplaceRegionPickerView: View {
                 .buttonStyle(.plain)
             }
             .listStyle(.plain)
-            .searchable(
-                text: $searchText,
-                prompt: L10n.tr("Search regions", "搜索地区")
-            )
             .navigationTitle(L10n.tr("Select Region", "选择地区"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -432,11 +426,6 @@ struct MarketplaceRegionPickerView: View {
                     ToolbarItem(placement: .topBarLeading) {
                         Button(L10n.tr("Cancel", "取消")) { dismiss() }
                     }
-                }
-            }
-            .overlay {
-                if filteredRegions.isEmpty {
-                    ContentUnavailableView.search(text: searchText)
                 }
             }
         }
