@@ -71,6 +71,14 @@ final class AuthCredentialStoreTests: XCTestCase {
         XCTAssertThrowsError(try AuthService.makeSecureNonce(length: 0))
     }
 
+    @MainActor
+    func testGoogleNonceUsesSHA256HexDigestExpectedBySupabase() {
+        XCTAssertEqual(
+            AuthService.hashedNonce("test-nonce"),
+            "ed04c4e9ea6c49cf9ceb39098787c5b9842524f96b07ef45305476a11caec9b4"
+        )
+    }
+
     func testPasswordResetFormNormalizesOnlyPlausibleEmailAddresses() {
         XCTAssertEqual(
             PasswordResetFormPolicy.normalizedEmail("  person@example.com  "),

@@ -824,7 +824,9 @@ class AuthService: ObservableObject {
             let rawNonce = try Self.makeSecureNonce()
             let result = try await nativeGoogleSignIn(
                 with: presenter,
-                nonce: rawNonce
+                // Supabase verifies the raw nonce after Google returns its
+                // SHA-256 digest in the ID token.
+                nonce: Self.hashedNonce(rawNonce)
             )
             guard let idToken = result.user.idToken?.tokenString else {
                 throw NativeSocialSignInError.missingIdentityToken
@@ -958,6 +960,12 @@ class AuthService: ObservableObject {
         return result
     }
 
+    static func hashedNonce(_ rawNonce: String) -> String {
+        SHA256.hash(data: Data(rawNonce.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
     private func nativeGoogleSignIn(
         with presenter: UIViewController,
         nonce: String
@@ -1046,7 +1054,7 @@ class AuthService: ObservableObject {
                 let rawNonce = try Self.makeSecureNonce()
                 let result = try await nativeGoogleSignIn(
                     with: presenter,
-                    nonce: rawNonce
+                    nonce: Self.hashedNonce(rawNonce)
                 )
                 guard let idToken = result.user.idToken?.tokenString else {
                     throw NativeSocialSignInError.missingIdentityToken
@@ -1469,7 +1477,7 @@ class AuthService: ObservableObject {
             let rawNonce = try Self.makeSecureNonce()
             let result = try await nativeGoogleSignIn(
                 with: presenter,
-                nonce: rawNonce
+                nonce: Self.hashedNonce(rawNonce)
             )
             guard let idToken = result.user.idToken?.tokenString else {
                 throw NativeSocialSignInError.missingIdentityToken
@@ -2383,9 +2391,7 @@ private final class AppleSignInCoordinator: NSObject,
 
             let request = ASAuthorizationAppleIDProvider().createRequest()
             request.requestedScopes = [.fullName, .email]
-            request.nonce = SHA256.hash(data: Data(rawNonce.utf8))
-                .map { String(format: "%02x", $0) }
-                .joined()
+            request.nonce = AuthService.hashedNonce(rawNonce)
 
             let controller = ASAuthorizationController(authorizationRequests: [request])
             controller.delegate = self
