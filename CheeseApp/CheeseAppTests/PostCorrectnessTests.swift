@@ -1441,7 +1441,7 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertFalse(item.isAuthorOfficial)
     }
 
-    func testForumHashtagDecodesBackendOwnedPermissionsAndCompatibilityFlag() throws {
+    func testForumBoardDecodesBackendOwnedPermissionsAndCompatibilityFlag() throws {
         let data = Data(
             """
             {
@@ -1477,7 +1477,7 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertFalse(board.canAdminister)
     }
 
-    func testAnonymousNamedHashtagUsesTheSameCompatibilityCapability() throws {
+    func testAnonymousNamedBoardUsesTheSameCompatibilityCapability() throws {
         let data = Data(
             """
             {

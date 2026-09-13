@@ -48,16 +48,13 @@ struct HomeView: View {
     /// discard loaded feed data or in-flight request de-duplication state.
     @ObservedObject var viewModel: HomeViewModel
     @EnvironmentObject private var authService: AuthService
-    @ObservedObject private var forumService = ForumService.shared
     @ObservedObject private var interactionStore = PostInteractionStore.shared
 
     /// 导航状态
-    @State private var showForumList = false
     @State private var showSearch = false
     @State private var shouldAutoFocusSearch = false
     @State private var showCustomerSupport = false
     @State private var showSettings = false
-    @State private var selectedForumBoardID: UUID?
     @State private var showNavigationDrawer = false
     @State private var navigationDrawerOpenRequest: UInt = 0
     @State private var selectedForumPost: ForumPostItem?
@@ -150,8 +147,6 @@ struct HomeView: View {
                 openRequest: navigationDrawerOpenRequest,
                 onPresentationChange: { showNavigationDrawer = $0 },
                 onForumTap: {
-                    selectedForumBoardID = nil
-                    showForumList = false
                     selectFeaturedCategory(.forum)
                 },
                 onSecondhandTap: {
@@ -171,11 +166,6 @@ struct HomeView: View {
         }
         .navigationBarHidden(true)
         // 导航目标由 MainTabView 的 Home NavigationStack 承载。
-        .navigationDestination(isPresented: $showForumList) {
-            if let selectedForumBoardID {
-                ForumBoardView(boardID: selectedForumBoardID)
-            }
-        }
         .navigationDestination(isPresented: $showSearch) {
             SearchView(
                 shouldAutoFocus: $shouldAutoFocusSearch,
@@ -206,9 +196,7 @@ struct HomeView: View {
             CheeseTabBarVisibilityController.shared.resetVisibility()
         }
         .task(id: homeLoadScopeKey) {
-            async let boards: Void = loadForumBoardsIfNeeded()
             await viewModel.loadIfNeeded(userID: authService.currentUser?.id)
-            await boards
         }
         .onChange(of: authService.accountTransitionGeneration) { _, _ in
             viewModel.resetAccountScopedState()
@@ -224,8 +212,6 @@ struct HomeView: View {
             guard let route = HomeFeedNavigationEvents.route(from: notification) else { return }
             switch route {
             case .forum:
-                selectedForumBoardID = nil
-                showForumList = false
                 selectFeaturedCategory(.forum)
             case .secondhand(let category):
                 MainTabNavigationEvents.postOpenSecondhand(category: category)
@@ -283,11 +269,6 @@ struct HomeView: View {
             : "stable"
         let loading = authService.isLoading ? "loading" : "idle"
         return "\(userID)-\(authService.accountTransitionGeneration)-\(transition)-\(loading)"
-    }
-
-    private func loadForumBoardsIfNeeded() async {
-        guard forumService.boards.isEmpty else { return }
-        await forumService.fetchBoards()
     }
 
     // MARK: - 内容分页
@@ -418,7 +399,7 @@ struct HomeView: View {
     }
 
     private var forumTabCards: [HomeCardItem] {
-        viewModel.forumTabCards(selectedBoardID: selectedForumBoardID)
+        viewModel.forumTabCards()
     }
 
     private func featuredLoadState(
@@ -778,7 +759,6 @@ struct HomeView: View {
                     && card.category == .secondhand,
                 showsCategoryMetadata: true,
                 onTap: { openFeaturedCard(card) },
-                onBoardTap: boardTapAction(for: card, in: category),
                 onAuthorTap: card.authorId.map { authorID in
                     { selectedProfileRoute = HomeProfileRoute(id: authorID) }
                 },
@@ -793,17 +773,6 @@ struct HomeView: View {
                 }
             )
         }
-    }
-
-    private func boardTapAction(
-        for card: HomeCardItem,
-        in category: HomeFeedTab
-    ) -> (() -> Void)? {
-        if card.category == .forum, card.boardID != nil {
-            return { openForumBoard(card) }
-        }
-
-        return nil
     }
 
     private func sharePayload(for card: HomeCardItem) -> PostSharePayload? {
@@ -841,7 +810,7 @@ struct HomeView: View {
             kind: kind,
             postId: postID,
             title: card.title,
-            subtitle: card.category == .secondhand ? card.priceText : card.badgeText,
+            subtitle: card.category == .secondhand ? card.priceText : nil,
             summary: card.subtitle,
             imageURL: imageURL
         )
@@ -899,12 +868,10 @@ struct HomeView: View {
 
     private func handleHomeReselect() {
         Task { await viewModel.loadIfNeeded(userID: authService.currentUser?.id) }
-        showForumList = false
         showSearch = false
         shouldAutoFocusSearch = false
         showCustomerSupport = false
         showSettings = false
-        selectedForumBoardID = nil
         selectedForumPost = nil
         selectedFeaturedSecondhandItem = nil
         selectedProfileRoute = nil
@@ -955,8 +922,6 @@ struct HomeView: View {
 
         promotedCreatedPostID = postID
         highlightedCreatedPostID = nil
-        showForumList = false
-        selectedForumBoardID = nil
         selectedSecondhandCategory = nil
         if kind == .secondhand {
             MainTabNavigationEvents.postOpenSecondhand()
@@ -1026,15 +991,10 @@ struct HomeView: View {
                     "该商品暂时无法打开，请刷新后重试。"
                 )
             case .forum:
-                if let boardID = card.boardID {
-                    selectedForumBoardID = boardID
-                    showForumList = true
-                } else {
-                    postOpenErrorMessage = L10n.tr(
-                        "This post is temporarily unavailable. Please refresh and try again.",
-                        "该帖子暂时无法打开，请刷新后重试。"
-                    )
-                }
+                postOpenErrorMessage = L10n.tr(
+                    "This post is temporarily unavailable. Please refresh and try again.",
+                    "该帖子暂时无法打开，请刷新后重试。"
+                )
             }
             return
         }
@@ -1052,9 +1012,6 @@ struct HomeView: View {
         case .forum:
             if let post = viewModel.forumPost(id: postId) {
                 selectedForumPost = post
-            } else if let boardID = card.boardID {
-                selectedForumBoardID = boardID
-                showForumList = true
             } else {
                 postOpenErrorMessage = L10n.tr(
                     "This post is temporarily unavailable. Please refresh and try again.",
@@ -1062,12 +1019,6 @@ struct HomeView: View {
                 )
             }
         }
-    }
-
-    private func openForumBoard(_ card: HomeCardItem) {
-        guard let boardID = card.boardID else { return }
-        selectedForumBoardID = boardID
-        showForumList = true
     }
 
     // MARK: - 处理快捷操作点击

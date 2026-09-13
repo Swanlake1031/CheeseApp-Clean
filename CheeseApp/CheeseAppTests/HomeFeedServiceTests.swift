@@ -196,7 +196,7 @@ final class HomeFeedServiceTests: XCTestCase {
             HomeCardItem(postId: UUID(), title: "Post \($0)", subtitle: "", boardID: board)
         }
         XCTAssertEqual(HomeViewModel.composeForumTabCards(
-            featured: [], ranked: cards, selectedBoardID: board).map(\.id), cards.map(\.id))
+            featured: [], ranked: cards).map(\.id), cards.map(\.id))
     }
 
     func testForumContinuationPreservesMicrosecondCursor() throws {
@@ -212,17 +212,8 @@ final class HomeFeedServiceTests: XCTestCase {
         let board = UUID()
         let pinned = HomeCardItem(postId: UUID(), title: "Pinned", subtitle: "", boardID: board, isSystemPinned: true)
         let ranked = (0..<15).map { HomeCardItem(postId: UUID(), title: "Rank \($0)", subtitle: "", boardID: board) }
-        let cards = HomeViewModel.composeForumTabCards(featured: [pinned], ranked: ranked + [pinned], selectedBoardID: nil)
+        let cards = HomeViewModel.composeForumTabCards(featured: [pinned], ranked: ranked + [pinned])
         XCTAssertEqual(cards.map(\.id), ([pinned] + ranked).map(\.id))
-    }
-
-    @MainActor
-    func testForumBoardFilterPreservesV2RelativeOrder() {
-        let selected = UUID()
-        let other = UUID()
-        let cards = [selected, other, selected].map { HomeCardItem(postId: UUID(), title: "Post", subtitle: "", boardID: $0) }
-        XCTAssertEqual(HomeViewModel.composeForumTabCards(featured: [], ranked: cards, selectedBoardID: selected).map(\.id),
-                       [cards[0].id, cards[2].id])
     }
 
     @MainActor

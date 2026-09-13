@@ -32,7 +32,6 @@
 		092 /* SecondhandService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192 /* SecondhandService.swift */; };
 		093 /* CreateSecondhandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 193 /* CreateSecondhandView.swift */; };
 		0C0 /* ForumPost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0 /* ForumPost.swift */; };
-		0C1 /* ForumListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1 /* ForumListView.swift */; };
 		0C2 /* ForumService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C2 /* ForumService.swift */; };
 		0C3 /* CreateForumView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C3 /* CreateForumView.swift */; };
 		0D1 /* ChatListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D1 /* ChatListView.swift */; };
@@ -86,13 +85,11 @@
 		DBA54BA42F2D43DA0073E17A /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA32F2D43DA0073E17A /* Storage */; };
 		DBA54BA72F2D44C30073E17A /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA62F2D44C30073E17A /* Supabase */; };
 		GIDPKGBLD1 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = GIDPKGPROD1 /* GoogleSignIn */; };
-		FBRDBLD1 /* ForumBoardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBRDFILE1 /* ForumBoardViews.swift */; };
 		FCARDBLD1 /* ForumPostCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCARDFILE1 /* ForumPostCardView.swift */; };
 		FDETBLD1 /* ForumDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDETFILE1 /* ForumDetailView.swift */; };
 		FEDITBLD1 /* ForumPostEditorSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEDITFILE1 /* ForumPostEditorSurface.swift */; };
 		FMEDBLD1 /* FeedMediaLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = FMEDFILE1 /* FeedMediaLayout.swift */; };
 		FREFBLD1 /* HotpotSteamRefreshView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FREFFILE1 /* HotpotSteamRefreshView.swift */; };
-		FSRCBLD1 /* ForumSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FSRCFILE1 /* ForumSearchView.swift */; };
 		GCVMBLD1 /* GroupChatViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = GCVMFILE1 /* GroupChatViewModels.swift */; };
 		H01 /* HomeCardItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = H11 /* HomeCardItem.swift */; };
 		H03 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = H21 /* HomeViewModel.swift */; };
@@ -171,7 +168,6 @@
 		192 /* SecondhandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondhandService.swift; sourceTree = "<group>"; };
 		193 /* CreateSecondhandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateSecondhandView.swift; sourceTree = "<group>"; };
 		1C0 /* ForumPost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumPost.swift; sourceTree = "<group>"; };
-		1C1 /* ForumListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumListView.swift; sourceTree = "<group>"; };
 		1C2 /* ForumService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumService.swift; sourceTree = "<group>"; };
 		1C3 /* CreateForumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateForumView.swift; sourceTree = "<group>"; };
 		1D1 /* ChatListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatListView.swift; sourceTree = "<group>"; };
@@ -221,13 +217,11 @@
 		CRSVFILE1 /* ChatRoomServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomServices.swift; sourceTree = "<group>"; };
 		CRUTLFILE1 /* ChatRoomUtilityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomUtilityViews.swift; sourceTree = "<group>"; };
 		CRVMFILE1 /* ChatRoomViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomViewModel.swift; sourceTree = "<group>"; };
-		FBRDFILE1 /* ForumBoardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumBoardViews.swift; sourceTree = "<group>"; };
 		FCARDFILE1 /* ForumPostCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumPostCardView.swift; sourceTree = "<group>"; };
 		FDETFILE1 /* ForumDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumDetailView.swift; sourceTree = "<group>"; };
 		FEDITFILE1 /* ForumPostEditorSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumPostEditorSurface.swift; sourceTree = "<group>"; };
 		FMEDFILE1 /* FeedMediaLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedMediaLayout.swift; sourceTree = "<group>"; };
 		FREFFILE1 /* HotpotSteamRefreshView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotpotSteamRefreshView.swift; sourceTree = "<group>"; };
-		FSRCFILE1 /* ForumSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumSearchView.swift; sourceTree = "<group>"; };
 		GCVMFILE1 /* GroupChatViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupChatViewModels.swift; sourceTree = "<group>"; };
 		H11 /* HomeCardItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeCardItem.swift; sourceTree = "<group>"; };
 		H21 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
@@ -514,11 +508,8 @@
 		G35E /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				1C1 /* ForumListView.swift */,
 				FCARDFILE1 /* ForumPostCardView.swift */,
 				FDETFILE1 /* ForumDetailView.swift */,
-				FBRDFILE1 /* ForumBoardViews.swift */,
-				FSRCFILE1 /* ForumSearchView.swift */,
 				FREFFILE1 /* HotpotSteamRefreshView.swift */,
 				1C3 /* CreateForumView.swift */,
 			);
@@ -999,11 +990,8 @@
 				090 /* SecondhandPost.swift in Sources */,
 				091 /* SecondhandListView.swift in Sources */,
 				0C0 /* ForumPost.swift in Sources */,
-				0C1 /* ForumListView.swift in Sources */,
 				FCARDBLD1 /* ForumPostCardView.swift in Sources */,
 				FDETBLD1 /* ForumDetailView.swift in Sources */,
-				FBRDBLD1 /* ForumBoardViews.swift in Sources */,
-				FSRCBLD1 /* ForumSearchView.swift in Sources */,
 				FREFBLD1 /* HotpotSteamRefreshView.swift in Sources */,
 				0D1 /* ChatListView.swift in Sources */,
 				0D2 /* ChatRoomView.swift in Sources */,

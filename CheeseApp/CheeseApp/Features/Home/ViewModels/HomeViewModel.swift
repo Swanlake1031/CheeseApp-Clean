@@ -160,21 +160,19 @@ class HomeViewModel: ObservableObject {
     /// The Home Forum tab consumes server-ordered V2 cards, not recommendedCards
     /// (which is the older mixed-content preview). Featured rows are already
     /// checked by the same server eligibility gate in HomeFeedService.
-    func forumTabCards(selectedBoardID: UUID?) -> [HomeCardItem] {
+    func forumTabCards() -> [HomeCardItem] {
         Self.composeForumTabCards(
             featured: homeFeaturedForumCards,
-            ranked: forumCards,
-            selectedBoardID: selectedBoardID
+            ranked: forumCards
         )
     }
 
     static func composeForumTabCards(
-        featured: [HomeCardItem], ranked: [HomeCardItem], selectedBoardID: UUID?
+        featured: [HomeCardItem], ranked: [HomeCardItem]
     ) -> [HomeCardItem] {
         var seen = Set<UUID>()
         let unique = (featured + ranked).filter { card in
-            (selectedBoardID == nil || card.boardID == selectedBoardID)
-                && seen.insert(card.postId ?? card.id).inserted
+            seen.insert(card.postId ?? card.id).inserted
         }
         // Preserve the existing system-pinned placement, then exact RPC order.
         return unique.filter(\.isSystemPinned)

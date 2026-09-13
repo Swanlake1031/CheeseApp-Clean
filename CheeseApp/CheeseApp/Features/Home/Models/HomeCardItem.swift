@@ -74,10 +74,10 @@ struct HomeCardItem: Identifiable {
     let isAuthorOfficial: Bool
     let isAuthorMcMasterVerified: Bool
     let category: HomeCardCategory  // 所属分类
-    let viewCount: Int              // Hashtag 内排序信号
-    let badgeText: String?          // 论坛 Hashtag 或内容分类
-    let boardID: UUID?              // Hashtag 稳定 ID（内部保留 board 命名）
-    let boardIcon: String?          // Hashtag 兼容图标
+    let viewCount: Int              // 论坛排序信号
+    let badgeText: String?          // 后端内容分类兼容字段
+    let boardID: UUID?              // 后端论坛路由兼容字段
+    let boardIcon: String?          // 后端论坛图标兼容字段
     let timeText: String?           // 发布时间
     let createdAt: Date?            // 真实发布时间（分类页稳定排序）
     let priceText: String?          // 价格正文（不作为 tag）

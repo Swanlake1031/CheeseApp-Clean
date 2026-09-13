@@ -516,7 +516,7 @@ final class UserPostsService: ObservableObject {
                     for: row.condition ?? SecondhandPost.Condition.good.rawValue
                 )
             case .forum:
-                subtitle = row.boardName ?? "论坛"
+                subtitle = ""
             }
 
             return UserPostSummary(
@@ -606,7 +606,7 @@ final class UserPostsService: ObservableObject {
                 kind: .forum,
                 title: $0.title,
                 description: $0.description ?? "",
-                subtitle: $0.boardName,
+                subtitle: "",
                 price: nil,
                 createdAt: $0.createdAt,
                 authorId: $0.userId,

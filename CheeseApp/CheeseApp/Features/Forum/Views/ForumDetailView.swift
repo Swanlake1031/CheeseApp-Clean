@@ -276,19 +276,6 @@ struct ForumDetailView: View {
     private var postHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                NavigationLink {
-                    ForumBoardView(boardID: post.boardID)
-                } label: {
-                    ForumHashtagChip(name: post.boardName)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    L10n.tr(
-                        "Open #\(post.boardName) hashtag",
-                        "查看 #\(post.boardName) Hashtag"
-                    )
-                )
-
                 if post.isPinned {
                     Label(L10n.tr("Pinned", "置顶"), systemImage: "pin.fill")
                         .font(.system(size: 11, weight: .medium))

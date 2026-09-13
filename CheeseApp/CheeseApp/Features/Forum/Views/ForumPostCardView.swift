@@ -15,7 +15,7 @@ extension ForumPostItem {
             kind: .forum,
             title: title,
             description: content,
-            subtitle: boardName,
+            subtitle: "",
             price: nil,
             createdAt: Date(),
             authorId: authorId ?? UUID(),
@@ -29,7 +29,7 @@ extension ForumPostItem {
             kind: .forum,
             postId: id,
             title: title,
-            subtitle: boardName,
+            subtitle: nil,
             summary: content,
             imageURLs: imageUrls.compactMap(URL.init(string:))
         )
@@ -59,7 +59,7 @@ extension ForumPostItem {
             isAuthorMcMasterVerified: !isAnonymous && isAuthorMcMasterVerified,
             category: .forum,
             viewCount: views,
-            badgeText: boardName,
+            badgeText: nil,
             boardID: boardID,
             boardIcon: boardIcon,
             timeText: timeAgo,
@@ -449,15 +449,5 @@ struct ProfileForumPostCardView: View {
                 onActionError?(AppErrorMessage.userMessage(for: error))
             }
         }
-    }
-}
-
-#Preview {
-    NavigationStack {
-        ForumBoardView(
-            boardID: UUID(
-                uuidString: "f0000000-0000-0000-0000-000000000005"
-            )!
-        )
     }
 }

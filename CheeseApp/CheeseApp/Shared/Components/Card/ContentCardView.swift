@@ -12,27 +12,6 @@ enum PostPreviewTypography {
     static let username: Font = .system(size: 15, weight: .bold)
 }
 
-struct ForumHashtagChip: View {
-    let name: String
-
-    private var displayName: String {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.hasPrefix("#") ? trimmed : "# \(trimmed)"
-    }
-
-    var body: some View {
-        Text(displayName)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(AppColors.textMuted)
-            .lineLimit(1)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color(.systemGray6))
-            .clipShape(Capsule())
-            .contentShape(Capsule())
-    }
-}
-
 struct ContentCardView: View {
     let item: HomeCardItem
     var interaction: PostInteractionState?
@@ -125,8 +104,7 @@ struct ContentCardView: View {
         item.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Every forum preview uses the same author-first header. Hashtags belong to
-    /// the post detail surface instead of creating a second feed-card variant.
+    /// Every forum preview uses the same author-first header.
     private var forumAuthorHeader: some View {
         HStack(spacing: 10) {
             tappableFooterAvatar

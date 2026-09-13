@@ -248,7 +248,7 @@ struct CreateForumView: View {
         CreateDraftStore.save(
             kind: .forum,
             title: title,
-            subtitle: selectedBoard?.name,
+            subtitle: nil,
             payload: payload
         )
         CreateComposerSessionStore.save(images: selectedImages, for: .forum)
