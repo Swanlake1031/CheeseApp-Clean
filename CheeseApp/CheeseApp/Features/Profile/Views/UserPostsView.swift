@@ -276,9 +276,6 @@ struct UserPostsView: View {
 
     private var navigableScene: some View {
         lifecycleScene
-            .navigationDestination(item: $selectedResolvedPost) { destination in
-                UserPostResolvedDetailRouter(destination: destination)
-            }
             .navigationDestination(item: $activeConversation) { conversation in
                 ChatRoomView(conversation: conversation)
             }
@@ -286,6 +283,11 @@ struct UserPostsView: View {
 
     private var presentedScene: some View {
         navigableScene
+            .fullScreenCover(item: $selectedResolvedPost) { destination in
+                NavigationStack {
+                    UserPostResolvedDetailRouter(destination: destination)
+                }
+            }
             .fullScreenCover(isPresented: $showingAvatarEditor) {
                 EditProfileView(startsWithAvatarActions: true)
             }
