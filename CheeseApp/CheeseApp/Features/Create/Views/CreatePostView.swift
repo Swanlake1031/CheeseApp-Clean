@@ -12,7 +12,6 @@ struct CreatePostView: View {
     @Environment(\.dismiss) private var dismiss
     var onDismiss: (() -> Void)?
     var onOpenComposer: ((PostKind, Bool) -> Void)?
-    @State private var selectedType: PostKind? = nil
     @State private var showDraftBox = false
     @State private var pendingDraftKind: PostKind?
     @State private var hasAppliedSessionResume = false
@@ -36,8 +35,8 @@ struct CreatePostView: View {
 
                     VStack(spacing: 2) {
                         ForEach([PostKind.forum, .secondhand], id: \.self) { type in
-                            PostTypeCard(type: type, isSelected: selectedType == type) {
-                                selectedType = type
+                            PostTypeCard(type: type) {
+                                openComposer(kind: type, autoRestoreDraft: false)
                             }
                         }
                     }
@@ -47,13 +46,6 @@ struct CreatePostView: View {
                 .padding(.top, 8)
             }
             .toolbar(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if selectedType != nil {
-                    continueButton
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-            .animation(.easeOut(duration: 0.2), value: selectedType)
             .sheet(
                 isPresented: $showDraftBox,
                 onDismiss: {
@@ -108,26 +100,6 @@ struct CreatePostView: View {
         .frame(height: 52)
     }
 
-    private var continueButton: some View {
-        Button {
-            guard let selectedType else { return }
-            openComposer(kind: selectedType, autoRestoreDraft: false)
-        } label: {
-            Text(L10n.tr("Continue", "继续"))
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.black)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(AppColors.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
-        .background(AppColors.pageBackground)
-    }
-    
     private func openComposer(kind: PostKind, autoRestoreDraft: Bool) {
         if let onOpenComposer {
             onOpenComposer(kind, autoRestoreDraft)
@@ -149,7 +121,6 @@ struct CreatePostView: View {
               CreateDraftStore.hasDraft(kind)
         else { return }
 
-        selectedType = kind
         openComposer(kind: kind, autoRestoreDraft: true)
     }
 }
@@ -174,7 +145,6 @@ private extension PostKind {
 // MARK: - 帖子类型卡片
 struct PostTypeCard: View {
     let type: PostKind
-    let isSelected: Bool
     let action: () -> Void
     
     var body: some View {
@@ -183,7 +153,7 @@ struct PostTypeCard: View {
                 // 图标
                 Image(systemName: type.icon)
                     .font(.system(size: 22, weight: .regular))
-                    .foregroundStyle(isSelected ? AppColors.textPrimary : AppColors.textMuted)
+                    .foregroundStyle(AppColors.textMuted)
                     .frame(width: 32, height: 32)
                 
                 // 文字
@@ -193,11 +163,9 @@ struct PostTypeCard: View {
                 
                 Spacer()
                 
-                // 选中指示
-                Image(systemName: "checkmark")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(AppColors.textPrimary)
-                    .opacity(isSelected ? 1 : 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AppColors.textMuted)
                     .accessibilityHidden(true)
             }
             .padding(.horizontal, 8)
@@ -205,7 +173,6 @@ struct PostTypeCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
