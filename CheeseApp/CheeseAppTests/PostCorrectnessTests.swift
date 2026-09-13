@@ -743,7 +743,7 @@ final class PostCorrectnessTests: XCTestCase {
             MarketplaceRegion.allCases.map(\.rawValue),
             [
                 "toronto", "north_york", "hamilton", "oakville",
-                "etobicoke", "richmond", "outside"
+                "mississauga", "brampton", "etobicoke", "richmond", "outside"
             ]
         )
     }

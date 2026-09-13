@@ -115,6 +115,8 @@ enum MarketplaceRegion: String, Codable, CaseIterable, Identifiable {
     case northYork = "north_york"
     case hamilton
     case oakville
+    case mississauga
+    case brampton
     case etobicoke
     case richmond
     case outside
@@ -127,6 +129,8 @@ enum MarketplaceRegion: String, Codable, CaseIterable, Identifiable {
         case .northYork: return "NorthYork"
         case .hamilton: return "Hamilton"
         case .oakville: return "Oakville"
+        case .mississauga: return "Mississauga"
+        case .brampton: return "Brampton"
         case .etobicoke: return "Etobicoke"
         case .richmond: return "Richmond"
         case .outside: return "Outside"
