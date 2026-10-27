@@ -62,9 +62,11 @@ final class AuthCredentialStoreTests: XCTestCase {
                 events.append("session")
                 cleanupFinished.fulfill()
             },
-            providerCleanup: {
-                events.append("provider")
-                cleanupFinished.fulfill()
+            scheduleProviderCleanup: {
+                Task { @MainActor in
+                    events.append("provider")
+                    cleanupFinished.fulfill()
+                }
             }
         )
 
@@ -73,6 +75,75 @@ final class AuthCredentialStoreTests: XCTestCase {
         XCTAssertEqual(events.first, "local")
         XCTAssertTrue(events.contains("session"))
         XCTAssertTrue(events.contains("provider"))
+    }
+
+    @MainActor
+    func testDeletionRegistersGoogleCleanupBeforeReturningToLogin() async {
+        let coordinator = GoogleSessionCoordinator()
+        var loggedOut = false
+        var cleanup: Task<Void, Never>?
+        AccountDeletionFinalizer.finalize(
+            localLogout: { loggedOut = true },
+            localSessionCleanup: {},
+            scheduleProviderCleanup: {
+                cleanup = coordinator.scheduleCleanup {}
+            }
+        )
+        XCTAssertTrue(loggedOut)
+        XCTAssertThrowsError(try coordinator.requireSignInAvailable())
+        await cleanup?.value
+        XCTAssertNoThrow(try coordinator.requireSignInAvailable())
+    }
+
+    @MainActor
+    func testGoogleCleanupBlocksNewSignInUntilSuccessfulDisconnectFinishes() async {
+        await assertGoogleCleanupIsolation(fails: false)
+    }
+
+    @MainActor
+    func testGoogleCleanupBlocksNewSignInUntilFailureFallbackFinishes() async {
+        await assertGoogleCleanupIsolation(fails: true)
+    }
+
+    @MainActor
+    private func assertGoogleCleanupIsolation(fails: Bool) async {
+        let coordinator = GoogleSessionCoordinator()
+        let started = expectation(description: "Disconnect started")
+        var completion: CheckedContinuation<Void, Error>?
+        var googleAccount: String? = "A"
+        var fallbackCalled = false
+        let cleanup = coordinator.scheduleCleanup {
+            do {
+                try await withCheckedThrowingContinuation { continuation in
+                    completion = continuation
+                    started.fulfill()
+                }
+                // Google SDK success callback clears its current singleton.
+                googleAccount = nil
+            } catch {
+                // AuthService's error fallback also clears that singleton.
+                fallbackCalled = true
+                googleAccount = nil
+            }
+        }
+
+        // The barrier must exist before the background task even starts.
+        XCTAssertThrowsError(try coordinator.requireSignInAvailable())
+        await fulfillment(of: [started], timeout: 1)
+        XCTAssertThrowsError(try coordinator.requireSignInAvailable())
+        XCTAssertEqual(googleAccount, "A")
+        if fails {
+            completion?.resume(throwing: URLError(.notConnectedToInternet))
+        } else {
+            completion?.resume()
+        }
+        await cleanup.value
+        XCTAssertEqual(fallbackCalled, fails)
+        XCTAssertNil(googleAccount)
+        XCTAssertNoThrow(try coordinator.requireSignInAvailable())
+        googleAccount = "B"
+        await Task.yield()
+        XCTAssertEqual(googleAccount, "B")
     }
 
     func testAppleAuthorizationCancellationIsRecognized() {
@@ -275,7 +346,8 @@ final class AuthCredentialStoreTests: XCTestCase {
 
     @MainActor
     func testAppleCredentialRevocationMonitorIgnoresResultAfterAccountSwitch() async {
-        let checker = DeferredAppleCredentialStateChecker()
+        let checkerStarted = expectation(description: "Apple credential check is suspended")
+        let checker = DeferredAppleCredentialStateChecker(onWait: { checkerStarted.fulfill() })
         let firstUser = UUID(uuidString: "5a000000-0000-0000-0000-000000000001")!
         let secondUser = UUID(uuidString: "5a000000-0000-0000-0000-000000000002")!
         var currentSession: AppleCredentialRevocationSession? = AppleCredentialRevocationSession(
@@ -296,10 +368,11 @@ final class AuthCredentialStoreTests: XCTestCase {
         let check = Task { @MainActor in
             await monitor.checkCurrentSession()
         }
-        for _ in 0..<20 where !checker.isWaiting {
-            await Task.yield()
+        await fulfillment(of: [checkerStarted], timeout: 2)
+        guard checker.isWaiting else {
+            check.cancel()
+            return
         }
-        XCTAssertTrue(checker.isWaiting)
 
         currentSession = AppleCredentialRevocationSession(
             userId: secondUser,
@@ -593,14 +666,21 @@ private final class TestAppleCredentialStateChecker: AppleCredentialStateCheckin
     }
 }
 
+@MainActor
 private final class DeferredAppleCredentialStateChecker: AppleCredentialStateChecking {
+    private let onWait: () -> Void
     private var continuation: CheckedContinuation<AppleCredentialState, Error>?
     private(set) var isWaiting = false
 
+    init(onWait: @escaping () -> Void) {
+        self.onWait = onWait
+    }
+
     func credentialState(for userIdentifier: String) async throws -> AppleCredentialState {
-        isWaiting = true
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
+            isWaiting = true
+            onWait()
         }
     }
 

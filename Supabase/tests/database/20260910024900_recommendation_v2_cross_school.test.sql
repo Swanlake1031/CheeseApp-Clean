@@ -180,7 +180,22 @@ RESET ROLE;
 SELECT set_config('request.jwt.claims',jsonb_build_object('sub',pg_temp.uid(2),'role','authenticated')::text,true);
 SELECT is((SELECT count(*) FROM get_recommendation_feed_page((SELECT id FROM sessions WHERE label='gated-new'),0,20)),0::bigint,'another user cannot read real existing session');
 SELECT set_config('request.jwt.claims',jsonb_build_object('sub',pg_temp.uid(1),'role','authenticated')::text,true);
-UPDATE cross_school_configuration SET gate_enabled=false;
+-- Configuration-only rollback must retain model/scoring data while making
+-- previously filtered sessions stale. All changes roll back with this suite.
+CREATE TEMP TABLE before_gate_rollback AS SELECT * FROM cross_school_configuration;
+CREATE TEMP TABLE scores_before_gate_rollback AS SELECT * FROM cross_school_scores;
+UPDATE cross_school_configuration SET gate_enabled=false WHERE singleton AND gate_enabled;
+SELECT is((SELECT revision FROM cross_school_configuration),
+ (SELECT revision+1 FROM before_gate_rollback),'gate rollback increments configuration revision once');
+SELECT results_eq('SELECT to_jsonb(c)-''gate_enabled''-''revision'' FROM cross_school_configuration c',
+ 'SELECT to_jsonb(c)-''gate_enabled''-''revision'' FROM before_gate_rollback c',
+ 'rollback preserves scoring, model, thresholds and rollout settings');
+SELECT results_eq('SELECT * FROM cross_school_scores ORDER BY post_id,model_version',
+ 'SELECT * FROM scores_before_gate_rollback ORDER BY post_id,model_version','rollback preserves stored scores');
+SELECT ok(pg_temp.allow_post(103),'gate rollback permits foreign low-score content');
+UPDATE cross_school_configuration SET gate_enabled=false WHERE singleton AND gate_enabled;
+SELECT is((SELECT revision FROM cross_school_configuration),
+ (SELECT revision+1 FROM before_gate_rollback),'repeated rollback is a no-op');
 SELECT ok(NOT recommendation_private.session_valid((SELECT id FROM sessions WHERE label='gated-new')),'rollback invalidates filtered session');
 SELECT results_eq('SELECT * FROM rank_forum_recommendations_v1(pg_temp.uid(1),NULL,80)',
  'SELECT * FROM test_v2_baseline_rank(pg_temp.uid(1),NULL,80)','rollback restores exact V1 ranking');

@@ -25,20 +25,23 @@ UPDATE public.profiles
 SET is_mcmaster_verified = TRUE
 WHERE id = '00000000-0000-0000-0000-000000000001'::UUID;
 
-INSERT INTO public.mcmaster_student_verifications (user_id, email)
+INSERT INTO public.mcmaster_student_verifications (user_id, school_id, email)
 VALUES (
   '00000000-0000-0000-0000-000000000001'::UUID,
+  (SELECT school_id FROM public.profiles WHERE id = '00000000-0000-0000-0000-000000000001'::UUID),
   'released@mcmaster.ca'
 );
 
 INSERT INTO public.mcmaster_email_challenges (
   user_id,
+  school_id,
   email,
   code_hash,
   expires_at
 )
 VALUES (
   '00000000-0000-0000-0000-000000000001'::UUID,
+  (SELECT school_id FROM public.profiles WHERE id = '00000000-0000-0000-0000-000000000001'::UUID),
   'released@mcmaster.ca',
   repeat('a', 64),
   NOW() + INTERVAL '10 minutes'
@@ -105,9 +108,10 @@ SELECT is(
   'deactivation removes the public McMaster verification badge'
 );
 
-INSERT INTO public.mcmaster_student_verifications (user_id, email)
+INSERT INTO public.mcmaster_student_verifications (user_id, school_id, email)
 VALUES (
   '00000000-0000-0000-0000-000000000002'::UUID,
+  (SELECT school_id FROM public.profiles WHERE id = '00000000-0000-0000-0000-000000000002'::UUID),
   'released@mcmaster.ca'
 );
 

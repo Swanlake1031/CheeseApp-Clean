@@ -32,6 +32,23 @@ SELECT lives_ok(
 RESET ROLE;
 SELECT is((SELECT profile_status FROM profiles WHERE id=auth.uid()),'working','working status persists');
 SELECT is((SELECT university FROM profiles WHERE id=auth.uid()),NULL,'working profile may keep public school empty');
+SELECT is((SELECT school_id FROM profiles WHERE id=auth.uid()),
+ (SELECT id FROM schools WHERE name='Other'),'working profile retains internal routing school');
+SET LOCAL ROLE authenticated;
+SELECT lives_ok(
+  $q$SELECT complete_profile('Worker','University of Calgary','prefer_not_to_say',NULL,NULL,NULL,'working')$q$,
+  'working profile may explicitly select a school'
+);
+RESET ROLE;
+SELECT is((SELECT university FROM profiles WHERE id=auth.uid()),'University of Calgary','explicit working school remains canonical');
+SET LOCAL ROLE authenticated;
+SELECT lives_ok(
+  $q$SELECT complete_profile('Worker',NULL,'prefer_not_to_say',NULL,NULL,NULL,'working')$q$,
+  'working profile may clear a previously selected school'
+);
+RESET ROLE;
+SELECT is((SELECT university FROM profiles WHERE id=auth.uid()),NULL,'cleared working school is not overwritten by sync trigger');
+
 
 SET LOCAL ROLE authenticated;
 SELECT throws_ok(
@@ -46,6 +63,8 @@ RESET ROLE;
 SELECT is((SELECT profile_status FROM profiles WHERE id=auth.uid()),'student','student status persists');
 SELECT is((SELECT university FROM profiles WHERE id=auth.uid()),'University of Calgary','student school is canonicalized');
 
+SELECT set_config('request.jwt.claim.role','service_role',true);
+SELECT set_config('request.jwt.claims','{"role":"service_role"}',true);
 SET LOCAL ROLE service_role;
 SELECT throws_ok(
   $q$SELECT issue_school_email_challenge(

@@ -285,17 +285,52 @@ final class AuthBootstrapDeadline {
 /// Account deletion becomes irreversible as soon as the server RPC succeeds.
 /// Finish the user-visible logout synchronously, then run provider/session SDK
 /// cleanup as independent best-effort work so neither network can strand the
-/// settings screen in its loading state.
+/// settings screen in its loading state. Provider scheduling is synchronous so
+/// its sign-in barrier is installed before control returns to the login screen.
 @MainActor
 enum AccountDeletionFinalizer {
     static func finalize(
         localLogout: () -> Void,
         localSessionCleanup: @escaping @MainActor () async -> Void,
-        providerCleanup: @escaping @MainActor () async -> Void
+        scheduleProviderCleanup: @MainActor () -> Void
     ) {
         localLogout()
         Task { @MainActor in await localSessionCleanup() }
-        Task { @MainActor in await providerCleanup() }
+        scheduleProviderCleanup()
+    }
+}
+
+/// Google disconnect clears the SDK singleton on both success and failure.
+/// Register cleanup synchronously before exposing another Google sign-in; never
+/// release this barrier on a timeout while the SDK can still call back.
+@MainActor
+final class GoogleSessionCoordinator {
+    enum SignInError: LocalizedError {
+        case cleanupInProgress
+
+        var errorDescription: String? {
+            L10n.tr(
+                "Google account cleanup is still finishing. Please try again shortly or use another sign-in method.",
+                "Google 账号仍在清理中，请稍后重试或使用其他登录方式。"
+            )
+        }
+    }
+
+    private var cleanupTask: Task<Void, Never>?
+
+    func requireSignInAvailable() throws {
+        guard cleanupTask == nil else { throw SignInError.cleanupInProgress }
+    }
+
+    @discardableResult
+    func scheduleCleanup(_ operation: @escaping @MainActor () async -> Void) -> Task<Void, Never> {
+        if let cleanupTask { return cleanupTask }
+        let task = Task { @MainActor in
+            defer { self.cleanupTask = nil }
+            await operation()
+        }
+        cleanupTask = task
+        return task
     }
 }
 
@@ -318,6 +353,7 @@ class AuthService: ObservableObject {
     
     // Supabase 客户端引用
     private let supabase = SupabaseManager.shared
+    private let googleSessionCoordinator = GoogleSessionCoordinator()
     
     // MARK: - 发布的状态
     @Published var currentUser: Profile? {
@@ -987,7 +1023,9 @@ class AuthService: ObservableObject {
         with presenter: UIViewController,
         nonce: String
     ) async throws -> GIDSignInResult {
-        try await withCheckedThrowingContinuation { continuation in
+        // Shared by login, account addition and identity linking.
+        try googleSessionCoordinator.requireSignInAvailable()
+        return try await withCheckedThrowingContinuation { continuation in
             GIDSignIn.sharedInstance.signIn(
                 withPresenting: presenter,
                 hint: nil,
@@ -1597,11 +1635,13 @@ class AuthService: ObservableObject {
                     // database RPC has already revoked the server session.
                     try? await self.supabase.auth.signOut(scope: .local)
                 },
-                providerCleanup: { [weak self] in
+                scheduleProviderCleanup: { [weak self] in
                     // Only revoke the Google grant that belonged to the
                     // deleted Supabase identity. This may require the network,
                     // so it must never block the account-deletion UI.
-                    await self?.disconnectMatchingGoogleAccount(subject: linkedGoogleSubject)
+                    self?.googleSessionCoordinator.scheduleCleanup { [weak self] in
+                        await self?.disconnectMatchingGoogleAccount(subject: linkedGoogleSubject)
+                    }
                 }
             )
         } catch {
@@ -2262,6 +2302,7 @@ class AuthService: ObservableObject {
     }
 
     private func socialSignInMessage(for error: Error, provider: String) -> String {
+        if error is GoogleSessionCoordinator.SignInError { return error.localizedDescription }
         let text = error.localizedDescription.lowercased()
         if text.contains("canceled") || text.contains("cancelled") {
             return "你已取消\(provider)登录。"
@@ -2324,6 +2365,7 @@ class AuthService: ObservableObject {
     }
 
     private func signUpErrorMessage(for error: Error) -> String {
+        if error is GoogleSessionCoordinator.SignInError { return error.localizedDescription }
         let text = error.localizedDescription.lowercased()
         if text.contains("database error saving new user") {
             return "注册失败：数据库用户初始化异常，请先执行最新 Supabase migrations（含 schools / handle_new_user）后重试。"

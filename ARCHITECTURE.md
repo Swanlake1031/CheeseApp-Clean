@@ -64,6 +64,14 @@ Account changes are special: `AuthService` synchronously begins an account trans
 
 `AuthService.shared` owns the session, current profile, bootstrap state, and profile-completion requirement. Feature code should not preserve an independent editable copy after a successful profile update.
 
+After server-confirmed account deletion, local logout is immediate. `AuthService`
+owns a `GoogleSessionCoordinator` that registers provider cleanup synchronously
+and prevents the shared native Google sign-in entry from starting until cleanup
+finishes. This covers sign-in, account addition, and identity linking because
+Google's disconnect callback clears its global SDK session. Other sign-in
+providers remain available; a Google attempt during cleanup receives a retry
+message. Do not release this guard on a timeout while the SDK can still complete.
+
 ### Home feed
 
 `MainTabView` owns one `HomeViewModel` for the lifetime of the authenticated tab shell. `HomeViewModel` publishes one `HomeContentSnapshot` containing visible card collections, lookup models, follow IDs, resolved flags, and recommendation seed. A refresh retains the old snapshot, fetches Home sources concurrently, keeps the old portion for any failed source, hydrates interactions in one batch, and replaces content once.

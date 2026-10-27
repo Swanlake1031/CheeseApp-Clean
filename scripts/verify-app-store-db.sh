@@ -79,11 +79,19 @@ local_sql <"$repo_root/Supabase/seed.sql" >>"$log_file" 2>&1
 local_sql >>"$log_file" 2>&1 <<'SQL'
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SQL
+# Keep current school/auth, ranking, paging, and release-safety contracts together.
+# Suites roll back their fixtures and policy toggles; do not glob historical tests
+# whose product contracts have been retired.
 for suite in \
   102_critical_security_boundaries.test.sql \
   141_release_school_binding_on_deactivation.test.sql \
   20260910052718_required_school.test.sql \
   190_recommendation_v1.test.sql \
+  20260910024900_recommendation_v2_cross_school.test.sql \
+  20260910061558_forum_continuation.test.sql \
+  20260910190417_ignore_penalty.test.sql \
+  20260910215652_home_forum_lifecycle.test.sql \
+  20260912041913_expand_university_profiles_and_verification.test.sql \
   20260911165358_no_manual_tags.test.sql \
   20260911164610_session_ttl.test.sql \
   20260911184137_app_store_safety.test.sql \
