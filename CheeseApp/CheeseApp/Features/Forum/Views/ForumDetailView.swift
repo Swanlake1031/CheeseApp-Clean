@@ -306,7 +306,7 @@ struct ForumDetailView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(AppColors.textPrimary)
                             if post.isAuthorMcMasterVerified {
-                                SchoolStudentBadge()
+                                SchoolStudentBadge(schoolName: post.authorSchoolName)
                             }
                         }
                     }
@@ -644,7 +644,7 @@ struct ForumDetailView: View {
                     commentAuthorName(comment)
 
                     if comment.isAuthorMcMasterVerified {
-                        SchoolStudentBadge()
+                        SchoolStudentBadge(schoolName: comment.authorSchoolName)
                     }
                 }
 

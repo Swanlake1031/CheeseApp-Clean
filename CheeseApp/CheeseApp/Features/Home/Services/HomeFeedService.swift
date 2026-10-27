@@ -41,6 +41,7 @@ struct HomeFeaturedSecondhandPost {
     let userAvatar: String?
     let isAnonymous: Bool
     let isUserMcMasterVerified: Bool
+    let userSchoolName: String?
     let images: [HomeFeedImage]
     let likeCount: Int
     let viewCount: Int
@@ -386,6 +387,7 @@ final class HomeFeedService {
             userAvatar: row.userAvatar,
             isAnonymous: row.isAnonymous,
             isUserMcMasterVerified: !row.isAnonymous && row.userMcMasterVerified == true,
+            userSchoolName: row.isAnonymous ? nil : row.userUniversity,
             images: DBSecondhandImage.stablySorted(row.images ?? [])
                 .prefix(1)
                 .map {

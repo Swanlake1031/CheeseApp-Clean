@@ -73,6 +73,7 @@ struct HomeCardItem: Identifiable {
     let isAnonymous: Bool
     let isAuthorOfficial: Bool
     let isAuthorMcMasterVerified: Bool
+    let authorSchoolName: String?
     let category: HomeCardCategory  // 所属分类
     let viewCount: Int              // 论坛排序信号
     let badgeText: String?          // 后端内容分类兼容字段
@@ -102,6 +103,7 @@ struct HomeCardItem: Identifiable {
         isAnonymous: Bool = false,
         isAuthorOfficial: Bool = false,
         isAuthorMcMasterVerified: Bool = false,
+        authorSchoolName: String? = nil,
         category: HomeCardCategory = .forum,
         viewCount: Int = 0,
         badgeText: String? = nil,
@@ -131,6 +133,7 @@ struct HomeCardItem: Identifiable {
         self.isAnonymous = isAnonymous
         self.isAuthorOfficial = isAuthorOfficial
         self.isAuthorMcMasterVerified = isAuthorMcMasterVerified
+        self.authorSchoolName = authorSchoolName
         self.category = category
         self.viewCount = max(viewCount, 0)
         self.badgeText = badgeText

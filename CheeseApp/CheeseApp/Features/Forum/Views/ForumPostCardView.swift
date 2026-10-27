@@ -57,6 +57,7 @@ extension ForumPostItem {
             isAnonymous: isAnonymous,
             isAuthorOfficial: !isAnonymous && isAuthorOfficial,
             isAuthorMcMasterVerified: !isAnonymous && isAuthorMcMasterVerified,
+            authorSchoolName: isAnonymous ? nil : authorSchoolName,
             category: .forum,
             viewCount: views,
             badgeText: nil,

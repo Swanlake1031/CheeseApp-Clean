@@ -26,6 +26,7 @@ struct SecondhandItem: Identifiable, Hashable {
     let isAnonymous: Bool
     let hasSellerProfile: Bool
     var isSellerMcMasterVerified: Bool = false
+    var sellerSchoolName: String? = nil
     let description: String
     let timeAgo: String
     let imageUrl: String?
@@ -83,6 +84,7 @@ struct SecondhandItem: Identifiable, Hashable {
             isAnonymous: isAnonymous,
             hasSellerProfile: hasSellerProfile,
             isSellerMcMasterVerified: isSellerMcMasterVerified,
+            sellerSchoolName: sellerSchoolName,
             description: payload.description,
             timeAgo: timeAgo,
             imageUrl: retainedImageURLs.first,
@@ -1409,6 +1411,7 @@ class SecondhandService: ObservableObject {
             isAnonymous: dbPost.isAnonymous,
             hasSellerProfile: !dbPost.isAnonymous && Self.hasUsableSellerName(dbPost.userName),
             isSellerMcMasterVerified: !dbPost.isAnonymous && dbPost.userMcMasterVerified == true,
+            sellerSchoolName: dbPost.isAnonymous ? nil : dbPost.userUniversity,
             description: dbPost.description ?? "",
             timeAgo: Formatters.formatCompactTimeAgo(dbPost.createdAt),
             imageUrl: orderedImageURLs.first,
@@ -1480,6 +1483,7 @@ struct DBSecondhandPost: Codable, Identifiable {
     let userName: String?
     let userAvatar: String?
     var userMcMasterVerified: Bool? = nil
+    var userUniversity: String? = nil
     let isAnonymous: Bool
     let images: [DBSecondhandImage]?
     let likeCount: Int?
@@ -1503,6 +1507,7 @@ struct DBSecondhandPost: Codable, Identifiable {
         case userName = "user_name"
         case userAvatar = "user_avatar"
         case userMcMasterVerified = "user_mcmaster_verified"
+        case userUniversity = "user_university"
         case isAnonymous = "is_anonymous"
         case images
         case likeCount = "like_count"

@@ -82,6 +82,36 @@ struct CheeseUniversityOption: Identifiable, Hashable {
         verificationDomains.map { "@\($0)" }.joined(separator: " / ")
     }
 
+    var studentBadgeName: String {
+        switch id {
+        case "university_of_alberta": return L10n.tr("Alberta Student", "阿尔伯塔学生")
+        case "university_of_british_columbia": return L10n.tr("UBC Student", "UBC 学生")
+        case "brock_university": return L10n.tr("Brock Student", "布鲁克学生")
+        case "university_of_calgary": return L10n.tr("Calgary Student", "卡尔加里学生")
+        case "carleton_university": return L10n.tr("Carleton Student", "卡尔顿学生")
+        case "concordia_university": return L10n.tr("Concordia Student", "康考迪亚学生")
+        case "dalhousie_university": return L10n.tr("Dalhousie Student", "达尔豪斯学生")
+        case "university_of_guelph": return L10n.tr("Guelph Student", "圭尔夫学生")
+        case "simon_fraser_university": return L10n.tr("SFU Student", "西蒙菲莎学生")
+        case "lakehead_university": return L10n.tr("Lakehead Student", "湖首学生")
+        case "mcgill_university": return L10n.tr("McGill Student", "麦吉尔学生")
+        case "university_of_manitoba": return L10n.tr("Manitoba Student", "曼尼托巴学生")
+        case "mcmaster_university": return L10n.tr("McMaster Student", "麦马学生")
+        case "universite_de_montreal": return L10n.tr("UdeM Student", "蒙特利尔大学学生")
+        case "ontario_tech_university": return L10n.tr("Ontario Tech Student", "安省理工学生")
+        case "queens_university": return L10n.tr("Queen's Student", "女王大学学生")
+        case "university_of_toronto": return L10n.tr("U of T Student", "多大学生")
+        case "toronto_metropolitan_university": return L10n.tr("TMU Student", "都会大学学生")
+        case "trent_university": return L10n.tr("Trent Student", "特伦特学生")
+        case "university_of_waterloo": return L10n.tr("Waterloo Student", "滑铁卢学生")
+        case "york_university": return L10n.tr("York Student", "约克学生")
+        case "ocad_university": return L10n.tr("OCAD Student", "OCAD 学生")
+        case "redeemer_university": return L10n.tr("Redeemer Student", "救赎主学生")
+        case "university_of_guelph_humber": return L10n.tr("Guelph-Humber Student", "圭尔夫汉博学生")
+        default: return L10n.tr("Verified Student", "认证学生")
+        }
+    }
+
     static let other = CheeseUniversityOption(
         id: "other", name: "Other", city: "其他大学", badgeCode: "•", verificationDomains: []
     )

@@ -416,6 +416,22 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertNil(CheeseUniversityOption.option(matching: "Typed Custom School"))
     }
 
+    func testVerifiedSchoolBadgesUseDistinctCodesAndStudentNames() {
+        let mcmaster = CheeseUniversityOption.option(matching: "McMaster University")
+        let toronto = CheeseUniversityOption.option(matching: "University of Toronto")
+        let waterloo = CheeseUniversityOption.option(matching: "University of Waterloo")
+        let simonFraser = CheeseUniversityOption.option(matching: "Simon Fraser University")
+
+        XCTAssertEqual(mcmaster?.badgeCode, "M")
+        XCTAssertEqual(mcmaster?.studentBadgeName, L10n.tr("McMaster Student", "麦马学生"))
+        XCTAssertEqual(toronto?.badgeCode, "T")
+        XCTAssertEqual(toronto?.studentBadgeName, L10n.tr("U of T Student", "多大学生"))
+        XCTAssertEqual(waterloo?.badgeCode, "W")
+        XCTAssertEqual(waterloo?.studentBadgeName, L10n.tr("Waterloo Student", "滑铁卢学生"))
+        XCTAssertEqual(simonFraser?.badgeCode, "S")
+        XCTAssertEqual(simonFraser?.studentBadgeName, L10n.tr("SFU Student", "西蒙菲莎学生"))
+    }
+
     func testSystemShareMetadataAlwaysUsesTheOfficialCheeseLogo() throws {
         XCTAssertEqual(PostShareMetadataFactory.iconAssetName, "CheeseAppLogo")
 
@@ -1417,6 +1433,22 @@ final class PostCorrectnessTests: XCTestCase {
         XCTAssertNil(card.authorId)
     }
 
+    func testForumFeedCardPreservesVerifiedAuthorSchoolBadge() {
+        let source = makeForumPost(
+            isAnonymous: false,
+            isVerified: true,
+            university: "McMaster University"
+        )
+
+        let card = ForumService.makePostItem(
+            source,
+            reaction: nil
+        ).forumFeedCardItem
+
+        XCTAssertTrue(card.isAuthorMcMasterVerified)
+        XCTAssertEqual(card.authorSchoolName, "McMaster University")
+    }
+
     func testTrustedOfficialForumFieldDisplaysOfficialIdentity() {
         let source = makeForumPost(isAnonymous: false, isOfficial: true)
 
@@ -2226,7 +2258,12 @@ final class PostCorrectnessTests: XCTestCase {
         )
     }
 
-    private func makeForumPost(isAnonymous: Bool, isOfficial: Bool = false) -> DBForumPost {
+    private func makeForumPost(
+        isAnonymous: Bool,
+        isOfficial: Bool = false,
+        isVerified: Bool = false,
+        university: String? = nil
+    ) -> DBForumPost {
         DBForumPost(
             id: UUID(uuidString: "91000000-0000-0000-0000-000000000001")!,
             userId: UUID(uuidString: "91000000-0000-0000-0000-000000000002")!,
@@ -2246,6 +2283,8 @@ final class PostCorrectnessTests: XCTestCase {
             userName: "Real Author",
             userAvatar: "https://example.com/real-author.png",
             userOfficial: isOfficial,
+            userMcMasterVerified: isVerified,
+            userUniversity: university,
             viewerOwnsPost: false,
             images: []
         )

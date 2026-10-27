@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		PRIVBUILD /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = PRIVFILE; };
 		001 /* CheeseAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100 /* CheeseAppApp.swift */; };
 		002 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101 /* MainTabView.swift */; };
 		010 /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110 /* SupabaseClient.swift */; };
@@ -84,13 +83,13 @@
 		DBA54BA22F2D43DA0073E17A /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA12F2D43DA0073E17A /* Realtime */; };
 		DBA54BA42F2D43DA0073E17A /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA32F2D43DA0073E17A /* Storage */; };
 		DBA54BA72F2D44C30073E17A /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = DBA54BA62F2D44C30073E17A /* Supabase */; };
-		GIDPKGBLD1 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = GIDPKGPROD1 /* GoogleSignIn */; };
 		FCARDBLD1 /* ForumPostCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCARDFILE1 /* ForumPostCardView.swift */; };
 		FDETBLD1 /* ForumDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDETFILE1 /* ForumDetailView.swift */; };
 		FEDITBLD1 /* ForumPostEditorSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEDITFILE1 /* ForumPostEditorSurface.swift */; };
 		FMEDBLD1 /* FeedMediaLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = FMEDFILE1 /* FeedMediaLayout.swift */; };
 		FREFBLD1 /* HotpotSteamRefreshView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FREFFILE1 /* HotpotSteamRefreshView.swift */; };
 		GCVMBLD1 /* GroupChatViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = GCVMFILE1 /* GroupChatViewModels.swift */; };
+		GIDPKGBLD1 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = GIDPKGPROD1 /* GoogleSignIn */; };
 		H01 /* HomeCardItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = H11 /* HomeCardItem.swift */; };
 		H03 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = H21 /* HomeViewModel.swift */; };
 		H04 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = H31 /* HomeView.swift */; };
@@ -105,6 +104,7 @@
 		PDRBLD1 /* PostDeepLinkRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = PDRFILE1 /* PostDeepLinkRoute.swift */; };
 		PEDTBLD1 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PEDTFILE1 /* EditProfileView.swift */; };
 		PLEGALBLD1 /* LegalDocumentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PLEGALFILE1 /* LegalDocumentViews.swift */; };
+		PRIVBUILD /* CheeseApp/Resources/PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = PRIVFILE /* CheeseApp/Resources/PrivacyInfo.xcprivacy */; };
 		PSETBLD1 /* ProfileSettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSETFILE1 /* ProfileSettingsViews.swift */; };
 		PSOCBLD1 /* ProfileSocialViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSOCFILE1 /* ProfileSocialViews.swift */; };
 		PSPBLD1 /* PostSharePayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSPFILE1 /* PostSharePayload.swift */; };
@@ -142,8 +142,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		PRIVFILE = {isa = PBXFileReference; lastKnownFileType = text.xml; path = CheeseApp/Resources/PrivacyInfo.xcprivacy; sourceTree = SOURCE_ROOT; };
-		CFGPROD = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Production.xcconfig; sourceTree = "<group>"; };
 		100 /* CheeseAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheeseAppApp.swift; sourceTree = "<group>"; };
 		101 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		110 /* SupabaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
@@ -202,6 +200,7 @@
 		AAA /* CheeseApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CheeseApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AUTHCRED01 /* AuthCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthCredentialStore.swift; sourceTree = "<group>"; };
 		AVCRP01 /* AvatarImageViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarImageViews.swift; sourceTree = "<group>"; };
+		CFGPROD /* Production.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Production.xcconfig; sourceTree = "<group>"; };
 		CFGSHARED /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		CFOLFILE1 /* ChatFollowSearchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFollowSearchViews.swift; sourceTree = "<group>"; };
 		CFVMFILE1 /* ChatFollowSearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFollowSearchViewModel.swift; sourceTree = "<group>"; };
@@ -237,6 +236,7 @@
 		PDRFILE1 /* PostDeepLinkRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDeepLinkRoute.swift; sourceTree = "<group>"; };
 		PEDTFILE1 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
 		PLEGALFILE1 /* LegalDocumentViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalDocumentViews.swift; sourceTree = "<group>"; };
+		PRIVFILE /* CheeseApp/Resources/PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = CheeseApp/Resources/PrivacyInfo.xcprivacy; sourceTree = SOURCE_ROOT; };
 		PSETFILE1 /* ProfileSettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsViews.swift; sourceTree = "<group>"; };
 		PSOCFILE1 /* ProfileSocialViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSocialViews.swift; sourceTree = "<group>"; };
 		PSPFILE1 /* PostSharePayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostSharePayload.swift; sourceTree = "<group>"; };
@@ -289,6 +289,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		DB4DD77830562AAC0098FB6D /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				PRIVFILE /* CheeseApp/Resources/PrivacyInfo.xcprivacy */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		DBA54BA52F2D44BE0073E17A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -304,6 +312,7 @@
 				GT0 /* CheeseAppTests */,
 				G02 /* Products */,
 				DBA54BA52F2D44BE0073E17A /* Frameworks */,
+				DB4DD77830562AAC0098FB6D /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -701,7 +710,7 @@
 			isa = PBXGroup;
 			children = (
 				CFGSHARED /* Shared.xcconfig */,
-				CFGPROD,
+				CFGPROD /* Production.xcconfig */,
 			);
 			path = Configuration;
 			sourceTree = "<group>";
@@ -837,7 +846,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = EEE /* Build configuration list for PBXNativeTarget "CheeseApp" */;
 			buildPhases = (
-				RELEASECHECK,
+				RELEASECHECK /* Validate Release configuration */,
 				DDD /* Sources */,
 				BBB /* Frameworks */,
 				FFF /* Resources */,
@@ -923,28 +932,13 @@
 		};
 /* End PBXProject section */
 
-/* Begin PBXShellScriptBuildPhase section */
-        RELEASECHECK = {
-            isa = PBXShellScriptBuildPhase;
-            alwaysOutOfDate = 1;
-            buildActionMask = 2147483647;
-            files = ();
-            inputPaths = ("$(SRCROOT)/../scripts/validate-ios-release.py",);
-            name = "Validate Release configuration";
-            outputPaths = ();
-            runOnlyForDeploymentPostprocessing = 0;
-            shellPath = /bin/sh;
-            shellScript = "if [ \"$CONFIGURATION\" = Release ]; then /usr/bin/python3 \"$SRCROOT/../scripts/validate-ios-release.py\" --build-settings; fi";
-        };
-/* End PBXShellScriptBuildPhase section */
-
 /* Begin PBXResourcesBuildPhase section */
 		FFF /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				0F0 /* Assets.xcassets in Resources */,
-				PRIVBUILD,
+				PRIVBUILD /* CheeseApp/Resources/PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -956,6 +950,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		RELEASECHECK /* Validate Release configuration */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../scripts/validate-ios-release.py",
+			);
+			name = "Validate Release configuration";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"$CONFIGURATION\" = Release ]; then /usr/bin/python3 \"$SRCROOT/../scripts/validate-ios-release.py\" --build-settings; fi";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		DDD /* Sources */ = {
@@ -1244,7 +1257,7 @@
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -1277,7 +1290,7 @@
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -1362,20 +1375,20 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		PKGREF1 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/supabase/supabase-swift.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.0.0;
-			};
-		};
 		GIDPKGREF1 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 9.2.0;
+			};
+		};
+		PKGREF1 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

@@ -282,6 +282,23 @@ final class AuthBootstrapDeadline {
     }
 }
 
+/// Account deletion becomes irreversible as soon as the server RPC succeeds.
+/// Finish the user-visible logout synchronously, then run provider/session SDK
+/// cleanup as independent best-effort work so neither network can strand the
+/// settings screen in its loading state.
+@MainActor
+enum AccountDeletionFinalizer {
+    static func finalize(
+        localLogout: () -> Void,
+        localSessionCleanup: @escaping @MainActor () async -> Void,
+        providerCleanup: @escaping @MainActor () async -> Void
+    ) {
+        localLogout()
+        Task { @MainActor in await localSessionCleanup() }
+        Task { @MainActor in await providerCleanup() }
+    }
+}
+
 // MARK: - 认证服务
 @MainActor
 class AuthService: ObservableObject {
@@ -1533,6 +1550,7 @@ class AuthService: ObservableObject {
     func deactivateCurrentAccount() async throws {
         guard !isLoading else { return }
         let userId = try await requireAuthUserId()
+        let deletedSessionAccessToken = supabase.auth.currentSession?.accessToken
         let linkedGoogleSubject = supabase.auth.currentSession?.user.identities?
             .first(where: { $0.provider.lowercased() == "google" })?
             .identityData?["sub"]?.stringValue
@@ -1547,28 +1565,45 @@ class AuthService: ObservableObject {
                 .execute()
                 .value
 
-            // The database deletion is authoritative. A matching Google SDK
-            // session can then revoke its own OAuth grant without risking a
-            // different locally-signed-in Google account on shared devices.
-            await disconnectMatchingGoogleAccount(subject: linkedGoogleSubject)
-            await EngagementNotificationService.shared.unregisterCurrentDeviceTokenIfNeeded()
-            UIApplication.shared.unregisterForRemoteNotifications()
+            AccountDeletionFinalizer.finalize(
+                localLogout: { [self] in
+                    // deactivate_my_account already removes this account's
+                    // push-token rows and server sessions. Do not make either
+                    // remote cleanup a prerequisite for leaving this screen.
+                    UIApplication.shared.unregisterForRemoteNotifications()
+                    beginAccountStateTransition()
+                    clearLocalAccountData(for: userId)
+                    clearSavedAccountsFromStorage()
+                    removeRecentLoginAccountFromStorage(userId: userId)
+                    currentUser = nil
+                    isAuthenticated = false
+                    requiresProfileCompletion = false
+                    bootstrapState = .ready
+                    hasCheckedSession = false
+                    profileCompletionReturnSnapshot = nil
+                    accountIdentityStatusesCache = nil
+                    accountIdentityStatusesCacheUserId = nil
+                    accountIdentityStatusesRefreshedAt = nil
+                    activateAccountState(nil)
+                },
+                localSessionCleanup: { [weak self] in
+                    guard let self,
+                          let deletedSessionAccessToken,
+                          self.supabase.auth.currentSession?.accessToken == deletedSessionAccessToken
+                    else { return }
 
-            beginAccountStateTransition()
-            try? await supabase.auth.signOut()
-            clearLocalAccountData(for: userId)
-            clearSavedAccountsFromStorage()
-            removeRecentLoginAccountFromStorage(userId: userId)
-            currentUser = nil
-            isAuthenticated = false
-            requiresProfileCompletion = false
-            bootstrapState = .ready
-            hasCheckedSession = false
-            profileCompletionReturnSnapshot = nil
-            accountIdentityStatusesCache = nil
-            accountIdentityStatusesCacheUserId = nil
-            accountIdentityStatusesRefreshedAt = nil
-            activateAccountState(nil)
+                    // The SDK removes its persisted session before contacting
+                    // the logout endpoint. Keep this best-effort because the
+                    // database RPC has already revoked the server session.
+                    try? await self.supabase.auth.signOut(scope: .local)
+                },
+                providerCleanup: { [weak self] in
+                    // Only revoke the Google grant that belonged to the
+                    // deleted Supabase identity. This may require the network,
+                    // so it must never block the account-deletion UI.
+                    await self?.disconnectMatchingGoogleAccount(subject: linkedGoogleSubject)
+                }
+            )
         } catch {
             let message = "注销账号失败：\(AppErrorMessage.userMessage(for: error))"
             errorMessage = message

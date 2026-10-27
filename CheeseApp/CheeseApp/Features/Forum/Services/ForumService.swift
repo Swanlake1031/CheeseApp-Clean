@@ -25,6 +25,7 @@ struct ForumPostItem: Identifiable, Hashable {
     let isAnonymous: Bool
     let isAuthorOfficial: Bool
     var isAuthorMcMasterVerified: Bool = false
+    var authorSchoolName: String? = nil
     let timeAgo: String
     let createdAt: Date
     var likes: Int
@@ -95,6 +96,7 @@ struct ForumCommentItem: Identifiable, Hashable {
     let authorAvatar: String?
     let isAuthorOfficial: Bool
     var isAuthorMcMasterVerified: Bool = false
+    var authorSchoolName: String? = nil
     var isAuthorDeactivated: Bool = false
 
     /// Keep retained automated comments in the database, but do not present
@@ -1201,7 +1203,7 @@ class ForumService: ObservableObject {
             let idFilters = userIds.map { $0 as any PostgrestFilterValue }
             let profiles: [DBProfileLite] = try await supabase
                 .database("profile_public_view")
-                .select("id,full_name,avatar_url,is_official,is_mcmaster_verified")
+                .select("id,full_name,avatar_url,university,is_official,is_mcmaster_verified")
                 .`in`("id", values: idFilters)
                 .execute()
                 .value
@@ -1242,6 +1244,9 @@ class ForumService: ObservableObject {
                 isAuthorMcMasterVerified: !row.isAnonymous
                     && row.authorIsDeactivated != true
                     && profile?.isMcMasterVerified == true,
+                authorSchoolName: row.isAnonymous || row.authorIsDeactivated == true
+                    ? nil
+                    : profile?.university,
                 isAuthorDeactivated: row.authorIsDeactivated == true
             )
         }
@@ -1426,6 +1431,7 @@ class ForumService: ObservableObject {
             isAnonymous: dbPost.isAnonymous,
             isAuthorOfficial: !dbPost.isAnonymous && dbPost.userOfficial == true,
             isAuthorMcMasterVerified: !dbPost.isAnonymous && dbPost.userMcMasterVerified == true,
+            authorSchoolName: dbPost.isAnonymous ? nil : dbPost.userUniversity,
             timeAgo: Formatters.formatCompactTimeAgo(dbPost.createdAt, useJustNow: true),
             createdAt: dbPost.createdAt,
             likes: dbPost.likeCount ?? 0,
@@ -1558,6 +1564,7 @@ struct DBForumPost: Codable, Identifiable {
     let userAvatar: String?
     let userOfficial: Bool?
     var userMcMasterVerified: Bool? = nil
+    var userUniversity: String? = nil
     let viewerOwnsPost: Bool?
     let images: [DBForumImage]?
 
@@ -1581,6 +1588,7 @@ struct DBForumPost: Codable, Identifiable {
         case userAvatar = "user_avatar"
         case userOfficial = "user_official"
         case userMcMasterVerified = "user_mcmaster_verified"
+        case userUniversity = "user_university"
         case viewerOwnsPost = "viewer_owns_post"
         case images
     }
@@ -1710,6 +1718,7 @@ struct DBProfileLite: Codable {
     let fullName: String?
     let avatarUrl: String?
     let email: String?
+    let university: String?
     let isOfficial: Bool?
     var isMcMasterVerified: Bool? = nil
 
@@ -1718,6 +1727,7 @@ struct DBProfileLite: Codable {
         case fullName = "full_name"
         case avatarUrl = "avatar_url"
         case email
+        case university
         case isOfficial = "is_official"
         case isMcMasterVerified = "is_mcmaster_verified"
     }

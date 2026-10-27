@@ -1,6 +1,19 @@
 # Current recommendation system — source of truth
 
-Last verified: **2026-09-11, America/Toronto**. Repository: **Swanlake1031/CheeseApp-Clean**.
+Last verified: **2026-09-13, America/Toronto**. Repository: **Swanlake1031/CheeseApp-Clean**.
+
+**Deployed emergency gate rollback (2026-09-13):** migration `20260913211512`
+sets `cross_school_configuration.gate_enabled=false`. This prevents new accounts
+at schools other than McMaster from receiving an empty Forum while the external
+embedding/scoring provider is paused for the 13+ release. The migration changes
+only the eligibility switch; it does not change V1 ranking, stored model data,
+session size/order, refresh, pagination, continuation or forum content. The
+configuration revision invalidates sessions created under the gated policy so
+the next Home load can rebuild them without cross-school filtering. This entry
+was applied to the linked production database and verified read-only: gate is
+`false`, scoring remains `true`, shadow remains `false`, rollout remains `100`,
+threshold remains `0.55`, and configuration revision is `4`. No iOS client
+release is required for this server-side switch.
 
 **Deployed TTL-only change (2026-09-11):** migration `20260911164610` is applied
 to production. The verified server default is now 15 minutes for new sessions.
@@ -42,9 +55,9 @@ Continuation is not a new ranker and must not be called V3.
 | Client contract header | `x-cheese-recommendation-contract: 2` | Required for supported-client V2 gating |
 | Continuation RPC | `get_forum_continuation_page` | Chronological browsing after the ranked batch |
 
-Production configuration was re-read for this document: ranking rollout 100%,
-gate rollout 100%, scoring on, gate on, cross-school shadow off. This says nothing
-about independent legacy V1/worker shadow switches.
+Production configuration was re-read after the rollback: ranking rollout 100%,
+gate rollout 100% but `gate_enabled=false`, scoring on, cross-school shadow off.
+This says nothing about independent legacy V1/worker shadow switches.
 
 Deployed migrations:
 
@@ -54,6 +67,12 @@ Deployed migrations:
 - `20260910190417_soften_recommendation_ignore_penalty.sql`: softer ignore penalty.
 - `20260910215652_home_forum_session_lifecycle.sql`: reusable Home Forum session RPCs.
 - `20260911164610_recommendation_session_ttl_15_minutes.sql`: 15-minute TTL for new sessions.
+
+Deployed migration:
+
+- `20260913211512_disable_cross_school_recommendation_gate.sql`: temporarily
+  disable the V2 eligibility gate while preserving the V1 ranker and browsing
+  lifecycle. Applied to production on 2026-09-13; no client release required.
 
 **The updated iOS code is in this workspace; these changes have not been released
 to TestFlight/App Store by this task.** Do not claim an existing installed binary
@@ -123,6 +142,11 @@ V2 compares the post's immutable `forum_posts.origin_school_id` with the viewer'
 - Known same school: pass the classifier gate, but not bypass normal protections.
 - Different schools: approved current model and valid cached `q >= 0.55` required.
 - Unknown school or missing/invalid/stale foreign score: fail closed.
+
+These are the preserved gate semantics, but the gate is bypassed whenever
+`cross_school_configuration.gate_enabled=false`. The deployed 2026-09-13
+rollback uses that existing switch; it does not delete or redefine the
+classifier policy.
 
 `q = sigmoid(w · post_embedding + b)`. It is an eligibility decision, **not an
 extra ranking-score term**. Display text alone does not define a user's school.

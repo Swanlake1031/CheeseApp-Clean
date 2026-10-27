@@ -817,38 +817,89 @@ struct SchoolStudentBadge: View {
     private var option: CheeseUniversityOption? { CheeseUniversityOption.option(matching: schoolName) }
     private var code: String { option?.badgeCode ?? "✓" }
     private var label: String {
-        if let option { return "\(option.name) 学生" }
+        if let option { return option.studentBadgeName }
         return L10n.tr("Verified Student", "学生认证")
     }
+    private var palette: SchoolBadgePalette { SchoolBadgePalette(schoolID: option?.id) }
 
     var body: some View {
         HStack(spacing: 4) {
             ZStack {
-                Image(systemName: "shield.fill")
-                    .foregroundStyle(AppColors.accentStrong)
+                Image(systemName: "hexagon.fill")
+                    .foregroundStyle(palette.primary)
                 Text(code)
-                    .font(.system(size: 7, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .font(.system(size: code.count >= 3 ? 5.5 : 7.5, weight: .black, design: .rounded))
+                    .foregroundStyle(palette.mark)
                     .offset(y: -0.5)
             }
-            .font(.system(size: style == .label ? 15 : 14, weight: .semibold))
+            .font(.system(size: style == .label ? 16 : 15, weight: .semibold))
 
             if style == .label {
                 Text(label)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(AppColors.textPrimary)
+                    .foregroundStyle(palette.primary)
             }
         }
         .padding(.horizontal, style == .label ? 7 : 0)
         .padding(.vertical, style == .label ? 4 : 0)
         .background {
             if style == .label {
-                Capsule().fill(AppColors.accent.opacity(0.24))
+                Capsule().fill(palette.background)
             }
         }
         .fixedSize()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(label))
+    }
+}
+
+private struct SchoolBadgePalette {
+    let primary: Color
+    let mark: Color
+    let background: Color
+
+    init(schoolID: String?) {
+        let colors: (UInt32, UInt32)
+        switch schoolID {
+        case "university_of_alberta": colors = (0x007C41, 0xFFDB05)
+        case "university_of_british_columbia": colors = (0x002145, 0xFFFFFF)
+        case "brock_university": colors = (0xCC0000, 0xFFFFFF)
+        case "university_of_calgary": colors = (0xD6001C, 0xFFCD00)
+        case "carleton_university": colors = (0xC8102E, 0xFFFFFF)
+        case "concordia_university": colors = (0x912338, 0xF2A900)
+        case "dalhousie_university": colors = (0x00205B, 0xFFD100)
+        case "university_of_guelph": colors = (0xB1272C, 0xFFC72C)
+        case "simon_fraser_university": colors = (0xCC0633, 0xFFFFFF)
+        case "lakehead_university": colors = (0x005DAA, 0xFFFFFF)
+        case "mcgill_university": colors = (0xED1B2F, 0xFFFFFF)
+        case "university_of_manitoba": colors = (0x7A0019, 0xFFB81C)
+        case "mcmaster_university": colors = (0x7A003C, 0xFFB81C)
+        case "universite_de_montreal": colors = (0x0057B8, 0xFFFFFF)
+        case "ontario_tech_university": colors = (0x003C71, 0xF15A22)
+        case "queens_university": colors = (0x002452, 0xFDBB30)
+        case "university_of_toronto": colors = (0x1E3765, 0xFFFFFF)
+        case "toronto_metropolitan_university": colors = (0x004C9B, 0xFFDC00)
+        case "trent_university": colors = (0x154734, 0xFFFFFF)
+        case "university_of_waterloo": colors = (0x111111, 0xFFD54F)
+        case "york_university": colors = (0xE31837, 0xFFFFFF)
+        case "ocad_university": colors = (0x111111, 0xFFFFFF)
+        case "redeemer_university": colors = (0x004B8D, 0xFFFFFF)
+        case "university_of_guelph_humber": colors = (0x003B5C, 0xF5A800)
+        default: colors = (0x6B7280, 0xFFFFFF)
+        }
+        primary = Color(schoolBadgeRGB: colors.0)
+        mark = Color(schoolBadgeRGB: colors.1)
+        background = Color(schoolBadgeRGB: colors.0).opacity(0.12)
+    }
+}
+
+private extension Color {
+    init(schoolBadgeRGB value: UInt32) {
+        self.init(
+            red: Double((value >> 16) & 0xFF) / 255,
+            green: Double((value >> 8) & 0xFF) / 255,
+            blue: Double(value & 0xFF) / 255
+        )
     }
 }
 

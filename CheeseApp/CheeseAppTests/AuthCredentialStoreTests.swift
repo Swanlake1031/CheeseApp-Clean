@@ -48,6 +48,33 @@ final class AuthCredentialStoreTests: XCTestCase {
         XCTAssertTrue(completed)
     }
 
+    @MainActor
+    func testAccountDeletionFinalizerSchedulesCleanupAfterLocalLogout() async {
+        var events: [String] = []
+        let cleanupFinished = expectation(description: "Background account cleanup finished")
+        cleanupFinished.expectedFulfillmentCount = 2
+
+        AccountDeletionFinalizer.finalize(
+            localLogout: {
+                events.append("local")
+            },
+            localSessionCleanup: {
+                events.append("session")
+                cleanupFinished.fulfill()
+            },
+            providerCleanup: {
+                events.append("provider")
+                cleanupFinished.fulfill()
+            }
+        )
+
+        XCTAssertEqual(events, ["local"])
+        await fulfillment(of: [cleanupFinished], timeout: 1)
+        XCTAssertEqual(events.first, "local")
+        XCTAssertTrue(events.contains("session"))
+        XCTAssertTrue(events.contains("provider"))
+    }
+
     func testAppleAuthorizationCancellationIsRecognized() {
         let cancellation = NSError(
             domain: "com.apple.AuthenticationServices.AuthorizationError",
